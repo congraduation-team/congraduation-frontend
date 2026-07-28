@@ -13,15 +13,18 @@ export class ApiError extends Error {
 
 async function parseError(res: Response) {
   let body: unknown
+  const text = await res.text().catch(() => '')
   try {
-    body = await res.json()
+    body = text ? JSON.parse(text) : null
   } catch {
-    body = await res.text().catch(() => null)
+    body = text
   }
   const message =
     typeof body === 'object' && body && 'message' in body
       ? String((body as { message: unknown }).message)
-      : `요청 실패 (${res.status})`
+      : typeof body === 'string' && body.trim()
+        ? body.trim()
+        : `요청 실패 (${res.status})`
   throw new ApiError(res.status, message, body)
 }
 
