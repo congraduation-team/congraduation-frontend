@@ -16,11 +16,22 @@ async function readRawBody(req: VercelRequest): Promise<Buffer | undefined> {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const parts = req.query.path
-    const subpath = Array.isArray(parts) ? parts.join('/') : String(parts ?? '')
+    const pathParam = req.query.path
+    const subpath = Array.isArray(pathParam)
+      ? pathParam.join('/')
+      : String(pathParam ?? '')
+
+    if (!subpath || subpath === 'proxy') {
+      res.status(400).json({ message: 'API 경로가 필요합니다.' })
+      return
+    }
+
     const searchIndex = req.url?.indexOf('?') ?? -1
-    const search = searchIndex >= 0 ? req.url!.slice(searchIndex) : ''
-    const targetUrl = `http://3.36.38.242/api/${subpath}${search}`
+    const rawSearch = searchIndex >= 0 ? req.url!.slice(searchIndex + 1) : ''
+    const params = new URLSearchParams(rawSearch)
+    params.delete('path')
+    const search = params.toString()
+    const targetUrl = `http://3.36.38.242/api/${subpath}${search ? `?${search}` : ''}`
 
     const headers: Record<string, string> = {}
     for (const [key, value] of Object.entries(req.headers)) {
