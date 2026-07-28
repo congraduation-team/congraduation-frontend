@@ -1,17 +1,46 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ApiError } from '../api/client'
+import { getTranscriptStatus, login } from '../api/endpoints'
 import { BrandHeader } from '../components/common/BrandHeader'
 import { UniversitySeal } from '../components/common/UniversitySeal'
+import { useAuth } from '../context/AuthContext'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const { setStudent } = useAuth()
+  const [userId, setUserId] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!agreed) return
-    navigate('/upload')
+    if (!agreed || loading) return
+
+    setLoading(true)
+    setError(null)
+    try {
+      const student = await login(userId.trim(), password)
+      setStudent(student)
+
+      try {
+        const status = await getTranscriptStatus(student.id)
+        navigate(status.hasTranscript ? '/dashboard' : '/upload', { replace: true })
+      } catch {
+        navigate('/upload', { replace: true })
+      }
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : '로그인에 실패했습니다. 학번과 비밀번호를 확인해주세요.'
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -29,6 +58,8 @@ export function LoginPage() {
             <input
               type="text"
               required
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
               placeholder="학번을 입력해주세요."
               className="w-full rounded-lg bg-[#f3f4f6] px-4 py-3.5 text-sm outline-none ring-sejong placeholder:text-[#b0b5bd] focus:ring-2"
             />
@@ -40,6 +71,8 @@ export function LoginPage() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="세종대학교 포털 비밀번호를 입력해주세요."
                 className="w-full rounded-lg bg-[#f3f4f6] px-4 py-3.5 pr-12 text-sm outline-none ring-sejong placeholder:text-[#b0b5bd] focus:ring-2"
               />
@@ -78,12 +111,14 @@ export function LoginPage() {
             개인정보 수집에 동의합니다.
           </label>
 
+          {error && <p className="text-center text-sm text-sejong">{error}</p>}
+
           <button
             type="submit"
-            disabled={!agreed}
+            disabled={!agreed || loading}
             className="w-full rounded-full bg-sejong py-3.5 text-base font-bold text-white transition hover:bg-sejong-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
-            로그인
+            {loading ? '로그인 중...' : '로그인'}
           </button>
         </form>
       </div>

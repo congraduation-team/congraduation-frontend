@@ -1,25 +1,56 @@
-import { useRef, useState, type DragEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ApiError } from '../api/client'
+import { getTranscriptStatus, uploadTranscript } from '../api/endpoints'
 import { BrandHeader } from '../components/common/BrandHeader'
 import { UniversitySeal } from '../components/common/UniversitySeal'
+import { useAuth } from '../context/AuthContext'
 
 export function UploadPage() {
   const navigate = useNavigate()
+  const { student } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
-  const [fileName, setFileName] = useState<string | null>(null)
+  const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [checking, setChecking] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const pickFile = (file?: File | null) => {
-    if (!file) return
-    if (!file.name.toLowerCase().endsWith('.xlsx')) {
-      alert('XLSX 파일만 업로드할 수 있습니다.')
+  useEffect(() => {
+    if (!student) return
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const status = await getTranscriptStatus(student.id)
+        if (!cancelled && status.hasTranscript) {
+          navigate('/dashboard', { replace: true })
+          return
+        }
+      } catch {
+        // keep upload screen
+      } finally {
+        if (!cancelled) setChecking(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [student, navigate])
+
+  const pickFile = (next?: File | null) => {
+    if (!next) return
+    if (!next.name.toLowerCase().endsWith('.xlsx')) {
+      setError('XLSX 파일만 업로드할 수 있습니다.')
       return
     }
-    if (file.size > 1024 * 1024) {
-      alert('파일 용량은 최대 1MB입니다.')
+    if (next.size > 1024 * 1024) {
+      setError('파일 용량은 최대 1MB입니다.')
       return
     }
-    setFileName(file.name)
+    setError(null)
+    setFile(next)
   }
 
   const onDrop = (e: DragEvent) => {
@@ -28,9 +59,28 @@ export function UploadPage() {
     pickFile(e.dataTransfer.files?.[0])
   }
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    navigate('/dashboard')
+    if (!student || !file || loading) return
+
+    setLoading(true)
+    setError(null)
+    try {
+      await uploadTranscript(student.id, file)
+      navigate('/dashboard', { replace: true })
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : '업로드에 실패했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white text-sm text-ink-muted">
+        성적 정보를 확인하는 중...
+      </div>
+    )
   }
 
   return (
@@ -65,7 +115,7 @@ export function UploadPage() {
           <p className="text-sm text-ink-muted">파일 형식 : XLSX</p>
           <p className="mt-1 text-sm text-ink-muted">파일 용량 : 최대 1MB</p>
           <p className="mt-3 text-xs text-ink-faint">*업로드한 파일은 서버에 별도로 저장되지 않음*</p>
-          {fileName && <p className="mt-4 text-sm font-semibold text-sejong">{fileName}</p>}
+          {file && <p className="mt-4 text-sm font-semibold text-sejong">{file.name}</p>}
         </button>
 
         <input
@@ -77,12 +127,14 @@ export function UploadPage() {
         />
 
         <p className="mt-5 text-sm font-medium text-ink">파일을 드래그하거나 클릭하여 선택해주세요!</p>
+        {error && <p className="mt-3 text-sm text-sejong">{error}</p>}
 
         <button
           type="submit"
-          className="mt-10 w-full max-w-md rounded-full bg-sejong py-3.5 text-base font-bold text-white transition hover:bg-sejong-dark"
+          disabled={!file || loading}
+          className="mt-10 w-full max-w-md rounded-full bg-sejong py-3.5 text-base font-bold text-white transition hover:bg-sejong-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          완료
+          {loading ? '업로드 중...' : '완료'}
         </button>
       </form>
     </div>
