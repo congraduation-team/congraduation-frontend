@@ -9,12 +9,6 @@ export default defineConfig({
       '/api': {
         target: 'http://3.36.38.242',
         changeOrigin: true,
-        configure: (proxy) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.removeHeader('origin')
-            proxyReq.removeHeader('referer')
-          })
-        },
       },
     },
   },
