@@ -76,7 +76,7 @@ export function MyCoursesPage() {
         </p>
       </div>
 
-      {majorCredits && (
+      {majorCredits ? (
         <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <CreditStat
             label="전공 필수"
@@ -101,6 +101,20 @@ export function MyCoursesPage() {
             value={`${majorCredits.totalCourseCount ?? 0}`}
             unit="과목"
             hint={totalListedCredits > 0 ? `목록 합계 ${totalListedCredits}학점` : undefined}
+          />
+        </section>
+      ) : (
+        <section className="grid gap-3 sm:grid-cols-2">
+          <CreditStat
+            label="이수 학점 합계"
+            value={`${totalListedCredits}`}
+            unit="학점"
+            accent
+          />
+          <CreditStat
+            label="이수 과목"
+            value={`${sections.reduce((n, s) => n + s.courses.length, 0)}`}
+            unit="과목"
           />
         </section>
       )}
