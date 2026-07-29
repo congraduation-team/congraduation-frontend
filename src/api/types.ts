@@ -141,3 +141,140 @@ export type TranscriptUploadResponse = {
     gradePoint?: string
   }>
 }
+
+export type AbeekCategoryProgress = {
+  earnedCredits?: string
+  requiredCredits?: string
+  satisfied?: boolean
+  progressPercent?: string
+}
+
+export type AbeekRequiredCourseStatus = {
+  courseCode: string
+  courseName: string
+  completed: boolean
+  waived?: boolean
+  note?: string
+}
+
+export type AbeekDesignLevel = 'NONE' | 'BASIC' | 'ELEMENT' | 'COMPREHENSIVE'
+
+export type AbeekDesignCourseResult = {
+  courseCode: string
+  courseName: string
+  takenYear?: number
+  takenSemester?: number
+  designLevel?: AbeekDesignLevel
+  rawDesignCredits?: number
+  recognizedDesignCredits?: number
+  recognized?: boolean
+  reason?: string
+}
+
+export type AbeekDesignEvaluationResult = {
+  recognizedDesignCredits?: number
+  hasBasicDesign?: boolean
+  hasElementDesign?: boolean
+  hasComprehensiveDesign?: boolean
+  sequenceSatisfied?: boolean
+  courses?: AbeekDesignCourseResult[]
+}
+
+export type AbeekEvaluationResponse = {
+  studentId?: string
+  studentName?: string
+  entranceYear?: number
+  graduationAbeekYear?: number
+  overallSatisfied?: boolean
+  general?: AbeekCategoryProgress
+  bsm?: AbeekCategoryProgress
+  major?: AbeekCategoryProgress
+  design?: AbeekCategoryProgress
+  designSequenceSatisfied?: boolean
+  designDetail?: AbeekDesignEvaluationResult
+  entranceRequiredCourses?: AbeekRequiredCourseStatus[]
+  waivedGraduationOnlyCourses?: AbeekRequiredCourseStatus[]
+  messages?: string[]
+}
+
+export type CurriculumCourseCategory = 'GENERAL' | 'BSM' | 'MAJOR'
+export type CurriculumCourseRole = 'REQUIRED' | 'CERT_ELECTIVE' | 'ELECTIVE' | 'BSM_REQUIRED'
+
+export type CurriculumCourse = {
+  departmentCode?: string
+  curriculumYear?: number
+  courseCode: string
+  courseName: string
+  category: CurriculumCourseCategory
+  role: CurriculumCourseRole
+  credits: number
+  designCredits?: number
+  designLevel?: AbeekDesignLevel
+  electiveArea?: string
+  recommendedTerm?: string
+  newlyIntroducedRequired?: boolean
+}
+
+export type RoadmapCourse = {
+  abeekCourseCode: string
+  courseName: string
+  category: CurriculumCourseCategory
+  categoryLabel?: string
+  professionalLiberal?: boolean
+  bsm?: boolean
+  abeekMajor?: boolean
+  role: CurriculumCourseRole
+  roleLabel?: string
+  credits: number
+  designCredits?: number
+  hasDesignCredits?: boolean
+  designLevel?: AbeekDesignLevel
+  recommendedTerm?: string
+  newlyIntroducedRequired?: boolean
+  completed?: boolean
+  takenYear?: number | null
+  takenSemester?: number | null
+  prerequisiteCourseCodes?: string[]
+}
+
+export type TermRoadmap = {
+  termKey: string
+  gradeYear?: number
+  semester?: number
+  termIndex?: number
+  categories?: Partial<Record<CurriculumCourseCategory, RoadmapCourse[]>>
+}
+
+export type RoadmapSummary = {
+  totalCourses?: number
+  completedCourses?: number
+  professionalLiberalCount?: number
+  bsmCount?: number
+  majorCount?: number
+  totalDesignCredits?: number
+  completedDesignCredits?: number
+}
+
+export type FullRoadmapResponse = {
+  departmentCode?: string
+  departmentName?: string
+  curriculumYear?: number
+  studentId?: string
+  studentName?: string
+  terms?: TermRoadmap[]
+  unscheduledCourses?: RoadmapCourse[]
+  summary?: RoadmapSummary
+}
+
+export function flattenRoadmapCourses(roadmap: FullRoadmapResponse | null | undefined): RoadmapCourse[] {
+  if (!roadmap) return []
+  const list: RoadmapCourse[] = []
+  for (const term of roadmap.terms ?? []) {
+    const categories = term.categories ?? {}
+    for (const courses of Object.values(categories)) {
+      if (Array.isArray(courses)) list.push(...courses)
+    }
+  }
+  if (roadmap.unscheduledCourses?.length) list.push(...roadmap.unscheduledCourses)
+  return list
+}

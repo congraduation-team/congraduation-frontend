@@ -1,6 +1,9 @@
 import { apiForm, apiJson } from './client'
 import type {
+  AbeekEvaluationResponse,
   AdminUploadResponse,
+  CurriculumCourse,
+  FullRoadmapResponse,
   GraduationProgressResponse,
   StudentLoginResponse,
   TranscriptStatusResponse,
@@ -43,4 +46,38 @@ export function uploadClassSchedule(file: File, year: number, semester: number) 
   form.append('year', String(year))
   form.append('semester', String(semester))
   return apiForm<AdminUploadResponse>('/api/admin/class-schedules', form)
+}
+
+/** 공학인증(ABEEK) 평가 — studentId는 학번(string) 기준 */
+export function getAbeekEvaluation(studentId: string | number) {
+  return apiJson<AbeekEvaluationResponse>(`/api/abeek/students/${studentId}/abeek-evaluation`)
+}
+
+export function getCurriculumCourses(departmentCode: string, year: number) {
+  return apiJson<CurriculumCourse[]>(
+    `/api/curriculum/${encodeURIComponent(departmentCode)}/${year}/courses`,
+  )
+}
+
+export function getDepartments() {
+  return apiJson<string[]>('/api/departments')
+}
+
+export function getAbeekFullRoadmap(options: {
+  departmentCode: string
+  curriculumYear: number
+  studentId?: string
+}) {
+  const params = new URLSearchParams({
+    departmentCode: options.departmentCode,
+    curriculumYear: String(options.curriculumYear),
+  })
+  if (options.studentId) params.set('studentId', options.studentId)
+  return apiJson<FullRoadmapResponse>(`/api/abeek/full-roadmap?${params}`)
+}
+
+export function getAbeekFullRoadmapByStudent(studentId: string) {
+  return apiJson<FullRoadmapResponse>(
+    `/api/abeek/full-roadmap/by-student?studentId=${encodeURIComponent(studentId)}`,
+  )
 }
