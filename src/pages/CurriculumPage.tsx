@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import {
   getAbeekFullRoadmap,
   getAbeekFullRoadmapByStudent,
@@ -106,9 +106,54 @@ export function CurriculumPage() {
   const [mode, setMode] = useState<'all' | 'mine'>('all')
   const [filter, setFilter] = useState<string | null>(null)
   const [paths, setPaths] = useState<Array<{ d: string; type: MapEdge['type']; key: string }>>([])
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [panning, setPanning] = useState(false)
 
+  const viewportRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const panRef = useRef(pan)
+  const zoomRef = useRef(zoom)
+  panRef.current = pan
+  zoomRef.current = zoom
+
+  const resetView = () => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
+  }
+
+  useEffect(() => {
+    resetView()
+  }, [year, departmentCode])
+
+  const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return
+    const target = e.target as HTMLElement
+    if (target.closest('button, a, select, input')) return
+
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setPanning(true)
+  }
+
+  const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!panning) return
+    setPan((prev) => {
+      const next = { x: prev.x + e.movementX, y: prev.y + e.movementY }
+      panRef.current = next
+      return next
+    })
+  }
+
+  const endPan = (e: PointerEvent<HTMLDivElement>) => {
+    if (!panning) return
+    setPanning(false)
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    } catch {
+      // already released
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -260,7 +305,37 @@ export function CurriculumPage() {
       observer.disconnect()
       window.removeEventListener('scroll', update, true)
     }
-  }, [visibleEdges, courses, mode, filter, year, departmentCode])
+  }, [visibleEdges, courses, mode, filter, year, departmentCode, zoom, pan])
+
+  useEffect(() => {
+    const viewport = viewportRef.current
+    if (!viewport || loading || error || allCourses.length === 0) return
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = viewport.getBoundingClientRect()
+      const mx = e.clientX - rect.left
+      const my = e.clientY - rect.top
+      const prevZoom = zoomRef.current
+      const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08
+      const nextZoom = Math.min(2.5, Math.max(0.45, prevZoom * factor))
+      if (nextZoom === prevZoom) return
+
+      const worldX = (mx - panRef.current.x) / prevZoom
+      const worldY = (my - panRef.current.y) / prevZoom
+      const nextPan = {
+        x: mx - worldX * nextZoom,
+        y: my - worldY * nextZoom,
+      }
+      zoomRef.current = nextZoom
+      panRef.current = nextPan
+      setZoom(nextZoom)
+      setPan(nextPan)
+    }
+
+    viewport.addEventListener('wheel', onWheel, { passive: false })
+    return () => viewport.removeEventListener('wheel', onWheel)
+  }, [loading, error, allCourses.length])
 
   return (
     <div className="flex min-h-screen bg-surface">
@@ -347,7 +422,7 @@ export function CurriculumPage() {
               label="전공(인선)"
             />
           </div>
-          <div className="ml-auto flex items-end gap-8">
+          <div className="ml-auto flex flex-wrap items-end gap-4">
             <div className="flex flex-col items-center gap-1">
               <span className="text-xs text-ink">필수 선수과목</span>
               <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
@@ -370,10 +445,11 @@ export function CurriculumPage() {
                 <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
               </svg>
             </div>
+            <p className="pb-0.5 text-xs text-ink-muted">휠: 확대/축소 · 드래그: 이동</p>
           </div>
         </div>
 
-        <div className="mt-6 overflow-x-auto rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+        <div className="mt-6 overflow-hidden rounded-2xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           {loading ? (
             <p className="py-16 text-center text-sm text-ink-muted">이수체계도를 불러오는 중...</p>
           ) : error ? (
@@ -383,7 +459,59 @@ export function CurriculumPage() {
               {departmentCode} {year}년 커리큘럼 과목이 없습니다.
             </p>
           ) : (
-            <div ref={boardRef} className="relative min-w-[1200px]">
+            <>
+              <div className="flex items-center justify-end gap-2 border-b border-[#eee] px-4 py-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.max(0.45, zoomRef.current / 1.12)
+                    zoomRef.current = next
+                    setZoom(next)
+                  }}
+                  className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
+                >
+                  −
+                </button>
+                <span className="min-w-12 text-center text-xs font-semibold text-ink-muted">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = Math.min(2.5, zoomRef.current * 1.12)
+                    zoomRef.current = next
+                    setZoom(next)
+                  }}
+                  className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={resetView}
+                  className="rounded-lg border border-[#e5e7eb] px-3 py-1 text-xs font-semibold text-ink hover:bg-surface"
+                >
+                  초기화
+                </button>
+              </div>
+
+              <div
+                ref={viewportRef}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={endPan}
+                onPointerCancel={endPan}
+                className={`relative h-[min(70vh,720px)] touch-none overflow-hidden p-5 ${
+                  panning ? 'cursor-grabbing' : 'cursor-grab'
+                }`}
+              >
+                <div
+                  ref={boardRef}
+                  className="relative min-w-[1200px] origin-top-left will-change-transform"
+                  style={{
+                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                  }}
+                >
               <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
                 <defs>
                   <marker
@@ -494,7 +622,9 @@ export function CurriculumPage() {
                   })}
                 </div>
               ))}
-            </div>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </main>
