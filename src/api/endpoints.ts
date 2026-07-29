@@ -48,13 +48,13 @@ export function uploadClassSchedule(file: File, year: number, semester: number) 
   return apiForm<AdminUploadResponse>('/api/admin/class-schedules', form)
 }
 
-/** 이수체계도(커리큘럼) 업데이트 (관리자) — 백엔드 경로에 맞게 조정 가능 */
+/** 이수체계도(커리큘럼) 업데이트 — 로그인 사용자용 */
 export function uploadCurriculumRoadmap(file: File, year: number, departmentCode: string) {
   const form = new FormData()
   form.append('file', file)
   form.append('year', String(year))
   form.append('departmentCode', departmentCode)
-  return apiForm<AdminUploadResponse>('/api/admin/curriculum-roadmaps', form)
+  return apiForm<AdminUploadResponse>('/api/curriculum/roadmaps', form)
 }
 
 /** 공학인증(ABEEK) 평가 — studentId는 학번(string) 기준 */

@@ -6,7 +6,7 @@ import {
   getDepartments,
 } from '../api/endpoints'
 import type { FullRoadmapResponse, RoadmapCourse } from '../api/types'
-import { flattenRoadmapCourses, isAdminUser } from '../api/types'
+import { flattenRoadmapCourses } from '../api/types'
 import { Sidebar } from '../components/layout/Sidebar'
 import { useAuth } from '../context/AuthContext'
 
@@ -93,7 +93,6 @@ function buildEdges(courses: RoadmapCourse[]): MapEdge[] {
 export function CurriculumPage() {
   const navigate = useNavigate()
   const { student } = useAuth()
-  const showAdmin = isAdminUser(student)
   const defaultYear =
     student?.admissionYear && YEARS.includes(student.admissionYear)
       ? student.admissionYear
@@ -304,15 +303,13 @@ export function CurriculumPage() {
             </label>
           </div>
 
-          {showAdmin && (
-            <button
-              type="button"
-              onClick={() => navigate('/admin#curriculum-upload')}
-              className="rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white transition hover:bg-sejong-dark"
-            >
-              이수체계도 업데이트
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => navigate('/curriculum/update')}
+            className="rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white transition hover:bg-sejong-dark"
+          >
+            이수체계도 업데이트
+          </button>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-6 border-b border-[#e5e5ea]">
