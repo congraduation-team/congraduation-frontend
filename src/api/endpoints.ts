@@ -1,5 +1,6 @@
 import { apiForm, apiJson } from './client'
 import type {
+  AdminUploadResponse,
   GraduationProgressResponse,
   StudentLoginResponse,
   TranscriptStatusResponse,
@@ -25,4 +26,21 @@ export function uploadTranscript(studentId: number, file: File) {
 
 export function getGraduationProgress(studentId: number) {
   return apiJson<GraduationProgressResponse>(`/api/evaluate/graduation-progress/${studentId}`)
+}
+
+/** 수강편람 업데이트 (관리자) — 백엔드 경로에 맞게 조정 가능 */
+export function uploadCourseCatalog(file: File, year: number) {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('year', String(year))
+  return apiForm<AdminUploadResponse>('/api/admin/course-catalogs', form)
+}
+
+/** 강의 시간표 업데이트 (관리자) — 백엔드 경로에 맞게 조정 가능 */
+export function uploadClassSchedule(file: File, year: number, semester: number) {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('year', String(year))
+  form.append('semester', String(semester))
+  return apiForm<AdminUploadResponse>('/api/admin/class-schedules', form)
 }

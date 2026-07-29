@@ -15,6 +15,8 @@ export type StudentMajorTrack = {
   teachingCert?: boolean
 }
 
+export type UserRole = 'USER' | 'ADMIN' | 'ROLE_USER' | 'ROLE_ADMIN' | (string & {})
+
 export type StudentLoginResponse = {
   id: number
   studentNo: string
@@ -26,6 +28,22 @@ export type StudentLoginResponse = {
   gradeLevel?: number
   admissionYear?: number
   status?: string
+  /** 백엔드가 내려주는 역할. ADMIN / ROLE_ADMIN 이면 관리자 */
+  role?: UserRole
+  /** role 대신 boolean으로 주는 경우 */
+  isAdmin?: boolean
+}
+
+export type AdminUploadResponse = {
+  message?: string
+  count?: number
+}
+
+export function isAdminUser(student: StudentLoginResponse | null | undefined): boolean {
+  if (!student) return false
+  if (student.isAdmin === true) return true
+  const role = student.role?.toUpperCase()
+  return role === 'ADMIN' || role === 'ROLE_ADMIN'
 }
 
 export type CategoryCourse = {
