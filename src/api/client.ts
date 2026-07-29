@@ -19,12 +19,21 @@ async function parseError(res: Response) {
   } catch {
     body = text
   }
-  const message =
-    typeof body === 'object' && body && 'message' in body
-      ? String((body as { message: unknown }).message)
-      : typeof body === 'string' && body.trim()
-        ? body.trim()
-        : `요청 실패 (${res.status})`
+
+  let message = `요청 실패 (${res.status})`
+  if (typeof body === 'object' && body) {
+    const record = body as Record<string, unknown>
+    if (typeof record.message === 'string' && record.message.trim()) {
+      message = record.message
+    } else if (typeof record.error === 'string' && record.error.trim()) {
+      message = record.error
+    } else if (typeof record.detail === 'string' && record.detail.trim()) {
+      message = record.detail
+    }
+  } else if (typeof body === 'string' && body.trim()) {
+    message = body.trim().slice(0, 300)
+  }
+
   throw new ApiError(res.status, message, body)
 }
 

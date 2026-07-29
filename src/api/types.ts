@@ -122,6 +122,16 @@ export type TranscriptStatusResponse = {
   hasTranscript: boolean
 }
 
+/** GET /api/transcripts/{studentDbId}/major-credits */
+export type TranscriptMajorCreditSummary = {
+  requiredMajorCredits?: number
+  electiveMajorCredits?: number
+  totalMajorCredits?: number
+  requiredMajorCourseCount?: number
+  electiveMajorCourseCount?: number
+  totalCourseCount?: number
+}
+
 export type TranscriptUploadResponse = {
   count: number
   summary?: {
@@ -182,6 +192,7 @@ export type AbeekDesignEvaluationResult = {
 
 export type AbeekEvaluationResponse = {
   studentId?: string
+  studentNo?: string
   studentName?: string
   entranceYear?: number
   graduationAbeekYear?: number

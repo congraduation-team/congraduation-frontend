@@ -9,6 +9,7 @@ import type {
   StudentLoginResponse,
   TranscriptStatusResponse,
   TranscriptUploadResponse,
+  TranscriptMajorCreditSummary,
 } from './types'
 
 export function login(userId: string, password: string) {
@@ -72,7 +73,13 @@ export async function uploadAcademicRecord(
   const departmentCode = student.tracks?.[0]?.departmentCode || 'CSE'
   const entranceYear = student.admissionYear
 
-  const transcript = await uploadTranscript(student.id, file)
+  let transcript: TranscriptUploadResponse
+  try {
+    transcript = await uploadTranscript(student.id, file)
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : '알 수 없는 오류'
+    throw new Error(`기이수 성적 저장 실패: ${detail}`)
+  }
 
   try {
     const abeek = await evaluateAbeekFromTranscript(file, {
@@ -96,6 +103,11 @@ export async function uploadAcademicRecord(
 
 export function getGraduationProgress(studentId: number) {
   return apiJson<GraduationProgressResponse>(`/api/evaluate/graduation-progress/${studentId}`)
+}
+
+/** 저장된 기이수성적 기준 전공필수/선택 학점 집계 */
+export function getTranscriptMajorCredits(studentDbId: number) {
+  return apiJson<TranscriptMajorCreditSummary>(`/api/transcripts/${studentDbId}/major-credits`)
 }
 
 /** 수강편람 업데이트 (관리자) — 백엔드 경로에 맞게 조정 가능 */

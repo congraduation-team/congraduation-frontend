@@ -132,12 +132,15 @@ export function CurriculumPage() {
     const target = e.target as HTMLElement
     if (target.closest('button, a, select, input')) return
 
+    e.preventDefault()
+    window.getSelection()?.removeAllRanges()
     e.currentTarget.setPointerCapture(e.pointerId)
     setPanning(true)
   }
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!panning) return
+    e.preventDefault()
     setPan((prev) => {
       const next = { x: prev.x + e.movementX, y: prev.y + e.movementY }
       panRef.current = next
@@ -265,18 +268,25 @@ export function CurriculumPage() {
 
     const update = () => {
       const boardRect = board.getBoundingClientRect()
+      // getBoundingClientRect는 scale 반영 → SVG 로컬 좌표로 환산
+      const scaleX = board.offsetWidth > 0 ? boardRect.width / board.offsetWidth : 1
+      const scaleY = board.offsetHeight > 0 ? boardRect.height / board.offsetHeight : 1
       const positions: Record<string, NodePos> = {}
 
       Object.entries(nodeRefs.current).forEach(([id, el]) => {
         if (!el) return
         const r = el.getBoundingClientRect()
+        const x1 = (r.left - boardRect.left) / scaleX
+        const y1 = (r.top - boardRect.top) / scaleY
+        const x2 = (r.right - boardRect.left) / scaleX
+        const y2 = (r.bottom - boardRect.top) / scaleY
         positions[id] = {
-          x1: r.left - boardRect.left,
-          y1: r.top - boardRect.top,
-          x2: r.right - boardRect.left,
-          y2: r.bottom - boardRect.top,
-          cx: r.left - boardRect.left + r.width / 2,
-          cy: r.top - boardRect.top + r.height / 2,
+          x1,
+          y1,
+          x2,
+          y2,
+          cx: (x1 + x2) / 2,
+          cy: (y1 + y2) / 2,
         }
       })
 
@@ -305,7 +315,7 @@ export function CurriculumPage() {
       observer.disconnect()
       window.removeEventListener('scroll', update, true)
     }
-  }, [visibleEdges, courses, mode, filter, year, departmentCode, zoom, pan])
+  }, [visibleEdges, courses, mode, filter, year, departmentCode])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -501,7 +511,8 @@ export function CurriculumPage() {
                 onPointerMove={onPointerMove}
                 onPointerUp={endPan}
                 onPointerCancel={endPan}
-                className={`relative h-[min(70vh,720px)] touch-none overflow-hidden p-5 ${
+                onDragStart={(e) => e.preventDefault()}
+                className={`relative h-[min(70vh,720px)] touch-none select-none overflow-hidden p-5 ${
                   panning ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
               >
