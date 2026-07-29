@@ -1,6 +1,11 @@
-import { useRef, useState, type DragEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { ApiError } from '../api/client'
-import { uploadClassSchedule, uploadCourseCatalog } from '../api/endpoints'
+import {
+  getDepartments,
+  uploadClassSchedule,
+  uploadCourseCatalog,
+  uploadCurriculumRoadmap,
+} from '../api/endpoints'
 import { Sidebar } from '../components/layout/Sidebar'
 import { useAuth } from '../context/AuthContext'
 
@@ -14,6 +19,7 @@ const semesters = [
 ]
 
 type UploadCardProps = {
+  id?: string
   title: string
   description: string
   acceptHint: string
@@ -21,6 +27,9 @@ type UploadCardProps = {
   onYearChange: (year: number) => void
   semester?: number
   onSemesterChange?: (semester: number) => void
+  departmentCode?: string
+  departments?: string[]
+  onDepartmentChange?: (code: string) => void
   file: File | null
   onFile: (file: File | null) => void
   loading: boolean
@@ -30,6 +39,7 @@ type UploadCardProps = {
 }
 
 function UploadCard({
+  id,
   title,
   description,
   acceptHint,
@@ -37,6 +47,9 @@ function UploadCard({
   onYearChange,
   semester,
   onSemesterChange,
+  departmentCode,
+  departments,
+  onDepartmentChange,
   file,
   onFile,
   loading,
@@ -64,6 +77,7 @@ function UploadCard({
 
   return (
     <form
+      id={id}
       onSubmit={onSubmit}
       className="flex flex-1 flex-col rounded-2xl bg-white p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]"
     >
@@ -85,6 +99,23 @@ function UploadCard({
             ))}
           </select>
         </label>
+
+        {onDepartmentChange != null && departmentCode != null && (
+          <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
+            학과
+            <select
+              value={departmentCode}
+              onChange={(e) => onDepartmentChange(e.target.value)}
+              className="rounded-lg border border-[#e5e7eb] bg-panel px-3 py-2 text-sm font-medium text-ink outline-none focus:ring-2 focus:ring-sejong/30"
+            >
+              {(departments ?? [departmentCode]).map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         {onSemesterChange != null && semester != null && (
           <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
@@ -145,6 +176,7 @@ function UploadCard({
 
 export function AdminPage() {
   const { student } = useAuth()
+  const [departments, setDepartments] = useState<string[]>(['CSE'])
 
   const [catalogYear, setCatalogYear] = useState(currentYear)
   const [catalogFile, setCatalogFile] = useState<File | null>(null)
@@ -158,6 +190,36 @@ export function AdminPage() {
   const [scheduleLoading, setScheduleLoading] = useState(false)
   const [scheduleMessage, setScheduleMessage] = useState<string | null>(null)
   const [scheduleError, setScheduleError] = useState<string | null>(null)
+
+  const [roadmapYear, setRoadmapYear] = useState(currentYear)
+  const [roadmapDept, setRoadmapDept] = useState(student?.tracks?.[0]?.departmentCode || 'CSE')
+  const [roadmapFile, setRoadmapFile] = useState<File | null>(null)
+  const [roadmapLoading, setRoadmapLoading] = useState(false)
+  const [roadmapMessage, setRoadmapMessage] = useState<string | null>(null)
+  const [roadmapError, setRoadmapError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const list = await getDepartments()
+        if (cancelled || !Array.isArray(list) || list.length === 0) return
+        setDepartments(list)
+        setRoadmapDept((prev) => (list.includes(prev) ? prev : list.includes('CSE') ? 'CSE' : list[0]))
+      } catch {
+        // keep default
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (window.location.hash === '#curriculum-upload') {
+      document.getElementById('curriculum-upload')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [])
 
   const submitCatalog = async (e: FormEvent) => {
     e.preventDefault()
@@ -197,6 +259,25 @@ export function AdminPage() {
     }
   }
 
+  const submitRoadmap = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!roadmapFile || roadmapLoading) return
+    setRoadmapLoading(true)
+    setRoadmapError(null)
+    setRoadmapMessage(null)
+    try {
+      const res = await uploadCurriculumRoadmap(roadmapFile, roadmapYear, roadmapDept)
+      setRoadmapMessage(res.message ?? '이수체계도가 업데이트되었습니다.')
+      setRoadmapFile(null)
+    } catch (err) {
+      setRoadmapError(
+        err instanceof ApiError ? err.message : '이수체계도 업로드에 실패했습니다.',
+      )
+    } finally {
+      setRoadmapLoading(false)
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-surface">
       <Sidebar />
@@ -205,11 +286,11 @@ export function AdminPage() {
           <p className="text-xs font-semibold tracking-wide text-sejong">ADMIN</p>
           <h1 className="mt-1 text-2xl font-extrabold text-ink">관리자</h1>
           <p className="mt-2 text-sm text-ink-muted">
-            {student?.name}님 · 수강편람·강의 시간표 데이터를 업데이트할 수 있습니다.
+            {student?.name}님 · 수강편람·강의 시간표·이수체계도 데이터를 업데이트할 수 있습니다.
           </p>
         </header>
 
-        <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="flex flex-col gap-6 xl:flex-row">
           <UploadCard
             title="수강편람"
             description="연도별 수강편람(개설 과목·이수구분 등) 파일을 업로드합니다."
@@ -246,6 +327,28 @@ export function AdminPage() {
             message={scheduleMessage}
             error={scheduleError}
             onSubmit={submitSchedule}
+          />
+
+          <UploadCard
+            id="curriculum-upload"
+            title="이수체계도"
+            description="학과·연도별 이수체계도(과목·선수과목) 파일을 업로드합니다."
+            acceptHint="파일 형식 : XLSX / XLS / CSV"
+            year={roadmapYear}
+            onYearChange={setRoadmapYear}
+            departmentCode={roadmapDept}
+            departments={departments}
+            onDepartmentChange={setRoadmapDept}
+            file={roadmapFile}
+            onFile={(f) => {
+              setRoadmapFile(f)
+              setRoadmapError(null)
+              setRoadmapMessage(null)
+            }}
+            loading={roadmapLoading}
+            message={roadmapMessage}
+            error={roadmapError}
+            onSubmit={submitRoadmap}
           />
         </div>
       </main>
