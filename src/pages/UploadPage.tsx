@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ApiError } from '../api/client'
-import { evaluateAbeekFromTranscript, getTranscriptStatus, uploadTranscript } from '../api/endpoints'
+import { getTranscriptStatus, uploadAcademicRecord } from '../api/endpoints'
 import { BrandHeader } from '../components/common/BrandHeader'
 import { UniversitySeal } from '../components/common/UniversitySeal'
 import { useAuth } from '../context/AuthContext'
@@ -72,23 +71,11 @@ export function UploadPage() {
     setLoading(true)
     setError(null)
     try {
-      await uploadTranscript(student.id, file)
-
-      // 졸업요건 업로드와 별개로 ABEEK 공학인증 학생/이수 정보를 등록
-      try {
-        await evaluateAbeekFromTranscript(file, {
-          studentId: student.studentNo || String(student.id),
-          name: student.name,
-          entranceYear: student.admissionYear,
-          departmentCode: student.tracks?.[0]?.departmentCode || 'CSE',
-        })
-      } catch (abeekErr) {
-        console.warn('ABEEK evaluate-from-transcript failed', abeekErr)
-      }
-
+      // 한 번 업로드로 졸업요건 + 공학인증(ABEEK) 모두 반영
+      await uploadAcademicRecord(student, file)
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '업로드에 실패했습니다.')
+      setError(err instanceof Error ? err.message : '업로드에 실패했습니다.')
     } finally {
       setLoading(false)
     }
@@ -117,9 +104,12 @@ export function UploadPage() {
         <p className="mt-3 text-center text-xs text-ink-muted">
           학사정보시스템 &gt; 수업/성적 &gt; 성적 및 강의 평가 &gt; 기이수성적조회 엑셀 다운로드
         </p>
+        <p className="mt-2 text-center text-xs font-medium text-ink">
+          한 번 업로드하면 졸업요건과 공학인증에 함께 반영됩니다.
+        </p>
         {isUpdate && (
-          <p className="mt-2 text-center text-xs text-ink-faint">
-            새 파일을 올리면 기존 기이수 성적 정보가 갱신됩니다.
+          <p className="mt-1 text-center text-xs text-ink-faint">
+            새 파일을 올리면 기존 기이수·공학인증 정보가 갱신됩니다.
           </p>
         )}
 
@@ -151,14 +141,14 @@ export function UploadPage() {
         />
 
         <p className="mt-5 text-sm font-medium text-ink">파일을 드래그하거나 클릭하여 선택해주세요!</p>
-        {error && <p className="mt-3 text-sm text-sejong">{error}</p>}
+        {error && <p className="mt-3 max-w-md text-center text-sm text-sejong">{error}</p>}
 
         <button
           type="submit"
           disabled={!file || loading}
           className="mt-10 w-full max-w-md rounded-full bg-sejong py-3.5 text-base font-bold text-white transition hover:bg-sejong-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? '업로드 중...' : isUpdate ? '업데이트' : '완료'}
+          {loading ? '졸업요건·공학인증 반영 중...' : isUpdate ? '업데이트' : '완료'}
         </button>
 
         {isUpdate && (

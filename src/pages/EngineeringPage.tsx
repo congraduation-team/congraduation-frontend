@@ -220,14 +220,14 @@ export function EngineeringPage() {
       <div className="rounded-2xl bg-white p-8 text-center shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
         <p className="text-sm text-sejong">{error ?? '데이터가 없습니다.'}</p>
         <p className="mt-2 text-xs text-ink-muted">
-          기이수 성적은 졸업요건용이고, 공학인증은 ABEEK 연동 업로드가 한 번 더 필요합니다.
+          기이수 성적 업로드 한 번으로 졸업요건·공학인증이 함께 반영됩니다.
         </p>
         <button
           type="button"
           onClick={() => navigate('/upload?update=1')}
           className="mt-4 rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white"
         >
-          기이수 성적 다시 업로드하기
+          기이수 성적 업로드하기
         </button>
       </div>
     )
