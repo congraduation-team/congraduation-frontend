@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
-import { getTranscriptStatus, uploadTranscript } from '../api/endpoints'
+import { evaluateAbeekFromTranscript, getTranscriptStatus, uploadTranscript } from '../api/endpoints'
 import { BrandHeader } from '../components/common/BrandHeader'
 import { UniversitySeal } from '../components/common/UniversitySeal'
 import { useAuth } from '../context/AuthContext'
@@ -73,6 +73,19 @@ export function UploadPage() {
     setError(null)
     try {
       await uploadTranscript(student.id, file)
+
+      // 졸업요건 업로드와 별개로 ABEEK 공학인증 학생/이수 정보를 등록
+      try {
+        await evaluateAbeekFromTranscript(file, {
+          studentId: student.studentNo || String(student.id),
+          name: student.name,
+          entranceYear: student.admissionYear,
+          departmentCode: student.tracks?.[0]?.departmentCode || 'CSE',
+        })
+      } catch (abeekErr) {
+        console.warn('ABEEK evaluate-from-transcript failed', abeekErr)
+      }
+
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof ApiError ? err.message : '업로드에 실패했습니다.')

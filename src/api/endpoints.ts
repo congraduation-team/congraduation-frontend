@@ -1,6 +1,7 @@
 import { apiForm, apiJson } from './client'
 import type {
   AbeekEvaluationResponse,
+  AbeekTranscriptEvaluationResponse,
   AdminUploadResponse,
   CurriculumCourse,
   FullRoadmapResponse,
@@ -25,6 +26,35 @@ export function uploadTranscript(studentId: number, file: File) {
   const form = new FormData()
   form.append('file', file)
   return apiForm<TranscriptUploadResponse>(`/api/transcripts/upload/${studentId}`, form)
+}
+
+/** 기이수성적 엑셀로 ABEEK 학생 등록 + 공학인증 평가 */
+export function evaluateAbeekFromTranscript(
+  file: File,
+  options: {
+    studentId?: string
+    name?: string
+    entranceYear?: number
+    graduationAbeekYear?: number
+    departmentCode?: string
+  } = {},
+) {
+  const params = new URLSearchParams()
+  if (options.studentId) params.set('studentId', options.studentId)
+  if (options.name) params.set('name', options.name)
+  if (options.entranceYear != null) params.set('entranceYear', String(options.entranceYear))
+  if (options.graduationAbeekYear != null) {
+    params.set('graduationAbeekYear', String(options.graduationAbeekYear))
+  }
+  if (options.departmentCode) params.set('departmentCode', options.departmentCode)
+
+  const form = new FormData()
+  form.append('file', file)
+  const query = params.toString()
+  return apiForm<AbeekTranscriptEvaluationResponse>(
+    `/api/abeek/evaluate-from-transcript${query ? `?${query}` : ''}`,
+    form,
+  )
 }
 
 export function getGraduationProgress(studentId: number) {

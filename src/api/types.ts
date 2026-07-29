@@ -266,6 +266,20 @@ export type FullRoadmapResponse = {
   summary?: RoadmapSummary
 }
 
+export type AbeekTranscriptEvaluationResponse = {
+  studentId?: string
+  studentName?: string
+  inferredSejongDepartmentCode?: string
+  departmentCode?: string
+  departmentName?: string
+  entranceYear?: number
+  graduationAbeekYear?: number
+  totalCourses?: number
+  matchedCourses?: number
+  unmatchedCourses?: number
+  evaluation?: AbeekEvaluationResponse
+}
+
 export function flattenRoadmapCourses(roadmap: FullRoadmapResponse | null | undefined): RoadmapCourse[] {
   if (!roadmap) return []
   const list: RoadmapCourse[] = []
