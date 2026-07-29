@@ -102,35 +102,35 @@ export function GraduationPage() {
         </p>
       </div>
 
-      <section className="grid gap-5 xl:grid-cols-[1.7fr_1fr_1fr]">
-        <article className="rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-5 text-lg font-bold text-ink">
+      <section className="grid items-start gap-5 xl:grid-cols-[1.7fr_1fr_1fr]">
+        <article className="rounded-2xl bg-white px-7 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <h3 className="mb-4 text-lg font-bold text-ink">
             현재 {totalEarned}/{totalRequired || '-'}학점 이수 완료!
           </h3>
 
-          <div className="grid grid-cols-[1fr_1fr_auto] items-start gap-6">
+          <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-5">
             <div className="flex flex-col items-center">
               <p className="mb-2 w-full text-left text-sm font-bold text-ink">전체 학점</p>
-              <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-3 w-full justify-start" />
+              <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
               <DonutChart percent={totalPct} size={150} stroke={16} label={formatPercentLabel(totalPct)} />
             </div>
 
             <div className="flex flex-col items-center">
               <p className="mb-2 w-full text-left text-sm font-bold text-ink">전공 학점</p>
-              <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-3 w-full justify-start" />
+              <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
               <DonutChart percent={majorPct} size={150} stroke={16} label={formatPercentLabel(majorPct)} />
             </div>
 
-            <div className="flex flex-col justify-between gap-5 self-stretch py-1">
+            <div className="flex flex-col justify-center gap-3">
               <div className="flex flex-col items-center">
-                <p className="mb-1.5 w-full text-left text-sm font-bold text-ink">전공 필수</p>
-                <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
-                <DonutChart percent={majorReqPct} size={92} stroke={11} label={formatPercentLabel(majorReqPct)} />
+                <p className="mb-1 w-full text-left text-sm font-bold text-ink">전공 필수</p>
+                <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-1.5 w-full justify-start" />
+                <DonutChart percent={majorReqPct} size={88} stroke={11} label={formatPercentLabel(majorReqPct)} />
               </div>
               <div className="flex flex-col items-center">
-                <p className="mb-1.5 w-full text-left text-sm font-bold text-ink">전공 선택</p>
-                <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
-                <DonutChart percent={majorElecPct} size={92} stroke={11} label={formatPercentLabel(majorElecPct)} />
+                <p className="mb-1 w-full text-left text-sm font-bold text-ink">전공 선택</p>
+                <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-1.5 w-full justify-start" />
+                <DonutChart percent={majorElecPct} size={88} stroke={11} label={formatPercentLabel(majorElecPct)} />
               </div>
             </div>
           </div>
@@ -173,14 +173,14 @@ export function GraduationPage() {
               ].map((item, index) => (
                 <div
                   key={item.name}
-                  className={`flex items-center justify-between gap-3 px-3 py-2.5 ${
+                  className={`flex items-center justify-between gap-2 px-3 py-2.5 ${
                     index < 2 ? 'border-b border-[#e5e7eb]' : ''
                   }`}
                 >
-                  <span className="rounded-full border border-[#e5e7eb] bg-white px-3 py-1 text-sm font-medium text-ink">
+                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1 text-[13px] font-medium text-ink">
                     {item.name}
                   </span>
-                  <span className="text-sm text-ink">{item.value}</span>
+                  <span className="shrink-0 whitespace-nowrap text-sm text-ink">{item.value}</span>
                 </div>
               ))}
             </div>
@@ -202,14 +202,14 @@ export function GraduationPage() {
               ].map((item, index) => (
                 <div
                   key={item.name}
-                  className={`flex items-center justify-between gap-3 px-3 py-2.5 ${
+                  className={`flex items-center justify-between gap-2 overflow-x-auto px-3 py-2.5 ${
                     index === 0 ? 'border-b border-[#e5e7eb]' : ''
                   }`}
                 >
-                  <span className="rounded-full border border-[#e5e7eb] bg-white px-3 py-1 text-sm font-medium text-ink">
+                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1 text-[12px] font-medium leading-none text-ink">
                     {item.name}
                   </span>
-                  <span className="shrink-0 text-sm text-ink">{item.value}</span>
+                  <span className="shrink-0 whitespace-nowrap text-sm text-ink">{item.value}</span>
                 </div>
               ))}
             </div>
