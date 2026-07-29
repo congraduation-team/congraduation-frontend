@@ -77,6 +77,11 @@ export function EngineeringPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [majorOpen, setMajorOpen] = useState(false)
+  const [remainingModal, setRemainingModal] = useState<{
+    title: string
+    subtitle?: string
+    courses: Course[]
+  } | null>(null)
 
   useEffect(() => {
     if (!student) return
@@ -191,7 +196,10 @@ export function EngineeringPage() {
 
   const bsmEarned = toNumber(evaluation?.bsm?.earnedCredits)
   const bsmRequired = toNumber(evaluation?.bsm?.requiredCredits)
-  const bsmPct = toPercent(evaluation?.bsm?.progressPercent)
+  const bsmPct =
+    bsmRequired > 0
+      ? Math.max(0, Math.min(100, Math.round((bsmEarned / bsmRequired) * 100)))
+      : toPercent(evaluation?.bsm?.progressPercent)
 
   const majorEarned = toNumber(evaluation?.major?.earnedCredits)
   const majorRequired = toNumber(evaluation?.major?.requiredCredits)
@@ -207,9 +215,6 @@ export function EngineeringPage() {
     designRequired > 0
       ? Math.max(0, Math.min(100, Math.round((toNumber(designEarned) / designRequired) * 100)))
       : toPercent(evaluation?.design?.progressPercent)
-
-  const remainingLeft = designLists.remaining.slice(0, Math.ceil(designLists.remaining.length / 2))
-  const remainingRight = designLists.remaining.slice(Math.ceil(designLists.remaining.length / 2))
 
   // 인증선택은 2022~ 제도. 2021 이하 입학은 요건 없음
   const entranceYear = evaluation?.entranceYear ?? student?.admissionYear
@@ -360,77 +365,110 @@ export function EngineeringPage() {
             </section>
           </div>
         </article>
-        <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-5 text-base font-bold text-ink">
-            {displayName}님 전문교양{' '}
-            <span className="text-sejong">
-              {generalEarned}/{generalRequiredCredits || '-'}
-            </span>
-            학점 이수
-          </h3>
-
-          <div className={`grid gap-5 ${showCertElective ? 'md:grid-cols-2' : ''}`}>
-            <section>
-              <p className="mb-2 text-sm font-bold text-ink">인증필수</p>
-              <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
-              <div className="flex items-start gap-4">
-                <DonutChart
-                  percent={genReqPct}
-                  size={110}
-                  stroke={12}
-                  color="#5b6470"
-                  label={formatPercentLabel(genReqPct)}
-                />
-                <CourseMiniList
-                  title="이수한 과목"
-                  courses={generalRequired.completed.slice(0, 6)}
-                  totalValue={genReqEarned}
-                />
+        <div className="grid gap-5 lg:grid-cols-2">
+          <article className="rounded-2xl bg-white px-5 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+              <h3 className="text-base font-bold text-ink">
+                {displayName}님 전문교양{' '}
+                <span className="text-sejong">
+                  {generalEarned}/{generalRequiredCredits || '-'}
+                </span>
+                학점 이수
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {(generalRequired.remaining.length > 0 ||
+                  (showCertElective && generalElective.remaining.length > 0)) && (
+                  <RemainingButton
+                    onClick={() =>
+                      setRemainingModal({
+                        title: '전문교양 남은 과목',
+                        subtitle: showCertElective
+                          ? `인증필수 ${generalRequired.remaining.length} · 인증선택 ${generalElective.remaining.length}`
+                          : `인증필수 ${generalRequired.remaining.length}과목`,
+                        courses: [
+                          ...generalRequired.remaining,
+                          ...(showCertElective ? generalElective.remaining : []),
+                        ],
+                      })
+                    }
+                  />
+                )}
+                <CurriculumButton onClick={() => navigate('/curriculum')} />
               </div>
-            </section>
+            </div>
 
-            {showCertElective && (
+            <div className={`grid gap-5 ${showCertElective ? 'sm:grid-cols-2' : ''}`}>
               <section>
-                <p className="mb-2 text-sm font-bold text-ink">인증선택</p>
+                <p className="mb-2 text-sm font-bold text-ink">인증필수</p>
                 <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3">
                   <DonutChart
-                    percent={genElecPct}
-                    size={110}
-                    stroke={12}
+                    percent={genReqPct}
+                    size={100}
+                    stroke={11}
                     color="#5b6470"
-                    label={formatPercentLabel(genElecPct)}
+                    label={formatPercentLabel(genReqPct)}
                   />
                   <CourseMiniList
                     title="이수한 과목"
-                    courses={generalElective.completed.slice(0, 6)}
-                    totalValue={genElecEarned}
+                    courses={generalRequired.completed.slice(0, 6)}
+                    totalValue={genReqEarned}
                   />
                 </div>
               </section>
-            )}
-          </div>
 
-          <div className="mt-5 flex justify-end">
-            <CurriculumButton onClick={() => navigate('/curriculum')} />
-          </div>
-        </article>
+              {showCertElective && (
+                <section>
+                  <p className="mb-2 text-sm font-bold text-ink">인증선택</p>
+                  <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
+                  <div className="flex items-start gap-3">
+                    <DonutChart
+                      percent={genElecPct}
+                      size={100}
+                      stroke={11}
+                      color="#5b6470"
+                      label={formatPercentLabel(genElecPct)}
+                    />
+                    <CourseMiniList
+                      title="이수한 과목"
+                      courses={generalElective.completed.slice(0, 6)}
+                      totalValue={genElecEarned}
+                    />
+                  </div>
+                </section>
+              )}
+            </div>
+          </article>
 
-        <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-2 text-base font-bold text-ink">
-            BSM{' '}
-            <span className="text-sejong">
-              {bsmEarned}/{bsmRequired || '-'}
-            </span>
-            학점 이수
-          </h3>
-          <ChartLegend secondaryLabel="총 학점" className="mb-4" />
-          <div className={`grid gap-5 ${bsm.remaining.length > 0 ? 'md:grid-cols-2' : ''}`}>
-            <div className="flex items-start gap-4">
+          <article className="rounded-2xl bg-white px-5 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="text-base font-bold text-ink">
+                  BSM{' '}
+                  <span className="text-sejong">
+                    {bsmEarned}/{bsmRequired || '-'}
+                  </span>
+                  학점 이수
+                </h3>
+                <ChartLegend secondaryLabel="총 학점" className="mt-2" />
+              </div>
+              {bsm.remaining.length > 0 && (
+                <RemainingButton
+                  onClick={() =>
+                    setRemainingModal({
+                      title: 'BSM 남은 과목',
+                      subtitle: `${bsm.remaining.length}과목`,
+                      courses: bsm.remaining,
+                    })
+                  }
+                />
+              )}
+            </div>
+            <div className="flex items-start gap-3">
               <DonutChart
                 percent={bsmPct}
-                size={110}
-                stroke={12}
+                size={100}
+                stroke={11}
                 color="#5b6470"
                 label={formatPercentLabel(bsmPct)}
               />
@@ -440,37 +478,50 @@ export function EngineeringPage() {
                 totalValue={bsmEarned}
               />
             </div>
-            {bsm.remaining.length > 0 && (
-              <div className="flex items-start gap-4">
-                <CourseMiniList title="남은 과목" courses={bsm.remaining.slice(0, 6)} />
-              </div>
-            )}
-          </div>
-        </article>
+          </article>
+        </div>
 
         <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="text-base font-bold text-ink">
-            전공{' '}
-            <span className="text-sejong">
-              {majorEarned}/{majorRequired || '-'}
-            </span>
-            학점 이수
-          </h3>
-          <p className="mb-5 mt-1 text-sm text-ink-muted">
-            전공 {majorEarned}학점 · 설계 {designEarned}
-            {designRequired ? `/${designRequired}` : ''}학점 이수
-            {evaluation.designSequenceSatisfied === false ? ' · 설계 시퀀스 미충족' : ''}
-          </p>
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 className="text-base font-bold text-ink">
+                전공{' '}
+                <span className="text-sejong">
+                  {majorEarned}/{majorRequired || '-'}
+                </span>
+                학점 이수
+              </h3>
+              <p className="mt-1 text-sm text-ink-muted">
+                전공 {majorEarned}학점 · 설계 {designEarned}
+                {designRequired ? `/${designRequired}` : ''}학점 이수
+                {evaluation.designSequenceSatisfied === false ? ' · 설계 시퀀스 미충족' : ''}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(major.remaining.length > 0 || designLists.remaining.length > 0) && (
+                <RemainingButton
+                  onClick={() =>
+                    setRemainingModal({
+                      title: '전공·설계 남은 과목',
+                      subtitle: `전공 ${major.remaining.length} · 설계 ${designLists.remaining.length}`,
+                      courses: [...major.remaining, ...designLists.remaining],
+                    })
+                  }
+                />
+              )}
+              <CurriculumButton onClick={() => navigate('/curriculum')} />
+            </div>
+          </div>
 
           <div className="grid gap-5 md:grid-cols-2">
             <section>
               <p className="mb-2 text-sm font-bold text-ink">전공교과목</p>
               <ChartLegend secondaryLabel="총 학점" className="mb-3.5" />
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3">
                 <DonutChart
                   percent={majorPct}
-                  size={110}
-                  stroke={12}
+                  size={100}
+                  stroke={11}
                   color="#5b6470"
                   label={formatPercentLabel(majorPct)}
                 />
@@ -486,11 +537,11 @@ export function EngineeringPage() {
             <section>
               <p className="mb-2 text-sm font-bold text-ink">설계</p>
               <ChartLegend secondaryLabel="총 학점" className="mb-3.5" />
-              <div className="flex items-start gap-4">
+              <div className="flex items-start gap-3">
                 <DonutChart
                   percent={designPct}
-                  size={110}
-                  stroke={12}
+                  size={100}
+                  stroke={11}
                   color="#5b6470"
                   label={formatPercentLabel(designPct)}
                 />
@@ -502,16 +553,27 @@ export function EngineeringPage() {
               </div>
             </section>
           </div>
-
-          <div className="mt-5 flex justify-end">
-            <CurriculumButton onClick={() => navigate('/curriculum')} />
-          </div>
         </article>
 
         <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-2 text-base font-bold text-ink">전공 설계 자세히 보기</h3>
-          <ChartLegend secondaryLabel="총 학점" className="mb-4" />
-          <div className={`grid gap-5 ${designLists.remaining.length > 0 ? 'lg:grid-cols-[auto_1fr_1.4fr]' : 'lg:grid-cols-[auto_1fr]'}`}>
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h3 className="text-base font-bold text-ink">전공 설계 자세히 보기</h3>
+              <ChartLegend secondaryLabel="총 학점" className="mt-2" />
+            </div>
+            {designLists.remaining.length > 0 && (
+              <RemainingButton
+                onClick={() =>
+                  setRemainingModal({
+                    title: '설계 남은 과목',
+                    subtitle: `${designLists.remaining.length}과목`,
+                    courses: designLists.remaining,
+                  })
+                }
+              />
+            )}
+          </div>
+          <div className="flex items-start gap-4">
             <DonutChart
               percent={designPct}
               size={110}
@@ -519,46 +581,11 @@ export function EngineeringPage() {
               color="#5b6470"
               label={formatPercentLabel(designPct)}
             />
-
             <CourseMiniList
               title="이수한 과목"
               courses={designLists.completed}
               totalValue={designEarned}
             />
-
-            {designLists.remaining.length > 0 && (
-              <div className="min-w-0">
-                <p className="mb-2.5 text-sm font-bold text-ink">남은 과목</p>
-                <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
-                  <ul className="space-y-2">
-                    {remainingLeft.map((course) => (
-                      <li
-                        key={course.code}
-                        className="flex items-center justify-between gap-3 text-sm"
-                      >
-                        <span className="truncate text-ink">{course.name}</span>
-                        <span className="shrink-0 font-semibold text-sejong">
-                          {course.semester ?? '-'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  <ul className="space-y-2">
-                    {remainingRight.map((course) => (
-                      <li
-                        key={course.code}
-                        className="flex items-center justify-between gap-3 text-sm"
-                      >
-                        <span className="truncate text-ink">{course.name}</span>
-                        <span className="shrink-0 font-semibold text-sejong">
-                          {course.semester ?? '-'}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )}
           </div>
         </article>
 
@@ -569,8 +596,27 @@ export function EngineeringPage() {
           subtitle={`${majorEarned}학점 이수`}
           courses={major.completed}
         />
+        <CourseListModal
+          open={remainingModal != null}
+          onClose={() => setRemainingModal(null)}
+          title={remainingModal?.title ?? '남은 과목'}
+          subtitle={remainingModal?.subtitle}
+          courses={remainingModal?.courses ?? []}
+        />
       </div>
     </div>
+  )
+}
+
+function RemainingButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-panel"
+    >
+      남은 과목 보기
+    </button>
   )
 }
 
