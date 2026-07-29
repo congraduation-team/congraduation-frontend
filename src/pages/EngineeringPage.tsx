@@ -211,6 +211,10 @@ export function EngineeringPage() {
   const remainingLeft = designLists.remaining.slice(0, Math.ceil(designLists.remaining.length / 2))
   const remainingRight = designLists.remaining.slice(Math.ceil(designLists.remaining.length / 2))
 
+  // 인증선택은 2022~ 제도. 2021 이하 입학은 요건 없음
+  const entranceYear = evaluation?.entranceYear ?? student?.admissionYear
+  const showCertElective = entranceYear == null || entranceYear >= 2022
+
   if (loading) {
     return <div className="py-20 text-center text-sm text-ink-muted">공학인증을 불러오는 중...</div>
   }
@@ -365,7 +369,7 @@ export function EngineeringPage() {
             학점 이수
           </h3>
 
-          <div className="grid gap-7 md:grid-cols-2">
+          <div className={`grid gap-7 ${showCertElective ? 'md:grid-cols-2' : ''}`}>
             <section>
               <p className="mb-2 text-sm font-bold text-ink">인증필수</p>
               <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
@@ -385,24 +389,26 @@ export function EngineeringPage() {
               </div>
             </section>
 
-            <section>
-              <p className="mb-2 text-sm font-bold text-ink">인증선택</p>
-              <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
-              <div className="flex items-start gap-5">
-                <DonutChart
-                  percent={genElecPct}
-                  size={120}
-                  stroke={13}
-                  color="#5b6470"
-                  label={formatPercentLabel(genElecPct)}
-                />
-                <CourseMiniList
-                  title="이수한 과목"
-                  courses={generalElective.completed.slice(0, 6)}
-                  totalValue={genElecEarned}
-                />
-              </div>
-            </section>
+            {showCertElective && (
+              <section>
+                <p className="mb-2 text-sm font-bold text-ink">인증선택</p>
+                <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
+                <div className="flex items-start gap-5">
+                  <DonutChart
+                    percent={genElecPct}
+                    size={120}
+                    stroke={13}
+                    color="#5b6470"
+                    label={formatPercentLabel(genElecPct)}
+                  />
+                  <CourseMiniList
+                    title="이수한 과목"
+                    courses={generalElective.completed.slice(0, 6)}
+                    totalValue={genElecEarned}
+                  />
+                </div>
+              </section>
+            )}
           </div>
 
           <div className="mt-5 flex justify-end">
