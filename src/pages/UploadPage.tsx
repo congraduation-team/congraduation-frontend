@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { getTranscriptStatus, uploadTranscript } from '../api/endpoints'
 import { BrandHeader } from '../components/common/BrandHeader'
@@ -8,16 +8,22 @@ import { useAuth } from '../context/AuthContext'
 
 export function UploadPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const isUpdate = searchParams.get('update') === '1'
   const { student } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [checking, setChecking] = useState(true)
+  const [checking, setChecking] = useState(!isUpdate)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!student) return
+    if (!student || isUpdate) {
+      setChecking(false)
+      return
+    }
+
     let cancelled = false
 
     ;(async () => {
@@ -37,7 +43,7 @@ export function UploadPage() {
     return () => {
       cancelled = true
     }
-  }, [student, navigate])
+  }, [student, navigate, isUpdate])
 
   const pickFile = (next?: File | null) => {
     if (!next) return
@@ -93,11 +99,16 @@ export function UploadPage() {
       >
         <UniversitySeal />
         <h1 className="mt-6 text-center text-3xl font-extrabold text-ink">
-          기이수성적조회 엑셀 파일 업로드
+          {isUpdate ? '기이수성적 업데이트' : '기이수성적조회 엑셀 파일 업로드'}
         </h1>
         <p className="mt-3 text-center text-xs text-ink-muted">
           학사정보시스템 &gt; 수업/성적 &gt; 성적 및 강의 평가 &gt; 기이수성적조회 엑셀 다운로드
         </p>
+        {isUpdate && (
+          <p className="mt-2 text-center text-xs text-ink-faint">
+            새 파일을 올리면 기존 기이수 성적 정보가 갱신됩니다.
+          </p>
+        )}
 
         <button
           type="button"
@@ -134,8 +145,18 @@ export function UploadPage() {
           disabled={!file || loading}
           className="mt-10 w-full max-w-md rounded-full bg-sejong py-3.5 text-base font-bold text-white transition hover:bg-sejong-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {loading ? '업로드 중...' : '완료'}
+          {loading ? '업로드 중...' : isUpdate ? '업데이트' : '완료'}
         </button>
+
+        {isUpdate && (
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="mt-3 text-sm font-medium text-ink-muted hover:text-sejong"
+          >
+            대시보드로 돌아가기
+          </button>
+        )}
       </form>
     </div>
   )

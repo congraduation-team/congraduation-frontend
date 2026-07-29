@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   getAbeekFullRoadmap,
   getAbeekFullRoadmapByStudent,
@@ -91,7 +90,6 @@ function buildEdges(courses: RoadmapCourse[]): MapEdge[] {
 }
 
 export function CurriculumPage() {
-  const navigate = useNavigate()
   const { student } = useAuth()
   const defaultYear =
     student?.admissionYear && YEARS.includes(student.admissionYear)
@@ -302,14 +300,6 @@ export function CurriculumPage() {
               </select>
             </label>
           </div>
-
-          <button
-            type="button"
-            onClick={() => navigate('/curriculum/update')}
-            className="rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white transition hover:bg-sejong-dark"
-          >
-            이수체계도 업데이트
-          </button>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-6 border-b border-[#e5e5ea]">

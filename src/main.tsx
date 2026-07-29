@@ -7,7 +7,6 @@ import { DashboardLayout } from './components/layout/DashboardLayout'
 import { AuthProvider } from './context/AuthContext'
 import { AdminPage } from './pages/AdminPage'
 import { CurriculumPage } from './pages/CurriculumPage'
-import { CurriculumUpdatePage } from './pages/CurriculumUpdatePage'
 import { EngineeringPage } from './pages/EngineeringPage'
 import { GraduationPage } from './pages/GraduationPage'
 import { LoginPage } from './pages/LoginPage'
@@ -29,7 +28,6 @@ createRoot(document.getElementById('root')!).render(
               <Route path="courses" element={<MyCoursesPage />} />
             </Route>
             <Route path="/curriculum" element={<CurriculumPage />} />
-            <Route path="/curriculum/update" element={<CurriculumUpdatePage />} />
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminPage />} />
             </Route>
