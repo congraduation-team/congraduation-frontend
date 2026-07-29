@@ -369,15 +369,15 @@ export function EngineeringPage() {
             학점 이수
           </h3>
 
-          <div className={`grid gap-7 ${showCertElective ? 'md:grid-cols-2' : ''}`}>
+          <div className={`grid gap-5 ${showCertElective ? 'md:grid-cols-2' : ''}`}>
             <section>
               <p className="mb-2 text-sm font-bold text-ink">인증필수</p>
               <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
-              <div className="flex items-start gap-5">
+              <div className="flex items-start gap-4">
                 <DonutChart
                   percent={genReqPct}
-                  size={120}
-                  stroke={13}
+                  size={110}
+                  stroke={12}
                   color="#5b6470"
                   label={formatPercentLabel(genReqPct)}
                 />
@@ -393,11 +393,11 @@ export function EngineeringPage() {
               <section>
                 <p className="mb-2 text-sm font-bold text-ink">인증선택</p>
                 <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
-                <div className="flex items-start gap-5">
+                <div className="flex items-start gap-4">
                   <DonutChart
                     percent={genElecPct}
-                    size={120}
-                    stroke={13}
+                    size={110}
+                    stroke={12}
                     color="#5b6470"
                     label={formatPercentLabel(genElecPct)}
                   />
@@ -425,22 +425,26 @@ export function EngineeringPage() {
             학점 이수
           </h3>
           <ChartLegend secondaryLabel="총 학점" className="mb-4" />
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-            <DonutChart
-              percent={bsmPct}
-              size={130}
-              stroke={14}
-              color="#5b6470"
-              label={formatPercentLabel(bsmPct)}
-            />
-            <div className="flex flex-1 gap-9">
+          <div className={`grid gap-5 ${bsm.remaining.length > 0 ? 'md:grid-cols-2' : ''}`}>
+            <div className="flex items-start gap-4">
+              <DonutChart
+                percent={bsmPct}
+                size={110}
+                stroke={12}
+                color="#5b6470"
+                label={formatPercentLabel(bsmPct)}
+              />
               <CourseMiniList
                 title="이수한 과목"
                 courses={bsm.completed.slice(0, 6)}
                 totalValue={bsmEarned}
               />
-              <CourseMiniList title="남은 과목" courses={bsm.remaining.slice(0, 6)} />
             </div>
+            {bsm.remaining.length > 0 && (
+              <div className="flex items-start gap-4">
+                <CourseMiniList title="남은 과목" courses={bsm.remaining.slice(0, 6)} />
+              </div>
+            )}
           </div>
         </article>
 
@@ -458,15 +462,15 @@ export function EngineeringPage() {
             {evaluation.designSequenceSatisfied === false ? ' · 설계 시퀀스 미충족' : ''}
           </p>
 
-          <div className="grid gap-7 md:grid-cols-2">
+          <div className="grid gap-5 md:grid-cols-2">
             <section>
               <p className="mb-2 text-sm font-bold text-ink">전공교과목</p>
               <ChartLegend secondaryLabel="총 학점" className="mb-3.5" />
-              <div className="flex items-start gap-5">
+              <div className="flex items-start gap-4">
                 <DonutChart
                   percent={majorPct}
-                  size={120}
-                  stroke={13}
+                  size={110}
+                  stroke={12}
                   color="#5b6470"
                   label={formatPercentLabel(majorPct)}
                 />
@@ -482,11 +486,11 @@ export function EngineeringPage() {
             <section>
               <p className="mb-2 text-sm font-bold text-ink">설계</p>
               <ChartLegend secondaryLabel="총 학점" className="mb-3.5" />
-              <div className="flex items-start gap-5">
+              <div className="flex items-start gap-4">
                 <DonutChart
                   percent={designPct}
-                  size={120}
-                  stroke={13}
+                  size={110}
+                  stroke={12}
                   color="#5b6470"
                   label={formatPercentLabel(designPct)}
                 />
@@ -507,29 +511,25 @@ export function EngineeringPage() {
         <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           <h3 className="mb-2 text-base font-bold text-ink">전공 설계 자세히 보기</h3>
           <ChartLegend secondaryLabel="총 학점" className="mb-4" />
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+          <div className={`grid gap-5 ${designLists.remaining.length > 0 ? 'lg:grid-cols-[auto_1fr_1.4fr]' : 'lg:grid-cols-[auto_1fr]'}`}>
             <DonutChart
               percent={designPct}
-              size={130}
-              stroke={14}
+              size={110}
+              stroke={12}
               color="#5b6470"
               label={formatPercentLabel(designPct)}
             />
 
-            <div className="min-w-0 flex-[0.9]">
-              <CourseMiniList
-                title="이수한 과목"
-                courses={designLists.completed}
-                totalValue={designEarned}
-              />
-            </div>
+            <CourseMiniList
+              title="이수한 과목"
+              courses={designLists.completed}
+              totalValue={designEarned}
+            />
 
-            <div className="min-w-0 flex-[1.4]">
-              <p className="mb-2.5 text-sm font-bold text-ink">남은 과목</p>
-              {designLists.remaining.length === 0 ? (
-                <p className="text-sm text-ink-muted">남은 설계 과목이 없습니다.</p>
-              ) : (
-                <div className="grid gap-x-7 gap-y-2 sm:grid-cols-2">
+            {designLists.remaining.length > 0 && (
+              <div className="min-w-0">
+                <p className="mb-2.5 text-sm font-bold text-ink">남은 과목</p>
+                <div className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
                   <ul className="space-y-2">
                     {remainingLeft.map((course) => (
                       <li
@@ -557,8 +557,8 @@ export function EngineeringPage() {
                     ))}
                   </ul>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </article>
 
