@@ -26,20 +26,13 @@ export function DonutChart({
   const arcLength = circumference * arcRatio
   const progressLength = arcLength * (Math.min(Math.max(percent, 0), 100) / 100)
   const center = size / 2
-  // 열린 하단을 잘라 시각 중심이 레이아웃 중앙에 오도록
-  const visualHeight = Math.round(size * 0.78)
 
   return (
     <div
-      className="relative inline-flex shrink-0 items-start justify-center overflow-hidden"
-      style={{ width: size, height: visualHeight }}
+      className="relative inline-flex shrink-0 items-center justify-center"
+      style={{ width: size, height: size }}
     >
-      <svg
-        width={size}
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        className="absolute left-0 top-0"
-      >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <g transform={`rotate(135 ${center} ${center})`}>
           <circle
             cx={center}
@@ -67,8 +60,8 @@ export function DonutChart({
 
       {(label || subLabel) && (
         <div
-          className="pointer-events-none absolute left-0 right-0 flex flex-col items-center justify-center text-center"
-          style={{ top: size * 0.22, height: size * 0.36 }}
+          className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center"
+          style={{ transform: `translateY(-${size * 0.04}px)` }}
         >
           {label && (
             <span
