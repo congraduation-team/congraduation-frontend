@@ -453,6 +453,7 @@ export function EngineeringPage() {
                     courses={generalRequired.completed}
                     totalValue={genReqEarned}
                     previewCount={3}
+                    className="w-[200px] shrink-0"
                     onMoreClick={() =>
                       setListModal({
                         title: '인증필수 이수 과목',
@@ -481,6 +482,7 @@ export function EngineeringPage() {
                       courses={generalElective.completed}
                       totalValue={genElecEarned}
                       previewCount={3}
+                    className="w-[200px] shrink-0"
                       onMoreClick={() =>
                         setListModal({
                           title: '인증선택 이수 과목',
@@ -532,6 +534,7 @@ export function EngineeringPage() {
                 courses={bsm.completed}
                 totalValue={bsmEarned}
                 previewCount={3}
+                    className="w-[200px] shrink-0"
                 onMoreClick={() =>
                   setListModal({
                     title: 'BSM 이수 과목',
@@ -593,6 +596,7 @@ export function EngineeringPage() {
                   courses={major.completed}
                   totalValue={majorEarned}
                   previewCount={3}
+                    className="w-[200px] shrink-0"
                   onMoreClick={() => setMajorOpen(true)}
                   onTitleClick={() => setMajorOpen(true)}
                 />
@@ -615,6 +619,7 @@ export function EngineeringPage() {
                   courses={designLists.completed}
                   totalValue={designEarned}
                   previewCount={3}
+                    className="w-[200px] shrink-0"
                   onMoreClick={() =>
                     setListModal({
                       title: '설계 이수 과목',
@@ -659,6 +664,7 @@ export function EngineeringPage() {
               courses={designLists.completed}
               totalValue={designEarned}
               previewCount={3}
+                    className="w-[200px] shrink-0"
               onMoreClick={() =>
                 setListModal({
                   title: '설계 이수 과목',

@@ -34,10 +34,11 @@ export function GraduationPage() {
   const [error, setError] = useState<string | null>(null)
   const [englishOpen, setEnglishOpen] = useState(false)
   const [swOpen, setSwOpen] = useState(false)
-  const [requiredOpen, setRequiredOpen] = useState(false)
-  const [electiveOpen, setElectiveOpen] = useState(false)
-  const [liberalReqOpen, setLiberalReqOpen] = useState(false)
-  const [liberalElecOpen, setLiberalElecOpen] = useState(false)
+  const [listModal, setListModal] = useState<{
+    title: string
+    subtitle?: string
+    courses: ReturnType<typeof toUiCourses>
+  } | null>(null)
 
   useEffect(() => {
     if (!student) return
@@ -77,23 +78,45 @@ export function GraduationPage() {
   }, [progress?.majorTracks, active])
 
   const majorRequired = useMemo(() => {
-    if (activeTrack?.requiredCourseProgress?.completedCourses) {
+    if (activeTrack?.requiredCourseProgress) {
       return {
         category: '전공필수',
-        courses: activeTrack.requiredCourseProgress.completedCourses,
+        courses:
+          activeTrack.requiredCourseProgress.completedCourses ??
+          progress?.categorySummaries?.find(
+            (c) => c.category.includes('전공필수') || c.category === '전필',
+          )?.courses ??
+          [],
+        remaining:
+          activeTrack.requiredCourseProgress.missingCourses ??
+          progress?.categorySummaries?.find(
+            (c) => c.category.includes('전공필수') || c.category === '전필',
+          )?.remainingCourses ??
+          progress?.categorySummaries?.find(
+            (c) => c.category.includes('전공필수') || c.category === '전필',
+          )?.missingCourses ??
+          [],
       }
     }
     const found = progress?.categorySummaries?.find(
       (c) => c.category.includes('전공필수') || c.category === '전필',
     )
-    return found
+    return {
+      category: found?.category ?? '전공필수',
+      courses: found?.courses ?? [],
+      remaining: found?.remainingCourses ?? found?.missingCourses ?? [],
+    }
   }, [progress, activeTrack])
 
   const majorElective = useMemo(() => {
     const found = progress?.categorySummaries?.find(
       (c) => c.category.includes('전공선택') || c.category === '전선',
     )
-    return found
+    return {
+      category: found?.category ?? '전공선택',
+      courses: found?.courses ?? [],
+      remaining: found?.remainingCourses ?? found?.missingCourses ?? [],
+    }
   }, [progress])
 
   const liberalRequired = useMemo(() => {
@@ -109,6 +132,12 @@ export function GraduationPage() {
       required: toNumber(fromCredits?.requiredCredits ?? fromSummary?.requiredCredits),
       percent: toPercent(fromCredits?.progressPercent ?? fromSummary?.progressPercent),
       courses: fromCredits?.completedCourses ?? fromSummary?.courses ?? [],
+      remaining:
+        fromCredits?.remainingCourses ??
+        fromCredits?.missingCourses ??
+        fromSummary?.remainingCourses ??
+        fromSummary?.missingCourses ??
+        [],
     }
   }, [progress])
 
@@ -125,6 +154,12 @@ export function GraduationPage() {
       required: toNumber(fromCredits?.requiredCredits ?? fromSummary?.requiredCredits),
       percent: toPercent(fromCredits?.progressPercent ?? fromSummary?.progressPercent),
       courses: fromCredits?.completedCourses ?? fromSummary?.courses ?? [],
+      remaining:
+        fromCredits?.remainingCourses ??
+        fromCredits?.missingCourses ??
+        fromSummary?.remainingCourses ??
+        fromSummary?.missingCourses ??
+        [],
     }
   }, [progress])
 
@@ -344,38 +379,99 @@ export function GraduationPage() {
         <div className="grid gap-5 lg:grid-cols-2">
           <DetailCreditCard
             title={`${displayName}님 ${majorTitle} 필수 현황`}
+            remainingTitle={`남은 ${majorTitle} 필수 과목`}
             percent={majorReqPct}
             earned={majorRequiredLabel}
             required={majorRequiredNeed}
-            courses={toUiCourses(majorRequired?.courses)}
-            onTitleClick={() => setRequiredOpen(true)}
+            completed={toUiCourses(majorRequired.courses)}
+            remaining={toUiCourses(majorRequired.remaining)}
+            onOpenCompleted={() =>
+              setListModal({
+                title: `${majorTitle} 필수 이수 과목`,
+                subtitle: `${majorRequiredLabel}학점 이수 완료`,
+                courses: toUiCourses(majorRequired.courses),
+              })
+            }
+            onOpenRemaining={() =>
+              setListModal({
+                title: `남은 ${majorTitle} 필수 과목`,
+                subtitle: `${majorRequired.remaining.length}과목`,
+                courses: toUiCourses(majorRequired.remaining),
+              })
+            }
             onCurriculum={() => navigate('/curriculum')}
           />
           <DetailCreditCard
             title={`${displayName}님 ${majorTitle} 선택 현황`}
+            remainingTitle={`남은 ${majorTitle} 선택 과목`}
             percent={majorElecPct}
             earned={majorElectiveEarned}
             required={majorElectiveNeed}
-            courses={toUiCourses(majorElective?.courses)}
-            onTitleClick={() => setElectiveOpen(true)}
+            completed={toUiCourses(majorElective.courses)}
+            remaining={toUiCourses(majorElective.remaining)}
+            onOpenCompleted={() =>
+              setListModal({
+                title: `${majorTitle} 선택 이수 과목`,
+                subtitle: `${majorElectiveEarned}학점 이수 완료`,
+                courses: toUiCourses(majorElective.courses),
+              })
+            }
+            onOpenRemaining={() =>
+              setListModal({
+                title: `남은 ${majorTitle} 선택 과목`,
+                subtitle: `${majorElective.remaining.length}과목`,
+                courses: toUiCourses(majorElective.remaining),
+              })
+            }
             onCurriculum={() => navigate('/curriculum')}
           />
           <DetailCreditCard
             title={`${displayName}님 교양 필수 현황`}
+            remainingTitle="남은 교양 필수 과목"
             percent={liberalRequired.percent}
             earned={liberalRequired.earned}
             required={liberalRequired.required}
-            courses={toUiCourses(liberalRequired.courses)}
-            onTitleClick={() => setLiberalReqOpen(true)}
+            completed={toUiCourses(liberalRequired.courses)}
+            remaining={toUiCourses(liberalRequired.remaining)}
+            onOpenCompleted={() =>
+              setListModal({
+                title: '교양 필수 이수 과목',
+                subtitle: `${liberalRequired.earned}학점 이수 완료`,
+                courses: toUiCourses(liberalRequired.courses),
+              })
+            }
+            onOpenRemaining={() =>
+              setListModal({
+                title: '남은 교양 필수 과목',
+                subtitle: `${liberalRequired.remaining.length}과목`,
+                courses: toUiCourses(liberalRequired.remaining),
+              })
+            }
             onCurriculum={() => navigate('/curriculum')}
           />
           <DetailCreditCard
             title={`${displayName}님 교양 선택 현황`}
+            remainingTitle="남은 교양 선택 과목"
             earned={liberalElective.earned}
-            courses={toUiCourses(liberalElective.courses)}
-            onTitleClick={() => setLiberalElecOpen(true)}
+            completed={toUiCourses(liberalElective.courses)}
+            remaining={toUiCourses(liberalElective.remaining)}
+            onOpenCompleted={() =>
+              setListModal({
+                title: '교양 선택 이수 과목',
+                subtitle: `취득 ${liberalElective.earned}학점`,
+                courses: toUiCourses(liberalElective.courses),
+              })
+            }
+            onOpenRemaining={() =>
+              setListModal({
+                title: '남은 교양 선택 과목',
+                subtitle: `${liberalElective.remaining.length}과목`,
+                courses: toUiCourses(liberalElective.remaining),
+              })
+            }
             onCurriculum={() => navigate('/curriculum')}
             earnedOnly
+            hideRemaining
           />
         </div>
       </section>
@@ -383,32 +479,11 @@ export function GraduationPage() {
       <EnglishCertModal open={englishOpen} onClose={() => setEnglishOpen(false)} />
       <SWCodingCertModal open={swOpen} onClose={() => setSwOpen(false)} />
       <CourseListModal
-        open={requiredOpen}
-        onClose={() => setRequiredOpen(false)}
-        title={`${majorTitle} 필수 이수 과목`}
-        subtitle={`${majorRequiredLabel}학점 이수 완료`}
-        courses={toUiCourses(majorRequired?.courses)}
-      />
-      <CourseListModal
-        open={electiveOpen}
-        onClose={() => setElectiveOpen(false)}
-        title={`${majorTitle} 선택 이수 과목`}
-        subtitle={`${majorElectiveEarned}학점 이수 완료`}
-        courses={toUiCourses(majorElective?.courses)}
-      />
-      <CourseListModal
-        open={liberalReqOpen}
-        onClose={() => setLiberalReqOpen(false)}
-        title="교양 필수 이수 과목"
-        subtitle={`${liberalRequired.earned}학점 이수 완료`}
-        courses={toUiCourses(liberalRequired.courses)}
-      />
-      <CourseListModal
-        open={liberalElecOpen}
-        onClose={() => setLiberalElecOpen(false)}
-        title="교양 선택 이수 과목"
-        subtitle={`취득 ${liberalElective.earned}학점`}
-        courses={toUiCourses(liberalElective.courses)}
+        open={listModal != null}
+        onClose={() => setListModal(null)}
+        title={listModal?.title ?? '과목 목록'}
+        subtitle={listModal?.subtitle}
+        courses={listModal?.courses ?? []}
       />
     </div>
   )
@@ -437,34 +512,42 @@ function GradeStatCard({ label, value }: { label: string; value: number }) {
 
 function DetailCreditCard({
   title,
+  remainingTitle,
   percent = 0,
   earned,
   required = 0,
-  courses,
-  onTitleClick,
+  completed,
+  remaining = [],
+  onOpenCompleted,
+  onOpenRemaining,
   onCurriculum,
   earnedOnly = false,
+  hideRemaining = false,
 }: {
   title: string
+  remainingTitle: string
   percent?: number
   earned: number
   required?: number
-  courses: ReturnType<typeof toUiCourses>
-  onTitleClick: () => void
+  completed: ReturnType<typeof toUiCourses>
+  remaining?: ReturnType<typeof toUiCourses>
+  onOpenCompleted: () => void
+  onOpenRemaining: () => void
   onCurriculum: () => void
-  /** 필요 학점 기준이 없을 때 취득 학점만 표시 */
   earnedOnly?: boolean
+  hideRemaining?: boolean
 }) {
   return (
-    <article className="rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+    <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
       <h3 className="mb-2 text-lg font-bold text-ink">{title}</h3>
       {!earnedOnly && (
-        <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-5" />
+        <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-4" />
       )}
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-        <div className="flex flex-col items-center gap-3">
+
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        <div className="flex shrink-0 flex-col items-center gap-2 self-center lg:self-start">
           {earnedOnly ? (
-            <div className="flex h-[140px] w-[140px] flex-col items-center justify-center rounded-full bg-panel">
+            <div className="flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full bg-panel">
               <span className="text-3xl font-extrabold tracking-tight text-ink">{earned}</span>
               <span className="mt-1 text-xs font-semibold text-ink-muted">취득 학점</span>
             </div>
@@ -472,27 +555,46 @@ function DetailCreditCard({
             <>
               <DonutChart
                 percent={percent}
-                size={140}
-                stroke={15}
+                size={120}
+                stroke={13}
                 label={formatPercentLabel(percent)}
               />
-              <div className="space-y-1 text-center text-sm text-ink-muted">
+              <div className="space-y-0.5 text-center text-sm text-ink-muted">
                 <p>필요 학점 {required || '-'}학점</p>
                 <p>이수 학점 {earned}학점</p>
               </div>
             </>
           )}
         </div>
-        <div className="flex flex-1 gap-10">
+
+        <div
+          className={`grid min-w-0 flex-1 gap-6 ${
+            hideRemaining ? 'grid-cols-1' : 'sm:grid-cols-2'
+          }`}
+        >
           <CourseMiniList
             title="이수한 과목"
-            courses={courses.slice(0, 6)}
+            courses={completed}
+            previewCount={4}
+            showMoreLink
             totalValue={earned}
-            onTitleClick={onTitleClick}
+            emptyText="이수한 과목이 없습니다."
+            onMoreClick={onOpenCompleted}
           />
+          {!hideRemaining && (
+            <CourseMiniList
+              title={remainingTitle}
+              courses={remaining}
+              previewCount={4}
+              showMoreLink
+              emptyText="남은 과목이 없습니다."
+              onMoreClick={onOpenRemaining}
+            />
+          )}
         </div>
       </div>
-      <div className="mt-6 flex justify-end">
+
+      <div className="mt-5 flex justify-end">
         <button
           type="button"
           onClick={onCurriculum}

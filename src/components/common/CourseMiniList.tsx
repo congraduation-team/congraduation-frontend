@@ -8,6 +8,9 @@ type CourseMiniListProps = {
   showSemester?: boolean
   /** 미리보기 개수. 미지정 시 전체 표시 */
   previewCount?: number
+  emptyText?: string
+  /** 헤더 오른쪽에 항상 더보기 표시 */
+  showMoreLink?: boolean
   onMoreClick?: () => void
   onTitleClick?: () => void
   className?: string
@@ -20,6 +23,8 @@ export function CourseMiniList({
   totalValue,
   showSemester,
   previewCount,
+  emptyText = '과목이 없습니다.',
+  showMoreLink = false,
   onMoreClick,
   onTitleClick,
   className = '',
@@ -27,21 +32,34 @@ export function CourseMiniList({
   const limited = previewCount != null
   const visible = limited ? courses.slice(0, previewCount) : courses
   const moreCount = limited ? Math.max(0, courses.length - previewCount) : 0
+  const openAll = onMoreClick ?? onTitleClick
+  const showHeaderMore = Boolean(openAll && (showMoreLink || moreCount > 0))
 
   return (
-    <div className={`w-[200px] shrink-0 ${className}`}>
+    <div className={`min-w-0 ${className}`}>
       {title && (
-        <button
-          type="button"
-          onClick={onTitleClick ?? onMoreClick}
-          className={`mb-2.5 text-left text-sm font-bold text-ink ${
-            onTitleClick || onMoreClick ? 'hover:text-sejong' : ''
-          }`}
-        >
-          {title}
-        </button>
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={openAll}
+            className={`text-left text-sm font-bold text-ink ${
+              openAll ? 'hover:text-sejong' : 'cursor-default'
+            }`}
+          >
+            {title}
+          </button>
+          {showHeaderMore && (
+            <button
+              type="button"
+              onClick={openAll}
+              className="shrink-0 text-xs font-medium text-ink-muted hover:text-sejong"
+            >
+              더보기
+            </button>
+          )}
+        </div>
       )}
-      <ul className="space-y-2">
+      <ul className="space-y-2.5">
         {visible.map((course) => (
           <li
             key={`${course.code}-${course.name}`}
@@ -56,20 +74,20 @@ export function CourseMiniList({
           </li>
         ))}
         {courses.length === 0 && (
-          <li className="text-sm text-ink-muted">이수한 과목이 없습니다.</li>
+          <li className="text-sm text-ink-muted">{emptyText}</li>
         )}
       </ul>
-      {moreCount > 0 && onMoreClick && (
+      {moreCount > 0 && openAll && !showHeaderMore && (
         <button
           type="button"
-          onClick={onMoreClick}
+          onClick={openAll}
           className="mt-2 text-xs font-semibold text-sejong hover:underline"
         >
           외 {moreCount}개 더보기
         </button>
       )}
       {totalValue !== undefined && (
-        <p className="mt-3 flex items-center justify-between text-sm font-bold">
+        <p className="mt-3 flex items-center justify-between border-t border-[#eee] pt-2.5 text-sm font-bold">
           <span className="text-ink">{totalLabel}</span>
           <span className="text-sejong">{totalValue}</span>
         </p>

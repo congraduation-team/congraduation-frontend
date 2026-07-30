@@ -60,6 +60,8 @@ export type CreditProgress = {
   progressPercent?: string | number
   completedCourseCount?: number
   completedCourses?: CategoryCourse[]
+  remainingCourses?: CategoryCourse[]
+  missingCourses?: CategoryCourse[]
 }
 
 export type CategorySummary = {
@@ -69,6 +71,8 @@ export type CategorySummary = {
   satisfied: boolean
   progressPercent: string
   courses: CategoryCourse[]
+  remainingCourses?: CategoryCourse[]
+  missingCourses?: CategoryCourse[]
 }
 
 export type MajorCreditSummary = {
