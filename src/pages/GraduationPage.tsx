@@ -250,13 +250,13 @@ export function GraduationPage() {
         </div>
       </section>
 
-      <section className="grid items-start gap-5 xl:grid-cols-[1.7fr_1fr_1fr]">
-        <article className="rounded-2xl bg-white px-7 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+      <section className="grid items-stretch gap-5 xl:grid-cols-[1.7fr_1fr_1fr]">
+        <article className="flex h-full flex-col rounded-2xl bg-white px-7 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           <h3 className="mb-4 text-lg font-bold text-ink">
             현재 {totalEarned}/{totalRequired || '-'}학점 이수 완료!
           </h3>
 
-          <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-5">
+          <div className="grid flex-1 grid-cols-[1fr_1fr_auto] items-center gap-5">
             <div className="flex flex-col items-center">
               <p className="mb-2 w-full text-left text-sm font-bold text-ink">전체 학점</p>
               <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
@@ -286,7 +286,7 @@ export function GraduationPage() {
           </div>
         </article>
 
-        <article className="flex flex-col rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+        <article className="flex h-full flex-col rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           <h3 className="text-lg font-bold text-ink">현재 고전독서인증 완료!</h3>
           <p className="mt-1 text-sm text-ink-muted">고전독서인증 현황</p>
           <div className="mt-5 overflow-hidden rounded-xl border border-[#e5e7eb]">
@@ -311,7 +311,7 @@ export function GraduationPage() {
           </p>
         </article>
 
-        <article className="rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+        <article className="flex h-full flex-col rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           <h3 className="mb-5 text-lg font-bold text-ink">미완료된 인증</h3>
           <div className="mb-6">
             <p className="mb-3 text-[15px] font-bold text-ink">영어졸업인증(비전공자)</p>
@@ -343,7 +343,7 @@ export function GraduationPage() {
             </button>
           </div>
 
-          <div>
+          <div className="mt-auto">
             <p className="mb-3 text-[15px] font-bold text-ink">SW코딩졸업인증(비전공자)</p>
             <div className="overflow-hidden rounded-xl border border-[#e5e7eb]">
               {[
@@ -376,10 +376,10 @@ export function GraduationPage() {
 
       <section>
         <h2 className="mb-4 text-xl font-bold text-ink">학점 현황 자세히 보기</h2>
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid items-stretch gap-5 lg:grid-cols-2">
           <DetailCreditCard
             title={`${displayName}님 ${majorTitle} 필수 현황`}
-            remainingTitle={`남은 ${majorTitle} 필수 과목`}
+            remainingTitle="남은 필수 과목"
             percent={majorReqPct}
             earned={majorRequiredLabel}
             required={majorRequiredNeed}
@@ -394,16 +394,15 @@ export function GraduationPage() {
             }
             onOpenRemaining={() =>
               setListModal({
-                title: `남은 ${majorTitle} 필수 과목`,
+                title: `${majorTitle} 남은 필수 과목`,
                 subtitle: `${majorRequired.remaining.length}과목`,
                 courses: toUiCourses(majorRequired.remaining),
               })
             }
-            onCurriculum={() => navigate('/curriculum')}
           />
           <DetailCreditCard
             title={`${displayName}님 ${majorTitle} 선택 현황`}
-            remainingTitle={`남은 ${majorTitle} 선택 과목`}
+            remainingTitle="남은 선택 과목"
             percent={majorElecPct}
             earned={majorElectiveEarned}
             required={majorElectiveNeed}
@@ -418,16 +417,15 @@ export function GraduationPage() {
             }
             onOpenRemaining={() =>
               setListModal({
-                title: `남은 ${majorTitle} 선택 과목`,
+                title: `${majorTitle} 남은 선택 과목`,
                 subtitle: `${majorElective.remaining.length}과목`,
                 courses: toUiCourses(majorElective.remaining),
               })
             }
-            onCurriculum={() => navigate('/curriculum')}
           />
           <DetailCreditCard
             title={`${displayName}님 교양 필수 현황`}
-            remainingTitle="남은 교양 필수 과목"
+            remainingTitle="남은 필수 과목"
             percent={liberalRequired.percent}
             earned={liberalRequired.earned}
             required={liberalRequired.required}
@@ -447,11 +445,10 @@ export function GraduationPage() {
                 courses: toUiCourses(liberalRequired.remaining),
               })
             }
-            onCurriculum={() => navigate('/curriculum')}
           />
           <DetailCreditCard
             title={`${displayName}님 교양 선택 현황`}
-            remainingTitle="남은 교양 선택 과목"
+            remainingTitle="남은 선택 과목"
             earned={liberalElective.earned}
             completed={toUiCourses(liberalElective.courses)}
             remaining={toUiCourses(liberalElective.remaining)}
@@ -469,7 +466,6 @@ export function GraduationPage() {
                 courses: toUiCourses(liberalElective.remaining),
               })
             }
-            onCurriculum={() => navigate('/curriculum')}
             earnedOnly
             hideRemaining
           />
@@ -520,7 +516,6 @@ function DetailCreditCard({
   remaining = [],
   onOpenCompleted,
   onOpenRemaining,
-  onCurriculum,
   earnedOnly = false,
   hideRemaining = false,
 }: {
@@ -533,18 +528,17 @@ function DetailCreditCard({
   remaining?: ReturnType<typeof toUiCourses>
   onOpenCompleted: () => void
   onOpenRemaining: () => void
-  onCurriculum: () => void
   earnedOnly?: boolean
   hideRemaining?: boolean
 }) {
   return (
-    <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-      <h3 className="mb-2 text-lg font-bold text-ink">{title}</h3>
+    <article className="flex h-full flex-col rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+      <h3 className="mb-2 text-lg font-bold leading-snug text-ink">{title}</h3>
       {!earnedOnly && (
         <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-4" />
       )}
 
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+      <div className="flex flex-1 flex-col gap-5 lg:flex-row lg:items-start">
         <div className="flex shrink-0 flex-col items-center gap-2 self-center lg:self-start">
           {earnedOnly ? (
             <div className="flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full bg-panel">
@@ -592,16 +586,6 @@ function DetailCreditCard({
             />
           )}
         </div>
-      </div>
-
-      <div className="mt-5 flex justify-end">
-        <button
-          type="button"
-          onClick={onCurriculum}
-          className="rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white hover:bg-sejong-dark"
-        >
-          이수체계도 확인
-        </button>
       </div>
     </article>
   )

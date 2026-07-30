@@ -38,11 +38,11 @@ export function CourseMiniList({
   return (
     <div className={`min-w-0 ${className}`}>
       {title && (
-        <div className="mb-2.5 flex items-center justify-between gap-2">
+        <div className="mb-2.5 flex items-start justify-between gap-2">
           <button
             type="button"
             onClick={openAll}
-            className={`text-left text-sm font-bold text-ink ${
+            className={`min-w-0 text-left text-sm font-bold leading-snug break-keep text-ink ${
               openAll ? 'hover:text-sejong' : 'cursor-default'
             }`}
           >
@@ -52,7 +52,7 @@ export function CourseMiniList({
             <button
               type="button"
               onClick={openAll}
-              className="shrink-0 text-xs font-medium text-ink-muted hover:text-sejong"
+              className="mt-0.5 shrink-0 text-xs font-medium text-ink-muted hover:text-sejong"
             >
               더보기
             </button>
