@@ -102,6 +102,7 @@ export type GraduationProgressResponse = {
   majorFoundationCredits?: CreditProgress
   averageGradePoint?: string
   majorGradePoint?: string
+  liberalGradePoint?: string
   majorCredits?: MajorCreditSummary
   categorySummaries?: CategorySummary[]
   balancedLiberalAreaProgresses?: Array<{

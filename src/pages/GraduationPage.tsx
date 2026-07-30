@@ -140,12 +140,7 @@ export function GraduationPage() {
   const displayName = student?.name || '학생'
   const totalEarned = toNumber(progress?.totalCredits?.earnedCredits)
   const totalRequired = toNumber(progress?.totalCredits?.requiredCredits)
-  const totalPct = toPercent(progress?.totalCredits?.progressPercent)
 
-  const majorPct = toPercent(
-    activeTrack?.totalCredits?.progressPercent ??
-      progress?.majorCredits?.majorCreditsProgressPercent,
-  )
   const majorReqPct = toPercent(
     activeTrack?.requiredCredits?.progressPercent ??
       progress?.majorCredits?.majorRequiredProgressPercent,
@@ -182,10 +177,14 @@ export function GraduationPage() {
     liberalRequired.earned + liberalElective.earned + balancedLiberal.earned
   const liberalRequiredTotal =
     liberalRequired.required + liberalElective.required + balancedLiberal.required
-  const liberalPct =
-    liberalRequiredTotal > 0
-      ? Math.max(0, Math.min(100, Math.round((liberalEarned / liberalRequiredTotal) * 100)))
-      : 0
+
+  const gpaScale = 4.5
+  const totalGpa = toNumber(progress?.averageGradePoint)
+  const majorGpa = toNumber(progress?.majorGradePoint)
+  const liberalGpa = toNumber(progress?.liberalGradePoint)
+  const gpaToPercent = (gpa: number) =>
+    gpaScale > 0 ? Math.max(0, Math.min(100, Math.round((gpa / gpaScale) * 100))) : 0
+  const formatGpa = (gpa: number) => (gpa > 0 ? gpa.toFixed(2) : '-')
 
   if (loading) {
     return <div className="py-20 text-center text-sm text-ink-muted">졸업요건을 불러오는 중...</div>
@@ -228,48 +227,61 @@ export function GraduationPage() {
 
           <div className="grid gap-5 sm:grid-cols-3">
             <div className="flex flex-col items-center">
-              <p className="mb-2 w-full text-center text-sm font-bold text-ink">총 학점</p>
-              <ChartLegend
-                secondaryLabel="총 학점"
-                activeColor="#c8012e"
-                className="mb-2 justify-center"
-              />
-              <DonutChart percent={totalPct} size={130} stroke={14} label={formatPercentLabel(totalPct)} />
-              <p className="mt-2 text-xs font-semibold text-ink-muted">
-                {totalEarned}/{totalRequired || '-'}학점
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <p className="mb-2 w-full text-center text-sm font-bold text-ink">전공 학점</p>
-              <ChartLegend
-                secondaryLabel="총 학점"
-                activeColor="#c8012e"
-                className="mb-2 justify-center"
-              />
-              <DonutChart percent={majorPct} size={130} stroke={14} label={formatPercentLabel(majorPct)} />
-              <p className="mt-2 text-xs font-semibold text-ink-muted">
-                {majorEarnedLabel}/{majorNeedLabel || '-'}학점
-              </p>
-            </div>
-
-            <div className="flex flex-col items-center">
-              <p className="mb-2 w-full text-center text-sm font-bold text-ink">교양 학점</p>
-              <ChartLegend
-                secondaryLabel="총 학점"
-                activeColor="#c8012e"
-                className="mb-2 justify-center"
-              />
+              <p className="mb-2 w-full text-center text-sm font-bold text-ink">총 성적</p>
+              <p className="mb-2 text-[11px] text-ink-muted">4.5 만점</p>
               <DonutChart
-                percent={liberalPct}
+                percent={gpaToPercent(totalGpa)}
                 size={130}
                 stroke={14}
-                label={formatPercentLabel(liberalPct)}
+                label={formatGpa(totalGpa)}
               />
               <p className="mt-2 text-xs font-semibold text-ink-muted">
-                {liberalEarned}/{liberalRequiredTotal || '-'}학점
+                {formatGpa(totalGpa)} / {gpaScale.toFixed(1)}
               </p>
             </div>
+
+            <div className="flex flex-col items-center">
+              <p className="mb-2 w-full text-center text-sm font-bold text-ink">전공 성적</p>
+              <p className="mb-2 text-[11px] text-ink-muted">4.5 만점</p>
+              <DonutChart
+                percent={gpaToPercent(majorGpa)}
+                size={130}
+                stroke={14}
+                label={formatGpa(majorGpa)}
+              />
+              <p className="mt-2 text-xs font-semibold text-ink-muted">
+                {formatGpa(majorGpa)} / {gpaScale.toFixed(1)}
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <p className="mb-2 w-full text-center text-sm font-bold text-ink">교양 성적</p>
+              <p className="mb-2 text-[11px] text-ink-muted">4.5 만점</p>
+              <DonutChart
+                percent={gpaToPercent(liberalGpa)}
+                size={130}
+                stroke={14}
+                label={formatGpa(liberalGpa)}
+              />
+              <p className="mt-2 text-xs font-semibold text-ink-muted">
+                {formatGpa(liberalGpa)} / {gpaScale.toFixed(1)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-xl bg-panel/70 px-4 py-3 text-center text-sm text-ink-muted">
+            이수 학점{' '}
+            <span className="font-bold text-ink">
+              총 {totalEarned}/{totalRequired || '-'}
+            </span>
+            {' · '}
+            <span className="font-bold text-ink">
+              전공 {majorEarnedLabel}/{majorNeedLabel || '-'}
+            </span>
+            {' · '}
+            <span className="font-bold text-ink">
+              교양 {liberalEarned}/{liberalRequiredTotal || '-'}
+            </span>
           </div>
 
           <div className="mt-6 grid gap-4 border-t border-[#eee] pt-5 sm:grid-cols-2 lg:grid-cols-4">
