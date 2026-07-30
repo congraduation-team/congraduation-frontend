@@ -120,6 +120,61 @@ export type GraduationProgressResponse = {
     requirementType?: string
     detail?: string
   }
+  /** 계획 과목 반영 후 졸업 가능 여부 */
+  graduationEligible?: boolean
+  /** 아직 부족한 조건 목록 */
+  graduationBlockers?: string[]
+}
+
+export type ExpectedGrade =
+  | 'A+'
+  | 'A0'
+  | 'B+'
+  | 'B0'
+  | 'C+'
+  | 'C0'
+  | 'D+'
+  | 'D0'
+  | 'F'
+  | 'P'
+  | 'NP'
+
+export type PlannedCourseItem = {
+  id: number
+  plannedSemesterId: number
+  gradeYear?: number
+  semester?: number
+  courseCode: string
+  courseName: string
+  category?: string
+  credit?: string | number
+  expectedGrade?: ExpectedGrade | string
+  expectedGradePoint?: string | number
+}
+
+export type PlannedSemester = {
+  plannedSemesterId: number
+  gradeYear: number
+  semester: number
+  totalCredits?: string | number
+  empty?: boolean
+  courses?: PlannedCourseItem[]
+}
+
+export type PlannedCoursesResponse = {
+  studentId?: number
+  lastCompletedSemester?: string
+  totalPlannedCredits?: string | number
+  semesters?: PlannedSemester[]
+}
+
+export type AddPlannedCourseRequest = {
+  plannedSemesterId: number
+  courseCode: string
+  courseName: string
+  category?: string
+  credit?: string
+  expectedGrade?: ExpectedGrade | string
 }
 
 export type MajorTrackRequiredCourseProgress = {
@@ -243,7 +298,12 @@ export type AbeekEvaluationResponse = {
   studentNo?: string
   studentName?: string
   entranceYear?: number
+  /** 공학인증 요건 계산용 적용 연도 (화면 표기용 아님) */
   graduationAbeekYear?: number
+  /** 예: "2027년 졸업 예정 기준" */
+  graduationAbeekBasisLabel?: string
+  /** 인증선택 요건 적용 여부 (2021 이하는 false) */
+  certElectiveApplicable?: boolean
   overallSatisfied?: boolean
   general?: AbeekCategoryProgress
   bsm?: AbeekCategoryProgress

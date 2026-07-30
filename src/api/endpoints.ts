@@ -3,10 +3,13 @@ import type {
   AbeekEvaluationResponse,
   AbeekTranscriptEvaluationResponse,
   AdminUploadResponse,
+  AddPlannedCourseRequest,
   CurriculumCourse,
+  ExpectedGrade,
   FullRoadmapResponse,
   GraduationProgressResponse,
   OfferedCurriculumResponse,
+  PlannedCoursesResponse,
   StudentLoginResponse,
   TranscriptStatusResponse,
   TranscriptUploadResponse,
@@ -210,4 +213,56 @@ export function getAbeekOfferedCoursesByStudent(options: {
 
 export function getAbeekTimetableTerms() {
   return apiJson<Array<Record<string, unknown>>>('/api/abeek/timetable-terms')
+}
+
+/** 계획 학기/과목 조회 */
+export function getPlannedCourses(studentId: number) {
+  return apiJson<PlannedCoursesResponse>(`/api/students/${studentId}/planned-courses`)
+}
+
+/** 다음 학기(들) 순차 생성 */
+export function addNextPlannedSemesters(studentId: number, count = 1) {
+  return apiJson<PlannedCoursesResponse>(`/api/students/${studentId}/planned-semesters/next`, {
+    method: 'POST',
+    body: JSON.stringify({ count }),
+  })
+}
+
+/** 계획 학기에 과목 추가 */
+export function addPlannedCourse(studentId: number, body: AddPlannedCourseRequest) {
+  return apiJson<PlannedCoursesResponse>(`/api/students/${studentId}/planned-courses`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/** 계획 과목 예상 성적 변경 */
+export function updatePlannedCourseExpectedGrade(
+  studentId: number,
+  plannedCourseId: number,
+  expectedGrade: ExpectedGrade | string,
+) {
+  return apiJson<PlannedCoursesResponse>(
+    `/api/students/${studentId}/planned-courses/${plannedCourseId}/expected-grade`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ expectedGrade }),
+    },
+  )
+}
+
+/** 계획 과목 삭제 */
+export function deletePlannedCourse(studentId: number, plannedCourseId: number) {
+  return apiJson<PlannedCoursesResponse>(
+    `/api/students/${studentId}/planned-courses/${plannedCourseId}`,
+    { method: 'DELETE' },
+  )
+}
+
+/** 계획 학기 삭제 */
+export function deletePlannedSemester(studentId: number, plannedSemesterId: number) {
+  return apiJson<PlannedCoursesResponse>(
+    `/api/students/${studentId}/planned-semesters/${plannedSemesterId}`,
+    { method: 'DELETE' },
+  )
 }
