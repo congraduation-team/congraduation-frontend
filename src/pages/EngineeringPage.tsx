@@ -221,9 +221,15 @@ export function EngineeringPage() {
       ? Math.max(0, Math.min(100, Math.round((toNumber(designEarned) / designRequired) * 100)))
       : toPercent(evaluation?.design?.progressPercent)
 
-  // 인증선택은 2022~ 제도. 2021 이하 입학은 요건 없음
-  const entranceYear = evaluation?.entranceYear ?? student?.admissionYear
-  const showCertElective = entranceYear == null || entranceYear >= 2022
+  // 인증선택: API 플래그 우선 (2021 이하는 false)
+  const showCertElective =
+    evaluation?.certElectiveApplicable ??
+    ((evaluation?.entranceYear ?? student?.admissionYear ?? 9999) >= 2022)
+
+  const incompleteRequiredCourses = useMemo(
+    () => (evaluation?.entranceRequiredCourses ?? []).filter((c) => c.completed === false),
+    [evaluation?.entranceRequiredCourses],
+  )
 
   if (loading) {
     return <div className="py-20 text-center text-sm text-ink-muted">공학인증을 불러오는 중...</div>
@@ -267,8 +273,8 @@ export function EngineeringPage() {
           {evaluation.entranceYear != null && (
             <MetaChip>{String(evaluation.entranceYear).slice(-2)}학번</MetaChip>
           )}
-          {evaluation.graduationAbeekYear != null && (
-            <MetaChip>ABEEK {evaluation.graduationAbeekYear} 기준</MetaChip>
+          {evaluation.graduationAbeekBasisLabel && (
+            <MetaChip>{evaluation.graduationAbeekBasisLabel}</MetaChip>
           )}
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold ${
@@ -280,6 +286,14 @@ export function EngineeringPage() {
             {evaluation.overallSatisfied ? '요건 충족' : '요건 미충족'}
           </span>
         </div>
+        {!evaluation.overallSatisfied && incompleteRequiredCourses.length > 0 && (
+          <p className="mt-2 text-sm text-ink-muted">
+            미이수 인증필수:{' '}
+            <span className="font-semibold text-sejong">
+              {incompleteRequiredCourses.map((c) => c.courseName).join(', ')}
+            </span>
+          </p>
+        )}
       </div>
 
       <div className="mx-auto max-w-[1080px] space-y-5">
@@ -327,6 +341,24 @@ export function EngineeringPage() {
 
             <section className="rounded-xl bg-panel px-4 py-4">
               <p className="mb-3 text-sm font-bold text-ink">적용 요건 · 안내</p>
+              {evaluation.graduationAbeekBasisLabel && (
+                <p className="mb-2 text-xs font-semibold text-ink">
+                  {evaluation.graduationAbeekBasisLabel}
+                </p>
+              )}
+              {incompleteRequiredCourses.length > 0 && (
+                <div className="mb-3">
+                  <p className="mb-1.5 text-xs font-semibold text-sejong">미이수 인증필수</p>
+                  <ul className="space-y-1">
+                    {incompleteRequiredCourses.map((c) => (
+                      <li key={c.courseCode} className="text-xs text-ink-muted">
+                        {c.courseName}
+                        {c.note ? ` · ${c.note}` : ''}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {requirementNotes.length > 0 ? (
                 <ul className="space-y-2">
                   {requirementNotes.map((msg) => (
@@ -336,10 +368,12 @@ export function EngineeringPage() {
                   ))}
                 </ul>
               ) : (
-                <p className="text-xs text-ink-muted">
-                  입학 {evaluation.entranceYear ?? '-'}년도 · 졸업 ABEEK{' '}
-                  {evaluation.graduationAbeekYear ?? '-'}년도 기준으로 평가합니다.
-                </p>
+                !evaluation.graduationAbeekBasisLabel &&
+                incompleteRequiredCourses.length === 0 && (
+                  <p className="text-xs text-ink-muted">
+                    입학 {evaluation.entranceYear ?? '-'}년도 기준으로 평가합니다.
+                  </p>
+                )
               )}
 
               {(waivedCourses.length > 0 || waivedNotes.length > 0) && (
@@ -370,9 +404,9 @@ export function EngineeringPage() {
             </section>
           </div>
         </article>
-        <div className="grid gap-5 lg:grid-cols-2">
-          <article className="rounded-2xl bg-white px-5 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <div className="grid items-start gap-5 lg:grid-cols-2">
+          <article className="rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <h3 className="text-base font-bold text-ink">
                 {displayName}님 전문교양{' '}
                 <span className="text-sejong">
@@ -402,11 +436,11 @@ export function EngineeringPage() {
               </div>
             </div>
 
-            <div className={`grid gap-5 ${showCertElective ? 'sm:grid-cols-2' : ''}`}>
+            <div className={`grid items-start gap-4 ${showCertElective ? 'sm:grid-cols-2' : ''}`}>
               <section>
                 <p className="mb-2 text-center text-sm font-bold text-ink">인증필수</p>
-                <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5 justify-center" />
-                <div className="mx-auto flex w-fit items-center gap-4">
+                <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3 justify-center" />
+                <ChartCourseRow>
                   <DonutChart
                     percent={genReqPct}
                     size={100}
@@ -427,14 +461,14 @@ export function EngineeringPage() {
                       })
                     }
                   />
-                </div>
+                </ChartCourseRow>
               </section>
 
               {showCertElective && (
                 <section>
                   <p className="mb-2 text-center text-sm font-bold text-ink">인증선택</p>
-                  <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5 justify-center" />
-                  <div className="mx-auto flex w-fit items-center gap-4">
+                  <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3 justify-center" />
+                  <ChartCourseRow>
                     <DonutChart
                       percent={genElecPct}
                       size={100}
@@ -455,14 +489,14 @@ export function EngineeringPage() {
                         })
                       }
                     />
-                  </div>
+                  </ChartCourseRow>
                 </section>
               )}
             </div>
           </article>
 
-          <article className="rounded-2xl bg-white px-5 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+          <article className="rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h3 className="text-base font-bold text-ink">
                   BSM{' '}
@@ -485,7 +519,7 @@ export function EngineeringPage() {
                 />
               )}
             </div>
-            <div className="mx-auto flex w-fit items-center gap-4">
+            <ChartCourseRow>
               <DonutChart
                 percent={bsmPct}
                 size={100}
@@ -506,12 +540,12 @@ export function EngineeringPage() {
                   })
                 }
               />
-            </div>
+            </ChartCourseRow>
           </article>
         </div>
 
-        <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <div className="mb-5 flex flex-wrap items-start justify-between gap-2">
+        <article className="rounded-2xl bg-white px-6 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
             <div>
               <h3 className="text-base font-bold text-ink">
                 전공{' '}
@@ -542,11 +576,11 @@ export function EngineeringPage() {
             </div>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          <div className="grid items-start gap-4 md:grid-cols-2">
             <section>
               <p className="mb-2 text-center text-sm font-bold text-ink">전공교과목</p>
-              <ChartLegend secondaryLabel="총 학점" className="mb-3.5 justify-center" />
-              <div className="mx-auto flex w-fit items-center gap-4">
+              <ChartLegend secondaryLabel="총 학점" className="mb-3 justify-center" />
+              <ChartCourseRow>
                 <DonutChart
                   percent={majorPct}
                   size={100}
@@ -562,13 +596,13 @@ export function EngineeringPage() {
                   onMoreClick={() => setMajorOpen(true)}
                   onTitleClick={() => setMajorOpen(true)}
                 />
-              </div>
+              </ChartCourseRow>
             </section>
 
             <section>
               <p className="mb-2 text-center text-sm font-bold text-ink">설계</p>
-              <ChartLegend secondaryLabel="총 학점" className="mb-3.5 justify-center" />
-              <div className="mx-auto flex w-fit items-center gap-4">
+              <ChartLegend secondaryLabel="총 학점" className="mb-3 justify-center" />
+              <ChartCourseRow>
                 <DonutChart
                   percent={designPct}
                   size={100}
@@ -589,13 +623,13 @@ export function EngineeringPage() {
                     })
                   }
                 />
-              </div>
+              </ChartCourseRow>
             </section>
           </div>
         </article>
 
-        <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <article className="rounded-2xl bg-white px-6 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
             <div>
               <h3 className="text-base font-bold text-ink">전공 설계 자세히 보기</h3>
               <ChartLegend secondaryLabel="총 학점" className="mt-2" />
@@ -612,7 +646,7 @@ export function EngineeringPage() {
               />
             )}
           </div>
-          <div className="mx-auto flex w-fit items-center gap-4">
+          <ChartCourseRow>
             <DonutChart
               percent={designPct}
               size={110}
@@ -633,7 +667,7 @@ export function EngineeringPage() {
                 })
               }
             />
-          </div>
+          </ChartCourseRow>
         </article>
 
         <CourseListModal
@@ -664,6 +698,14 @@ function RemainingButton({ onClick }: { onClick: () => void }) {
     >
       남은 과목 보기
     </button>
+  )
+}
+
+function ChartCourseRow({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex w-full justify-center">
+      <div className="inline-flex items-start gap-5">{children}</div>
+    </div>
   )
 }
 
