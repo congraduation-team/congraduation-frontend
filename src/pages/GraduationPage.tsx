@@ -229,7 +229,7 @@ export function GraduationPage() {
     : progress.major ?? '전공'
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div>
         <h2 className="text-xl font-bold text-ink">{displayName}님 졸업요건 현황</h2>
         <p className="mt-1 text-sm text-ink-muted">
@@ -239,62 +239,98 @@ export function GraduationPage() {
       </div>
 
       <section>
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-          <h3 className="text-base font-bold text-ink">성적 현황</h3>
+        <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+          <h3 className="text-sm font-bold text-ink">성적 현황</h3>
           <p className="text-xs text-ink-muted">4.5 만점 기준</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-2.5 sm:grid-cols-3">
           <GradeStatCard label="총 성적" value={totalGpa} />
           <GradeStatCard label="전공 성적" value={majorGpa} />
           <GradeStatCard label="교양 성적" value={liberalGpa} />
         </div>
       </section>
 
-      <section className="grid items-stretch gap-5 xl:grid-cols-[1.7fr_1fr_1fr]">
-        <article className="flex h-full flex-col rounded-2xl bg-white px-7 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-4 text-lg font-bold text-ink">
+      <section className="grid items-stretch gap-4 xl:grid-cols-[1.7fr_1fr_1fr]">
+        <article className="flex h-full flex-col rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <h3 className="mb-3 text-base font-bold text-ink">
             현재 {totalEarned}/{totalRequired || '-'}학점 이수 완료!
           </h3>
 
-          <div className="grid flex-1 grid-cols-[1fr_1fr_auto] items-center gap-5">
+          <div className="grid flex-1 grid-cols-[1fr_1fr_auto] items-end gap-3">
             <div className="flex flex-col items-center">
-              <p className="mb-2 w-full text-left text-sm font-bold text-ink">전체 학점</p>
-              <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
-              <DonutChart percent={totalPct} size={150} stroke={16} label={formatPercentLabel(totalPct)} />
+              <p className="mb-1 w-full text-left text-xs font-bold text-ink">전체 학점</p>
+              <ChartLegend
+                secondaryLabel="총 학점"
+                activeColor="#c8012e"
+                className="mb-1.5 w-full justify-start scale-90 origin-left"
+              />
+              <DonutChart
+                percent={totalPct}
+                size={118}
+                stroke={13}
+                label={formatPercentLabel(totalPct)}
+              />
             </div>
 
             <div className="flex flex-col items-center">
-              <p className="mb-2 w-full text-left text-sm font-bold text-ink">
+              <p className="mb-1 w-full text-left text-xs font-bold text-ink">
                 전공 학점{majorEarnedLabel > 0 ? ` (${majorEarnedLabel})` : ''}
               </p>
-              <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
-              <DonutChart percent={majorPct} size={150} stroke={16} label={formatPercentLabel(majorPct)} />
+              <ChartLegend
+                secondaryLabel="총 학점"
+                activeColor="#c8012e"
+                className="mb-1.5 w-full justify-start scale-90 origin-left"
+              />
+              <DonutChart
+                percent={majorPct}
+                size={118}
+                stroke={13}
+                label={formatPercentLabel(majorPct)}
+              />
             </div>
 
-            <div className="flex flex-col justify-center gap-3">
+            <div className="flex flex-col justify-end gap-2 pb-0.5">
               <div className="flex flex-col items-center">
-                <p className="mb-1 w-full text-left text-sm font-bold text-ink">전공 필수</p>
-                <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-1.5 w-full justify-start" />
-                <DonutChart percent={majorReqPct} size={88} stroke={11} label={formatPercentLabel(majorReqPct)} />
+                <p className="mb-0.5 w-full text-left text-[11px] font-bold text-ink">전공 필수</p>
+                <ChartLegend
+                  secondaryLabel="총 학점"
+                  activeColor="#c8012e"
+                  className="mb-1 w-full justify-start scale-75 origin-left"
+                />
+                <DonutChart
+                  percent={majorReqPct}
+                  size={72}
+                  stroke={9}
+                  label={formatPercentLabel(majorReqPct)}
+                />
               </div>
               <div className="flex flex-col items-center">
-                <p className="mb-1 w-full text-left text-sm font-bold text-ink">전공 선택</p>
-                <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-1.5 w-full justify-start" />
-                <DonutChart percent={majorElecPct} size={88} stroke={11} label={formatPercentLabel(majorElecPct)} />
+                <p className="mb-0.5 w-full text-left text-[11px] font-bold text-ink">전공 선택</p>
+                <ChartLegend
+                  secondaryLabel="총 학점"
+                  activeColor="#c8012e"
+                  className="mb-1 w-full justify-start scale-75 origin-left"
+                />
+                <DonutChart
+                  percent={majorElecPct}
+                  size={72}
+                  stroke={9}
+                  label={formatPercentLabel(majorElecPct)}
+                />
               </div>
             </div>
           </div>
         </article>
 
-        <article className="flex h-full flex-col rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="text-lg font-bold text-ink">현재 고전독서인증 완료!</h3>
-          <p className="mt-1 text-sm text-ink-muted">고전독서인증 현황</p>
-          <div className="mt-5 overflow-hidden rounded-xl border border-[#e5e7eb]">
+        <article className="flex h-full flex-col rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <h3 className="text-base font-bold text-ink">현재 고전독서인증 완료!</h3>
+          <p className="mt-0.5 text-xs text-ink-muted">고전독서인증 현황</p>
+          <div className="mt-3 overflow-hidden rounded-xl border border-[#e5e7eb]">
             <ul>
               {classicReading.map((item, index) => (
                 <li
                   key={item.category}
-                  className={`flex items-center justify-between px-4 py-3.5 text-[15px] ${
+                  className={`flex items-center justify-between px-3 py-2.5 text-sm ${
                     index < classicReading.length - 1 ? 'border-b border-[#e5e7eb]' : ''
                   }`}
                 >
@@ -306,15 +342,15 @@ export function GraduationPage() {
               ))}
             </ul>
           </div>
-          <p className="mt-auto pt-6 text-center text-sm font-bold text-sejong">
+          <p className="mt-auto pt-3 text-center text-xs font-bold text-sejong">
             고전독서인증을 모두 완료하였습니다.
           </p>
         </article>
 
-        <article className="flex h-full flex-col rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-5 text-lg font-bold text-ink">미완료된 인증</h3>
-          <div className="mb-6">
-            <p className="mb-3 text-[15px] font-bold text-ink">영어졸업인증(비전공자)</p>
+        <article className="flex h-full flex-col rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <h3 className="mb-3 text-base font-bold text-ink">미완료된 인증</h3>
+          <div className="mb-4">
+            <p className="mb-2 text-sm font-bold text-ink">영어졸업인증(비전공자)</p>
             <div className="overflow-hidden rounded-xl border border-[#e5e7eb]">
               {[
                 { name: 'TOEIC', value: '800점 이상' },
@@ -323,28 +359,28 @@ export function GraduationPage() {
               ].map((item, index) => (
                 <div
                   key={item.name}
-                  className={`flex items-center justify-between gap-2 px-3 py-2.5 ${
+                  className={`flex items-center justify-between gap-2 px-2.5 py-2 ${
                     index < 2 ? 'border-b border-[#e5e7eb]' : ''
                   }`}
                 >
-                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1 text-[13px] font-medium text-ink">
+                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[12px] font-medium text-ink">
                     {item.name}
                   </span>
-                  <span className="shrink-0 whitespace-nowrap text-sm text-ink">{item.value}</span>
+                  <span className="shrink-0 whitespace-nowrap text-xs text-ink">{item.value}</span>
                 </div>
               ))}
             </div>
             <button
               type="button"
               onClick={() => setEnglishOpen(true)}
-              className="mt-2 w-full text-right text-xs text-ink-muted hover:text-sejong"
+              className="mt-1.5 w-full text-right text-xs text-ink-muted hover:text-sejong"
             >
               더 보기
             </button>
           </div>
 
           <div className="mt-auto">
-            <p className="mb-3 text-[15px] font-bold text-ink">SW코딩졸업인증(비전공자)</p>
+            <p className="mb-2 text-sm font-bold text-ink">SW코딩졸업인증(비전공자)</p>
             <div className="overflow-hidden rounded-xl border border-[#e5e7eb]">
               {[
                 { name: 'TOSC (SW역량테스트)', value: 'Level 5 이상' },
@@ -352,21 +388,21 @@ export function GraduationPage() {
               ].map((item, index) => (
                 <div
                   key={item.name}
-                  className={`flex items-center justify-between gap-2 overflow-x-auto px-3 py-2.5 ${
+                  className={`flex items-center justify-between gap-2 overflow-x-auto px-2.5 py-2 ${
                     index === 0 ? 'border-b border-[#e5e7eb]' : ''
                   }`}
                 >
-                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1 text-[12px] font-medium leading-none text-ink">
+                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[11px] font-medium leading-none text-ink">
                     {item.name}
                   </span>
-                  <span className="shrink-0 whitespace-nowrap text-sm text-ink">{item.value}</span>
+                  <span className="shrink-0 whitespace-nowrap text-xs text-ink">{item.value}</span>
                 </div>
               ))}
             </div>
             <button
               type="button"
               onClick={() => setSwOpen(true)}
-              className="mt-2 w-full text-right text-xs text-ink-muted hover:text-sejong"
+              className="mt-1.5 w-full text-right text-xs text-ink-muted hover:text-sejong"
             >
               더 보기
             </button>
@@ -375,8 +411,8 @@ export function GraduationPage() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-xl font-bold text-ink">학점 현황 자세히 보기</h2>
-        <div className="grid items-stretch gap-5 lg:grid-cols-2">
+        <h2 className="mb-3 text-lg font-bold text-ink">학점 현황 자세히 보기</h2>
+        <div className="grid items-stretch gap-4 lg:grid-cols-2">
           <DetailCreditCard
             title={`${displayName}님 ${majorTitle} 필수 현황`}
             remainingTitle="남은 필수 과목"
@@ -493,13 +529,13 @@ function GradeStatCard({ label, value }: { label: string; value: number }) {
   const barWidth = value > 0 ? Math.min(100, Math.max(0, (value / 4.5) * 100)) : 0
 
   return (
-    <div className="rounded-2xl bg-white px-5 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-      <p className="text-sm font-semibold text-ink-muted">{label}</p>
-      <div className="mt-3 flex items-end gap-1.5">
-        <span className="text-4xl font-extrabold tracking-tight text-ink">{formatGpa(value)}</span>
-        <span className="mb-1 text-sm font-semibold text-ink-muted">/ 4.5</span>
+    <div className="rounded-xl bg-white px-4 py-3 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+      <p className="text-xs font-semibold text-ink-muted">{label}</p>
+      <div className="mt-1.5 flex items-end gap-1">
+        <span className="text-2xl font-extrabold tracking-tight text-ink">{formatGpa(value)}</span>
+        <span className="mb-0.5 text-xs font-semibold text-ink-muted">/ 4.5</span>
       </div>
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-panel">
+      <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-panel">
         <div className="h-full rounded-full bg-sejong" style={{ width: `${barWidth}%` }} />
       </div>
     </div>
@@ -532,40 +568,19 @@ function DetailCreditCard({
   hideRemaining?: boolean
 }) {
   return (
-    <article className="flex h-full flex-col rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-      <h3 className="mb-2 text-lg font-bold leading-snug text-ink">{title}</h3>
+    <article className="flex h-full flex-col rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+      <h3 className="mb-1.5 text-base font-bold leading-snug text-ink">{title}</h3>
       {!earnedOnly && (
-        <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-4" />
+        <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-3" />
       )}
 
-      <div className="flex flex-1 flex-col gap-5 lg:flex-row lg:items-start">
-        <div className="flex shrink-0 flex-col items-center gap-2 self-center lg:self-start">
-          {earnedOnly ? (
-            <div className="flex h-[120px] w-[120px] flex-col items-center justify-center rounded-full bg-panel">
-              <span className="text-3xl font-extrabold tracking-tight text-ink">{earned}</span>
-              <span className="mt-1 text-xs font-semibold text-ink-muted">취득 학점</span>
-            </div>
-          ) : (
-            <>
-              <DonutChart
-                percent={percent}
-                size={120}
-                stroke={13}
-                label={formatPercentLabel(percent)}
-              />
-              <div className="space-y-0.5 text-center text-sm text-ink-muted">
-                <p>필요 학점 {required || '-'}학점</p>
-                <p>이수 학점 {earned}학점</p>
-              </div>
-            </>
-          )}
-        </div>
-
-        <div
-          className={`grid min-w-0 flex-1 gap-6 ${
-            hideRemaining ? 'grid-cols-1' : 'sm:grid-cols-2'
-          }`}
-        >
+      {earnedOnly ? (
+        <div className="flex flex-1 flex-col gap-3">
+          <div className="flex items-baseline gap-2 border-b border-[#eee] pb-2.5">
+            <span className="text-sm font-semibold text-ink-muted">취득 학점</span>
+            <span className="text-2xl font-extrabold tracking-tight text-ink">{earned}</span>
+            <span className="text-sm font-semibold text-ink-muted">학점</span>
+          </div>
           <CourseMiniList
             title="이수한 과목"
             courses={completed}
@@ -575,18 +590,49 @@ function DetailCreditCard({
             emptyText="이수한 과목이 없습니다."
             onMoreClick={onOpenCompleted}
           />
-          {!hideRemaining && (
+        </div>
+      ) : (
+        <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="flex shrink-0 flex-col items-center gap-1.5 self-center sm:self-start">
+            <DonutChart
+              percent={percent}
+              size={100}
+              stroke={11}
+              label={formatPercentLabel(percent)}
+            />
+            <div className="space-y-0.5 text-center text-xs text-ink-muted">
+              <p>필요 학점 {required || '-'}학점</p>
+              <p>이수 학점 {earned}학점</p>
+            </div>
+          </div>
+
+          <div
+            className={`grid min-w-0 flex-1 gap-5 ${
+              hideRemaining ? 'grid-cols-1' : 'sm:grid-cols-2'
+            }`}
+          >
             <CourseMiniList
-              title={remainingTitle}
-              courses={remaining}
+              title="이수한 과목"
+              courses={completed}
               previewCount={4}
               showMoreLink
-              emptyText="남은 과목이 없습니다."
-              onMoreClick={onOpenRemaining}
+              totalValue={earned}
+              emptyText="이수한 과목이 없습니다."
+              onMoreClick={onOpenCompleted}
             />
-          )}
+            {!hideRemaining && (
+              <CourseMiniList
+                title={remainingTitle}
+                courses={remaining}
+                previewCount={4}
+                showMoreLink
+                emptyText="남은 과목이 없습니다."
+                onMoreClick={onOpenRemaining}
+              />
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </article>
   )
 }
