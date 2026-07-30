@@ -406,7 +406,7 @@ export function EngineeringPage() {
               <section>
                 <p className="mb-2 text-center text-sm font-bold text-ink">인증필수</p>
                 <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5 justify-center" />
-                <div className="flex items-start justify-center gap-3">
+                <div className="mx-auto flex w-fit items-center gap-4">
                   <DonutChart
                     percent={genReqPct}
                     size={100}
@@ -434,7 +434,7 @@ export function EngineeringPage() {
                 <section>
                   <p className="mb-2 text-center text-sm font-bold text-ink">인증선택</p>
                   <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5 justify-center" />
-                  <div className="flex items-start justify-center gap-3">
+                  <div className="mx-auto flex w-fit items-center gap-4">
                     <DonutChart
                       percent={genElecPct}
                       size={100}
@@ -485,7 +485,7 @@ export function EngineeringPage() {
                 />
               )}
             </div>
-            <div className="flex items-start justify-center gap-3">
+            <div className="mx-auto flex w-fit items-center gap-4">
               <DonutChart
                 percent={bsmPct}
                 size={100}
@@ -546,7 +546,7 @@ export function EngineeringPage() {
             <section>
               <p className="mb-2 text-center text-sm font-bold text-ink">전공교과목</p>
               <ChartLegend secondaryLabel="총 학점" className="mb-3.5 justify-center" />
-              <div className="flex items-start justify-center gap-3">
+              <div className="mx-auto flex w-fit items-center gap-4">
                 <DonutChart
                   percent={majorPct}
                   size={100}
@@ -568,7 +568,7 @@ export function EngineeringPage() {
             <section>
               <p className="mb-2 text-center text-sm font-bold text-ink">설계</p>
               <ChartLegend secondaryLabel="총 학점" className="mb-3.5 justify-center" />
-              <div className="flex items-start justify-center gap-3">
+              <div className="mx-auto flex w-fit items-center gap-4">
                 <DonutChart
                   percent={designPct}
                   size={100}
@@ -612,7 +612,7 @@ export function EngineeringPage() {
               />
             )}
           </div>
-          <div className="flex items-start justify-center gap-4">
+          <div className="mx-auto flex w-fit items-center gap-4">
             <DonutChart
               percent={designPct}
               size={110}

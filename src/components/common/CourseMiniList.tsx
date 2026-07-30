@@ -29,7 +29,7 @@ export function CourseMiniList({
   const moreCount = limited ? Math.max(0, courses.length - previewCount) : 0
 
   return (
-    <div className={`w-full max-w-[220px] shrink-0 ${className}`}>
+    <div className={`w-[200px] shrink-0 ${className}`}>
       {title && (
         <button
           type="button"
