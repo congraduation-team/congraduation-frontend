@@ -14,12 +14,15 @@ import { classicReading } from '../data/mockData'
 import { trackTypeLabel } from '../utils/majorTrack'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 
-function toUiCourses(courses?: CategoryCourse[]) {
-  return (courses ?? []).map((c) => ({
-    name: c.courseName,
-    credits: toNumber(c.credit),
-    code: c.courseCode,
-  }))
+function toUiCourses(courses?: CategoryCourse[] | Array<Record<string, unknown>>) {
+  return (courses ?? []).map((c) => {
+    const row = c as Record<string, unknown>
+    return {
+      name: String(row.courseName ?? ''),
+      credits: toNumber((row.credit ?? row.credits) as string | number | undefined),
+      code: String(row.courseCode ?? ''),
+    }
+  })
 }
 
 export function GraduationPage() {
@@ -33,6 +36,8 @@ export function GraduationPage() {
   const [swOpen, setSwOpen] = useState(false)
   const [requiredOpen, setRequiredOpen] = useState(false)
   const [electiveOpen, setElectiveOpen] = useState(false)
+  const [liberalReqOpen, setLiberalReqOpen] = useState(false)
+  const [liberalElecOpen, setLiberalElecOpen] = useState(false)
 
   useEffect(() => {
     if (!student) return
@@ -91,6 +96,47 @@ export function GraduationPage() {
     return found
   }, [progress])
 
+  const liberalRequired = useMemo(() => {
+    const fromCredits = progress?.commonLiberalCredits
+    const fromSummary = progress?.categorySummaries?.find(
+      (c) =>
+        c.category.includes('교양필수') ||
+        c.category.includes('공통교양') ||
+        c.category === '교필',
+    )
+    return {
+      earned: toNumber(fromCredits?.earnedCredits ?? fromSummary?.earnedCredits),
+      required: toNumber(fromCredits?.requiredCredits ?? fromSummary?.requiredCredits),
+      percent: toPercent(fromCredits?.progressPercent ?? fromSummary?.progressPercent),
+      courses: fromCredits?.completedCourses ?? fromSummary?.courses ?? [],
+    }
+  }, [progress])
+
+  const liberalElective = useMemo(() => {
+    const fromCredits = progress?.electiveLiberalCredits
+    const fromSummary = progress?.categorySummaries?.find(
+      (c) =>
+        c.category.includes('교양선택') ||
+        c.category.includes('선택교양') ||
+        c.category === '교선',
+    )
+    return {
+      earned: toNumber(fromCredits?.earnedCredits ?? fromSummary?.earnedCredits),
+      required: toNumber(fromCredits?.requiredCredits ?? fromSummary?.requiredCredits),
+      percent: toPercent(fromCredits?.progressPercent ?? fromSummary?.progressPercent),
+      courses: fromCredits?.completedCourses ?? fromSummary?.courses ?? [],
+    }
+  }, [progress])
+
+  const balancedLiberal = useMemo(() => {
+    const fromCredits = progress?.balancedLiberalCredits
+    return {
+      earned: toNumber(fromCredits?.earnedCredits),
+      required: toNumber(fromCredits?.requiredCredits),
+      percent: toPercent(fromCredits?.progressPercent),
+    }
+  }, [progress])
+
   const displayName = student?.name || '학생'
   const totalEarned = toNumber(progress?.totalCredits?.earnedCredits)
   const totalRequired = toNumber(progress?.totalCredits?.requiredCredits)
@@ -112,6 +158,9 @@ export function GraduationPage() {
   const majorEarnedLabel = toNumber(
     activeTrack?.totalCredits?.earnedCredits ?? progress?.majorCredits?.earnedMajorCredits,
   )
+  const majorNeedLabel = toNumber(
+    activeTrack?.totalCredits?.requiredCredits ?? progress?.majorCredits?.requiredMajorCredits,
+  )
   const majorRequiredLabel = toNumber(
     activeTrack?.requiredCredits?.earnedCredits ??
       progress?.majorCredits?.earnedMajorRequiredCredits,
@@ -128,6 +177,15 @@ export function GraduationPage() {
     activeTrack?.electiveCredits?.requiredCredits ??
       progress?.majorCredits?.requiredMajorElectiveCredits,
   )
+
+  const liberalEarned =
+    liberalRequired.earned + liberalElective.earned + balancedLiberal.earned
+  const liberalRequiredTotal =
+    liberalRequired.required + liberalElective.required + balancedLiberal.required
+  const liberalPct =
+    liberalRequiredTotal > 0
+      ? Math.max(0, Math.min(100, Math.round((liberalEarned / liberalRequiredTotal) * 100)))
+      : 0
 
   if (loading) {
     return <div className="py-20 text-center text-sm text-ink-muted">졸업요건을 불러오는 중...</div>
@@ -168,34 +226,76 @@ export function GraduationPage() {
             현재 {totalEarned}/{totalRequired || '-'}학점 이수 완료!
           </h3>
 
-          <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-5">
+          <div className="grid gap-5 sm:grid-cols-3">
             <div className="flex flex-col items-center">
-              <p className="mb-2 w-full text-left text-sm font-bold text-ink">전체 학점</p>
-              <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
-              <DonutChart percent={totalPct} size={150} stroke={16} label={formatPercentLabel(totalPct)} />
-            </div>
-
-            <div className="flex flex-col items-center">
-              <p className="mb-2 w-full text-left text-sm font-bold text-ink">
-                전공 학점{majorEarnedLabel > 0 ? ` (${majorEarnedLabel})` : ''}
+              <p className="mb-2 w-full text-center text-sm font-bold text-ink">총 학점</p>
+              <ChartLegend
+                secondaryLabel="총 학점"
+                activeColor="#c8012e"
+                className="mb-2 justify-center"
+              />
+              <DonutChart percent={totalPct} size={130} stroke={14} label={formatPercentLabel(totalPct)} />
+              <p className="mt-2 text-xs font-semibold text-ink-muted">
+                {totalEarned}/{totalRequired || '-'}학점
               </p>
-              <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
-              <DonutChart percent={majorPct} size={150} stroke={16} label={formatPercentLabel(majorPct)} />
             </div>
 
-            <div className="flex flex-col justify-center gap-3">
-              <div className="flex flex-col items-center">
-                <p className="mb-1 w-full text-left text-sm font-bold text-ink">전공 필수</p>
-                <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-1.5 w-full justify-start" />
-                <DonutChart percent={majorReqPct} size={88} stroke={11} label={formatPercentLabel(majorReqPct)} />
-              </div>
-              <div className="flex flex-col items-center">
-                <p className="mb-1 w-full text-left text-sm font-bold text-ink">전공 선택</p>
-                <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-1.5 w-full justify-start" />
-                <DonutChart percent={majorElecPct} size={88} stroke={11} label={formatPercentLabel(majorElecPct)} />
-              </div>
+            <div className="flex flex-col items-center">
+              <p className="mb-2 w-full text-center text-sm font-bold text-ink">전공 학점</p>
+              <ChartLegend
+                secondaryLabel="총 학점"
+                activeColor="#c8012e"
+                className="mb-2 justify-center"
+              />
+              <DonutChart percent={majorPct} size={130} stroke={14} label={formatPercentLabel(majorPct)} />
+              <p className="mt-2 text-xs font-semibold text-ink-muted">
+                {majorEarnedLabel}/{majorNeedLabel || '-'}학점
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center">
+              <p className="mb-2 w-full text-center text-sm font-bold text-ink">교양 학점</p>
+              <ChartLegend
+                secondaryLabel="총 학점"
+                activeColor="#c8012e"
+                className="mb-2 justify-center"
+              />
+              <DonutChart
+                percent={liberalPct}
+                size={130}
+                stroke={14}
+                label={formatPercentLabel(liberalPct)}
+              />
+              <p className="mt-2 text-xs font-semibold text-ink-muted">
+                {liberalEarned}/{liberalRequiredTotal || '-'}학점
+              </p>
             </div>
           </div>
+
+          <div className="mt-6 grid gap-4 border-t border-[#eee] pt-5 sm:grid-cols-2 lg:grid-cols-4">
+            <MiniCreditGauge label="전공 필수" percent={majorReqPct} earned={majorRequiredLabel} required={majorRequiredNeed} />
+            <MiniCreditGauge label="전공 선택" percent={majorElecPct} earned={majorElectiveEarned} required={majorElectiveNeed} />
+            <MiniCreditGauge
+              label="교양 필수"
+              percent={liberalRequired.percent}
+              earned={liberalRequired.earned}
+              required={liberalRequired.required}
+            />
+            <MiniCreditGauge
+              label="교양 선택"
+              percent={liberalElective.percent}
+              earned={liberalElective.earned}
+              required={liberalElective.required}
+            />
+          </div>
+          {balancedLiberal.required > 0 && (
+            <p className="mt-3 text-center text-xs text-ink-muted">
+              균형교양 {balancedLiberal.earned}/{balancedLiberal.required}학점
+              {progress.balancedLiberalRequiredAreaCount != null
+                ? ` · 영역 ${progress.balancedLiberalCompletedAreaCount ?? 0}/${progress.balancedLiberalRequiredAreaCount}`
+                : ''}
+            </p>
+          )}
         </article>
 
         <article className="flex flex-col rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
@@ -289,71 +389,42 @@ export function GraduationPage() {
       <section>
         <h2 className="mb-4 text-xl font-bold text-ink">학점 현황 자세히 보기</h2>
         <div className="grid gap-5 lg:grid-cols-2">
-          <article className="rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <h3 className="mb-2 text-lg font-bold text-ink">
-              {displayName}님 {majorTitle} 필수 현황
-            </h3>
-            <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-5" />
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-              <div className="flex flex-col items-center gap-3">
-                <DonutChart percent={majorReqPct} size={160} stroke={16} label={formatPercentLabel(majorReqPct)} />
-                <div className="space-y-1 text-center text-sm text-ink-muted">
-                  <p>필요 학점 {majorRequiredNeed}학점</p>
-                  <p>이수 학점 {majorRequiredLabel}학점</p>
-                </div>
-              </div>
-              <div className="flex flex-1 gap-10">
-                <CourseMiniList
-                  title="이수한 과목"
-                  courses={toUiCourses(majorRequired?.courses).slice(0, 6)}
-                  totalValue={majorRequiredLabel}
-                  onTitleClick={() => setRequiredOpen(true)}
-                />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={() => navigate('/curriculum')}
-                className="rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white hover:bg-sejong-dark"
-              >
-                이수체계도 확인
-              </button>
-            </div>
-          </article>
-
-          <article className="rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <h3 className="mb-2 text-lg font-bold text-ink">
-              {displayName}님 {majorTitle} 선택 현황
-            </h3>
-            <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-5" />
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
-              <div className="flex flex-col items-center gap-3">
-                <DonutChart percent={majorElecPct} size={160} stroke={16} label={formatPercentLabel(majorElecPct)} />
-                <div className="space-y-1 text-center text-sm text-ink-muted">
-                  <p>필요 학점 {majorElectiveNeed}학점</p>
-                  <p>이수 학점 {majorElectiveEarned}학점</p>
-                </div>
-              </div>
-              <div className="flex flex-1 gap-10">
-                <CourseMiniList
-                  title="이수한 과목"
-                  courses={toUiCourses(majorElective?.courses).slice(0, 6)}
-                  totalValue={majorElectiveEarned}
-                  onTitleClick={() => setElectiveOpen(true)}
-                />
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                onClick={() => navigate('/curriculum')}
-                className="rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white hover:bg-sejong-dark"
-              >
-                이수체계도 확인
-              </button>
-            </div>
-          </article>
+          <DetailCreditCard
+            title={`${displayName}님 ${majorTitle} 필수 현황`}
+            percent={majorReqPct}
+            earned={majorRequiredLabel}
+            required={majorRequiredNeed}
+            courses={toUiCourses(majorRequired?.courses)}
+            onTitleClick={() => setRequiredOpen(true)}
+            onCurriculum={() => navigate('/curriculum')}
+          />
+          <DetailCreditCard
+            title={`${displayName}님 ${majorTitle} 선택 현황`}
+            percent={majorElecPct}
+            earned={majorElectiveEarned}
+            required={majorElectiveNeed}
+            courses={toUiCourses(majorElective?.courses)}
+            onTitleClick={() => setElectiveOpen(true)}
+            onCurriculum={() => navigate('/curriculum')}
+          />
+          <DetailCreditCard
+            title={`${displayName}님 교양 필수 현황`}
+            percent={liberalRequired.percent}
+            earned={liberalRequired.earned}
+            required={liberalRequired.required}
+            courses={toUiCourses(liberalRequired.courses)}
+            onTitleClick={() => setLiberalReqOpen(true)}
+            onCurriculum={() => navigate('/curriculum')}
+          />
+          <DetailCreditCard
+            title={`${displayName}님 교양 선택 현황`}
+            percent={liberalElective.percent}
+            earned={liberalElective.earned}
+            required={liberalElective.required}
+            courses={toUiCourses(liberalElective.courses)}
+            onTitleClick={() => setLiberalElecOpen(true)}
+            onCurriculum={() => navigate('/curriculum')}
+          />
         </div>
       </section>
 
@@ -373,6 +444,93 @@ export function GraduationPage() {
         subtitle={`${majorElectiveEarned}학점 이수 완료`}
         courses={toUiCourses(majorElective?.courses)}
       />
+      <CourseListModal
+        open={liberalReqOpen}
+        onClose={() => setLiberalReqOpen(false)}
+        title="교양 필수 이수 과목"
+        subtitle={`${liberalRequired.earned}학점 이수 완료`}
+        courses={toUiCourses(liberalRequired.courses)}
+      />
+      <CourseListModal
+        open={liberalElecOpen}
+        onClose={() => setLiberalElecOpen(false)}
+        title="교양 선택 이수 과목"
+        subtitle={`${liberalElective.earned}학점 이수 완료`}
+        courses={toUiCourses(liberalElective.courses)}
+      />
     </div>
+  )
+}
+
+function MiniCreditGauge({
+  label,
+  percent,
+  earned,
+  required,
+}: {
+  label: string
+  percent: number
+  earned: number
+  required: number
+}) {
+  return (
+    <div className="flex flex-col items-center rounded-xl bg-panel/60 px-3 py-3">
+      <p className="mb-1 text-xs font-bold text-ink">{label}</p>
+      <DonutChart percent={percent} size={72} stroke={9} label={formatPercentLabel(percent)} />
+      <p className="mt-1.5 text-[11px] font-semibold text-ink-muted">
+        {earned}/{required || '-'}학점
+      </p>
+    </div>
+  )
+}
+
+function DetailCreditCard({
+  title,
+  percent,
+  earned,
+  required,
+  courses,
+  onTitleClick,
+  onCurriculum,
+}: {
+  title: string
+  percent: number
+  earned: number
+  required: number
+  courses: ReturnType<typeof toUiCourses>
+  onTitleClick: () => void
+  onCurriculum: () => void
+}) {
+  return (
+    <article className="rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+      <h3 className="mb-2 text-lg font-bold text-ink">{title}</h3>
+      <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-5" />
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
+        <div className="flex flex-col items-center gap-3">
+          <DonutChart percent={percent} size={140} stroke={15} label={formatPercentLabel(percent)} />
+          <div className="space-y-1 text-center text-sm text-ink-muted">
+            <p>필요 학점 {required || '-'}학점</p>
+            <p>이수 학점 {earned}학점</p>
+          </div>
+        </div>
+        <div className="flex flex-1 gap-10">
+          <CourseMiniList
+            title="이수한 과목"
+            courses={courses.slice(0, 6)}
+            totalValue={earned}
+            onTitleClick={onTitleClick}
+          />
+        </div>
+      </div>
+      <div className="mt-6 flex justify-end">
+        <button
+          type="button"
+          onClick={onCurriculum}
+          className="rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white hover:bg-sejong-dark"
+        >
+          이수체계도 확인
+        </button>
+      </div>
+    </article>
   )
 }

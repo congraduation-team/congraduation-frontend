@@ -53,10 +53,13 @@ export type CategoryCourse = {
 }
 
 export type CreditProgress = {
-  earnedCredits: string
-  requiredCredits: string
-  satisfied: boolean
-  progressPercent: string
+  category?: string
+  earnedCredits?: string | number
+  requiredCredits?: string | number
+  satisfied?: boolean
+  progressPercent?: string | number
+  completedCourseCount?: number
+  completedCourses?: CategoryCourse[]
 }
 
 export type CategorySummary = {
