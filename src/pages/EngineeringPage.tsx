@@ -77,7 +77,7 @@ export function EngineeringPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [majorOpen, setMajorOpen] = useState(false)
-  const [remainingModal, setRemainingModal] = useState<{
+  const [listModal, setListModal] = useState<{
     title: string
     subtitle?: string
     courses: Course[]
@@ -380,7 +380,7 @@ export function EngineeringPage() {
                   (showCertElective && generalElective.remaining.length > 0)) && (
                   <RemainingButton
                     onClick={() =>
-                      setRemainingModal({
+                      setListModal({
                         title: '전문교양 남은 과목',
                         subtitle: showCertElective
                           ? `인증필수 ${generalRequired.remaining.length} · 인증선택 ${generalElective.remaining.length}`
@@ -399,9 +399,9 @@ export function EngineeringPage() {
 
             <div className={`grid gap-5 ${showCertElective ? 'sm:grid-cols-2' : ''}`}>
               <section>
-                <p className="mb-2 text-sm font-bold text-ink">인증필수</p>
-                <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
-                <div className="flex items-start gap-3">
+                <p className="mb-2 text-center text-sm font-bold text-ink">인증필수</p>
+                <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5 justify-center" />
+                <div className="flex items-start justify-center gap-3">
                   <DonutChart
                     percent={genReqPct}
                     size={100}
@@ -411,17 +411,25 @@ export function EngineeringPage() {
                   />
                   <CourseMiniList
                     title="이수한 과목"
-                    courses={generalRequired.completed.slice(0, 6)}
+                    courses={generalRequired.completed}
                     totalValue={genReqEarned}
+                    previewCount={3}
+                    onMoreClick={() =>
+                      setListModal({
+                        title: '인증필수 이수 과목',
+                        subtitle: `${genReqEarned}학점 · ${generalRequired.completed.length}과목`,
+                        courses: generalRequired.completed,
+                      })
+                    }
                   />
                 </div>
               </section>
 
               {showCertElective && (
                 <section>
-                  <p className="mb-2 text-sm font-bold text-ink">인증선택</p>
-                  <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5" />
-                  <div className="flex items-start gap-3">
+                  <p className="mb-2 text-center text-sm font-bold text-ink">인증선택</p>
+                  <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3.5 justify-center" />
+                  <div className="flex items-start justify-center gap-3">
                     <DonutChart
                       percent={genElecPct}
                       size={100}
@@ -431,8 +439,16 @@ export function EngineeringPage() {
                     />
                     <CourseMiniList
                       title="이수한 과목"
-                      courses={generalElective.completed.slice(0, 6)}
+                      courses={generalElective.completed}
                       totalValue={genElecEarned}
+                      previewCount={3}
+                      onMoreClick={() =>
+                        setListModal({
+                          title: '인증선택 이수 과목',
+                          subtitle: `${genElecEarned}학점 · ${generalElective.completed.length}과목`,
+                          courses: generalElective.completed,
+                        })
+                      }
                     />
                   </div>
                 </section>
@@ -455,7 +471,7 @@ export function EngineeringPage() {
               {bsm.remaining.length > 0 && (
                 <RemainingButton
                   onClick={() =>
-                    setRemainingModal({
+                    setListModal({
                       title: 'BSM 남은 과목',
                       subtitle: `${bsm.remaining.length}과목`,
                       courses: bsm.remaining,
@@ -464,7 +480,7 @@ export function EngineeringPage() {
                 />
               )}
             </div>
-            <div className="flex items-start gap-3">
+            <div className="flex items-start justify-center gap-3">
               <DonutChart
                 percent={bsmPct}
                 size={100}
@@ -474,8 +490,16 @@ export function EngineeringPage() {
               />
               <CourseMiniList
                 title="이수한 과목"
-                courses={bsm.completed.slice(0, 6)}
+                courses={bsm.completed}
                 totalValue={bsmEarned}
+                previewCount={3}
+                onMoreClick={() =>
+                  setListModal({
+                    title: 'BSM 이수 과목',
+                    subtitle: `${bsmEarned}학점 · ${bsm.completed.length}과목`,
+                    courses: bsm.completed,
+                  })
+                }
               />
             </div>
           </article>
@@ -501,7 +525,7 @@ export function EngineeringPage() {
               {(major.remaining.length > 0 || designLists.remaining.length > 0) && (
                 <RemainingButton
                   onClick={() =>
-                    setRemainingModal({
+                    setListModal({
                       title: '전공·설계 남은 과목',
                       subtitle: `전공 ${major.remaining.length} · 설계 ${designLists.remaining.length}`,
                       courses: [...major.remaining, ...designLists.remaining],
@@ -515,9 +539,9 @@ export function EngineeringPage() {
 
           <div className="grid gap-5 md:grid-cols-2">
             <section>
-              <p className="mb-2 text-sm font-bold text-ink">전공교과목</p>
-              <ChartLegend secondaryLabel="총 학점" className="mb-3.5" />
-              <div className="flex items-start gap-3">
+              <p className="mb-2 text-center text-sm font-bold text-ink">전공교과목</p>
+              <ChartLegend secondaryLabel="총 학점" className="mb-3.5 justify-center" />
+              <div className="flex items-start justify-center gap-3">
                 <DonutChart
                   percent={majorPct}
                   size={100}
@@ -527,17 +551,19 @@ export function EngineeringPage() {
                 />
                 <CourseMiniList
                   title="이수한 과목"
-                  courses={major.completed.slice(0, 4)}
+                  courses={major.completed}
                   totalValue={majorEarned}
+                  previewCount={3}
+                  onMoreClick={() => setMajorOpen(true)}
                   onTitleClick={() => setMajorOpen(true)}
                 />
               </div>
             </section>
 
             <section>
-              <p className="mb-2 text-sm font-bold text-ink">설계</p>
-              <ChartLegend secondaryLabel="총 학점" className="mb-3.5" />
-              <div className="flex items-start gap-3">
+              <p className="mb-2 text-center text-sm font-bold text-ink">설계</p>
+              <ChartLegend secondaryLabel="총 학점" className="mb-3.5 justify-center" />
+              <div className="flex items-start justify-center gap-3">
                 <DonutChart
                   percent={designPct}
                   size={100}
@@ -547,8 +573,16 @@ export function EngineeringPage() {
                 />
                 <CourseMiniList
                   title="이수한 과목"
-                  courses={designLists.completed.slice(0, 4)}
+                  courses={designLists.completed}
                   totalValue={designEarned}
+                  previewCount={3}
+                  onMoreClick={() =>
+                    setListModal({
+                      title: '설계 이수 과목',
+                      subtitle: `${designEarned}학점 · ${designLists.completed.length}과목`,
+                      courses: designLists.completed,
+                    })
+                  }
                 />
               </div>
             </section>
@@ -564,7 +598,7 @@ export function EngineeringPage() {
             {designLists.remaining.length > 0 && (
               <RemainingButton
                 onClick={() =>
-                  setRemainingModal({
+                  setListModal({
                     title: '설계 남은 과목',
                     subtitle: `${designLists.remaining.length}과목`,
                     courses: designLists.remaining,
@@ -573,7 +607,7 @@ export function EngineeringPage() {
               />
             )}
           </div>
-          <div className="flex items-start gap-4">
+          <div className="flex items-start justify-center gap-4">
             <DonutChart
               percent={designPct}
               size={110}
@@ -585,6 +619,14 @@ export function EngineeringPage() {
               title="이수한 과목"
               courses={designLists.completed}
               totalValue={designEarned}
+              previewCount={3}
+              onMoreClick={() =>
+                setListModal({
+                  title: '설계 이수 과목',
+                  subtitle: `${designEarned}학점 · ${designLists.completed.length}과목`,
+                  courses: designLists.completed,
+                })
+              }
             />
           </div>
         </article>
@@ -597,11 +639,11 @@ export function EngineeringPage() {
           courses={major.completed}
         />
         <CourseListModal
-          open={remainingModal != null}
-          onClose={() => setRemainingModal(null)}
-          title={remainingModal?.title ?? '남은 과목'}
-          subtitle={remainingModal?.subtitle}
-          courses={remainingModal?.courses ?? []}
+          open={listModal != null}
+          onClose={() => setListModal(null)}
+          title={listModal?.title ?? '과목 목록'}
+          subtitle={listModal?.subtitle}
+          courses={listModal?.courses ?? []}
         />
       </div>
     </div>
