@@ -10,6 +10,9 @@ import type {
   TranscriptStatusResponse,
   TranscriptUploadResponse,
   TranscriptMajorCreditSummary,
+  MajorOption,
+  StudentMajorTracksResponse,
+  StudentMajorTrackUpdateRequest,
 } from './types'
 
 export function login(userId: string, password: string) {
@@ -103,6 +106,21 @@ export async function uploadAcademicRecord(
 
 export function getGraduationProgress(studentId: number) {
   return apiJson<GraduationProgressResponse>(`/api/evaluate/graduation-progress/${studentId}`)
+}
+
+export function getStudentMajorTracks(studentId: number) {
+  return apiJson<StudentMajorTracksResponse>(`/api/students/${studentId}/major-tracks`)
+}
+
+export function updateStudentMajorTrack(studentId: number, body: StudentMajorTrackUpdateRequest) {
+  return apiJson<StudentLoginResponse>(`/api/students/${studentId}/major-track`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+export function getMajorOptions() {
+  return apiJson<MajorOption[]>('/api/students/major-options')
 }
 
 /** 저장된 기이수성적 기준 전공필수/선택 학점 집계 */

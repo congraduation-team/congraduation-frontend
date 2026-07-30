@@ -9,7 +9,9 @@ import { CourseListModal } from '../components/modals/CourseListModal'
 import { EnglishCertModal } from '../components/modals/EnglishCertModal'
 import { SWCodingCertModal } from '../components/modals/SWCodingCertModal'
 import { useAuth } from '../context/AuthContext'
+import { useMajorTrack } from '../context/MajorTrackContext'
 import { classicReading } from '../data/mockData'
+import { trackTypeLabel } from '../utils/majorTrack'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 
 function toUiCourses(courses?: CategoryCourse[]) {
@@ -23,6 +25,7 @@ function toUiCourses(courses?: CategoryCourse[]) {
 export function GraduationPage() {
   const navigate = useNavigate()
   const { student } = useAuth()
+  const { active, setMajorTracksProgress } = useMajorTrack()
   const [progress, setProgress] = useState<GraduationProgressResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +43,10 @@ export function GraduationPage() {
       setError(null)
       try {
         const data = await getGraduationProgress(student.id)
-        if (!cancelled) setProgress(data)
+        if (!cancelled) {
+          setProgress(data)
+          setMajorTracksProgress(data.majorTracks ?? [])
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : '졸업요건 정보를 불러오지 못했습니다.')
@@ -53,15 +59,35 @@ export function GraduationPage() {
     return () => {
       cancelled = true
     }
-  }, [student])
+  }, [student, setMajorTracksProgress])
+
+  const activeTrack = useMemo(() => {
+    const tracks = progress?.majorTracks ?? []
+    if (!active || tracks.length === 0) return null
+    return (
+      tracks.find((t) => t.department === active.department) ??
+      tracks.find((t) => t.trackType === active.trackType) ??
+      null
+    )
+  }, [progress?.majorTracks, active])
 
   const majorRequired = useMemo(() => {
-    const found = progress?.categorySummaries?.find((c) => c.category.includes('전공필수') || c.category === '전필')
+    if (activeTrack?.requiredCourseProgress?.completedCourses) {
+      return {
+        category: '전공필수',
+        courses: activeTrack.requiredCourseProgress.completedCourses,
+      }
+    }
+    const found = progress?.categorySummaries?.find(
+      (c) => c.category.includes('전공필수') || c.category === '전필',
+    )
     return found
-  }, [progress])
+  }, [progress, activeTrack])
 
   const majorElective = useMemo(() => {
-    const found = progress?.categorySummaries?.find((c) => c.category.includes('전공선택') || c.category === '전선')
+    const found = progress?.categorySummaries?.find(
+      (c) => c.category.includes('전공선택') || c.category === '전선',
+    )
     return found
   }, [progress])
 
@@ -69,9 +95,39 @@ export function GraduationPage() {
   const totalEarned = toNumber(progress?.totalCredits?.earnedCredits)
   const totalRequired = toNumber(progress?.totalCredits?.requiredCredits)
   const totalPct = toPercent(progress?.totalCredits?.progressPercent)
-  const majorPct = toPercent(progress?.majorCredits?.majorCreditsProgressPercent)
-  const majorReqPct = toPercent(progress?.majorCredits?.majorRequiredProgressPercent)
-  const majorElecPct = toPercent(progress?.majorCredits?.majorElectiveProgressPercent)
+
+  const majorPct = toPercent(
+    activeTrack?.totalCredits?.progressPercent ??
+      progress?.majorCredits?.majorCreditsProgressPercent,
+  )
+  const majorReqPct = toPercent(
+    activeTrack?.requiredCredits?.progressPercent ??
+      progress?.majorCredits?.majorRequiredProgressPercent,
+  )
+  const majorElecPct = toPercent(
+    activeTrack?.electiveCredits?.progressPercent ??
+      progress?.majorCredits?.majorElectiveProgressPercent,
+  )
+
+  const majorEarnedLabel = toNumber(
+    activeTrack?.totalCredits?.earnedCredits ?? progress?.majorCredits?.earnedMajorCredits,
+  )
+  const majorRequiredLabel = toNumber(
+    activeTrack?.requiredCredits?.earnedCredits ??
+      progress?.majorCredits?.earnedMajorRequiredCredits,
+  )
+  const majorRequiredNeed = toNumber(
+    activeTrack?.requiredCredits?.requiredCredits ??
+      progress?.majorCredits?.requiredMajorRequiredCredits,
+  )
+  const majorElectiveEarned = toNumber(
+    activeTrack?.electiveCredits?.earnedCredits ??
+      progress?.majorCredits?.earnedMajorElectiveCredits,
+  )
+  const majorElectiveNeed = toNumber(
+    activeTrack?.electiveCredits?.requiredCredits ??
+      progress?.majorCredits?.requiredMajorElectiveCredits,
+  )
 
   if (loading) {
     return <div className="py-20 text-center text-sm text-ink-muted">졸업요건을 불러오는 중...</div>
@@ -92,13 +148,17 @@ export function GraduationPage() {
     )
   }
 
+  const majorTitle = active
+    ? `${trackTypeLabel(active.trackType)} (${active.label})`
+    : progress.major ?? '전공'
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-bold text-ink">{displayName}님 졸업요건 현황</h2>
         <p className="mt-1 text-sm text-ink-muted">
           {progress.admissionYear ? `${progress.admissionYear}학번` : ''}
-          {progress.major ? ` · ${progress.major}` : ''}
+          {active ? ` · ${majorTitle}` : progress.major ? ` · ${progress.major}` : ''}
         </p>
       </div>
 
@@ -116,7 +176,9 @@ export function GraduationPage() {
             </div>
 
             <div className="flex flex-col items-center">
-              <p className="mb-2 w-full text-left text-sm font-bold text-ink">전공 학점</p>
+              <p className="mb-2 w-full text-left text-sm font-bold text-ink">
+                전공 학점{majorEarnedLabel > 0 ? ` (${majorEarnedLabel})` : ''}
+              </p>
               <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-2 w-full justify-start" />
               <DonutChart percent={majorPct} size={150} stroke={16} label={formatPercentLabel(majorPct)} />
             </div>
@@ -228,21 +290,23 @@ export function GraduationPage() {
         <h2 className="mb-4 text-xl font-bold text-ink">학점 현황 자세히 보기</h2>
         <div className="grid gap-5 lg:grid-cols-2">
           <article className="rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <h3 className="mb-2 text-lg font-bold text-ink">{displayName}님 전공 필수 현황</h3>
+            <h3 className="mb-2 text-lg font-bold text-ink">
+              {displayName}님 {majorTitle} 필수 현황
+            </h3>
             <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-5" />
             <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
               <div className="flex flex-col items-center gap-3">
                 <DonutChart percent={majorReqPct} size={160} stroke={16} label={formatPercentLabel(majorReqPct)} />
                 <div className="space-y-1 text-center text-sm text-ink-muted">
-                  <p>필요 학점 {toNumber(progress.majorCredits?.requiredMajorRequiredCredits)}학점</p>
-                  <p>이수 학점 {toNumber(progress.majorCredits?.earnedMajorRequiredCredits)}학점</p>
+                  <p>필요 학점 {majorRequiredNeed}학점</p>
+                  <p>이수 학점 {majorRequiredLabel}학점</p>
                 </div>
               </div>
               <div className="flex flex-1 gap-10">
                 <CourseMiniList
                   title="이수한 과목"
                   courses={toUiCourses(majorRequired?.courses).slice(0, 6)}
-                  totalValue={toNumber(progress.majorCredits?.earnedMajorRequiredCredits)}
+                  totalValue={majorRequiredLabel}
                   onTitleClick={() => setRequiredOpen(true)}
                 />
               </div>
@@ -259,21 +323,23 @@ export function GraduationPage() {
           </article>
 
           <article className="rounded-2xl bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <h3 className="mb-2 text-lg font-bold text-ink">{displayName}님 전공 선택 현황</h3>
+            <h3 className="mb-2 text-lg font-bold text-ink">
+              {displayName}님 {majorTitle} 선택 현황
+            </h3>
             <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-5" />
             <div className="flex flex-col gap-6 sm:flex-row sm:items-start">
               <div className="flex flex-col items-center gap-3">
                 <DonutChart percent={majorElecPct} size={160} stroke={16} label={formatPercentLabel(majorElecPct)} />
                 <div className="space-y-1 text-center text-sm text-ink-muted">
-                  <p>필요 학점 {toNumber(progress.majorCredits?.requiredMajorElectiveCredits)}학점</p>
-                  <p>이수 학점 {toNumber(progress.majorCredits?.earnedMajorElectiveCredits)}학점</p>
+                  <p>필요 학점 {majorElectiveNeed}학점</p>
+                  <p>이수 학점 {majorElectiveEarned}학점</p>
                 </div>
               </div>
               <div className="flex flex-1 gap-10">
                 <CourseMiniList
                   title="이수한 과목"
                   courses={toUiCourses(majorElective?.courses).slice(0, 6)}
-                  totalValue={toNumber(progress.majorCredits?.earnedMajorElectiveCredits)}
+                  totalValue={majorElectiveEarned}
                   onTitleClick={() => setElectiveOpen(true)}
                 />
               </div>
@@ -296,15 +362,15 @@ export function GraduationPage() {
       <CourseListModal
         open={requiredOpen}
         onClose={() => setRequiredOpen(false)}
-        title="전공 필수 이수 과목"
-        subtitle={`${toNumber(progress.majorCredits?.earnedMajorRequiredCredits)}학점 이수 완료`}
+        title={`${majorTitle} 필수 이수 과목`}
+        subtitle={`${majorRequiredLabel}학점 이수 완료`}
         courses={toUiCourses(majorRequired?.courses)}
       />
       <CourseListModal
         open={electiveOpen}
         onClose={() => setElectiveOpen(false)}
-        title="전공 선택 이수 과목"
-        subtitle={`${toNumber(progress.majorCredits?.earnedMajorElectiveCredits)}학점 이수 완료`}
+        title={`${majorTitle} 선택 이수 과목`}
+        subtitle={`${majorElectiveEarned}학점 이수 완료`}
         courses={toUiCourses(majorElective?.courses)}
       />
     </div>

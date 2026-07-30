@@ -7,7 +7,9 @@ import {
 import type { FullRoadmapResponse, RoadmapCourse } from '../api/types'
 import { flattenRoadmapCourses } from '../api/types'
 import { Sidebar } from '../components/layout/Sidebar'
+import { MajorTrackSwitcher } from '../components/modals/MajorTrackSwitcher'
 import { useAuth } from '../context/AuthContext'
+import { useMajorTrack } from '../context/MajorTrackContext'
 
 const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
 const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'] as const
@@ -91,11 +93,15 @@ function buildEdges(courses: RoadmapCourse[]): MapEdge[] {
 
 export function CurriculumPage() {
   const { student } = useAuth()
+  const { active } = useMajorTrack()
   const defaultYear =
     student?.admissionYear && YEARS.includes(student.admissionYear)
       ? student.admissionYear
       : 2024
-  const defaultDept = student?.tracks?.[0]?.departmentCode || 'CSE'
+  const defaultDept =
+    student?.tracks?.find((t) => t.departmentCode === active?.department)?.departmentCode ||
+    student?.tracks?.[0]?.departmentCode ||
+    'CSE'
 
   const [year, setYear] = useState(defaultYear)
   const [departmentCode, setDepartmentCode] = useState(defaultDept)
@@ -122,6 +128,12 @@ export function CurriculumPage() {
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }
+
+  useEffect(() => {
+    if (!active?.department) return
+    const matched = student?.tracks?.find((t) => t.departmentCode === active.department)
+    if (matched?.departmentCode) setDepartmentCode(matched.departmentCode)
+  }, [active?.department, student?.tracks])
 
   useEffect(() => {
     resetView()
@@ -354,6 +366,7 @@ export function CurriculumPage() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-4">
             <h1 className="text-3xl font-bold text-ink">이수체계도</h1>
+            <MajorTrackSwitcher />
             <div className="flex overflow-hidden rounded-full border border-[#ddd] text-sm font-semibold">
               <button
                 type="button"

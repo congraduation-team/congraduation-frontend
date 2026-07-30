@@ -17,6 +17,7 @@ import { DonutChart } from '../components/charts/DonutChart'
 import { CourseMiniList } from '../components/common/CourseMiniList'
 import { CourseListModal } from '../components/modals/CourseListModal'
 import { useAuth } from '../context/AuthContext'
+import { useMajorTrack } from '../context/MajorTrackContext'
 import type { Course } from '../data/mockData'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 
@@ -72,6 +73,7 @@ async function loadRoadmap(studentId: string, departmentCode: string, year: numb
 export function EngineeringPage() {
   const navigate = useNavigate()
   const { student } = useAuth()
+  const { active } = useMajorTrack()
   const [evaluation, setEvaluation] = useState<AbeekEvaluationResponse | null>(null)
   const [roadmap, setRoadmap] = useState<FullRoadmapResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -92,7 +94,10 @@ export function EngineeringPage() {
       setError(null)
       try {
         const abeekId = student.studentNo || String(student.id)
-        const departmentCode = student.tracks?.[0]?.departmentCode || 'CSE'
+        const departmentCode =
+          student.tracks?.find((t) => t.departmentCode === active?.department)?.departmentCode ||
+          student.tracks?.[0]?.departmentCode ||
+          'CSE'
 
         const data = await getAbeekEvaluation(abeekId)
         if (cancelled) return
@@ -129,7 +134,7 @@ export function EngineeringPage() {
     return () => {
       cancelled = true
     }
-  }, [student])
+  }, [student, active?.department])
 
   const roadmapCourses = useMemo(() => flattenRoadmapCourses(roadmap), [roadmap])
 

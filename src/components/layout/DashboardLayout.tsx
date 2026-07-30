@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { MajorTrackSwitcher } from '../modals/MajorTrackSwitcher'
 import { Sidebar } from './Sidebar'
 
 const tabs = [
@@ -12,7 +13,10 @@ export function DashboardLayout() {
     <div className="flex min-h-screen bg-surface">
       <Sidebar />
       <main className="flex-1 overflow-auto px-8 py-7">
-        <h1 className="text-3xl font-bold text-ink">Dashboard</h1>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h1 className="text-3xl font-bold text-ink">Dashboard</h1>
+          <MajorTrackSwitcher />
+        </div>
         <div className="mt-5 flex gap-8 border-b border-[#e5e5ea]">
           {tabs.map((tab) => (
             <NavLink

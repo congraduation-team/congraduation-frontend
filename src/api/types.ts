@@ -90,6 +90,7 @@ export type GraduationProgressResponse = {
   major?: string
   majorType?: MajorType
   secondaryMajor?: string
+  majorTracks?: MajorTrackProgress[]
   totalCredits?: CreditProgress
   commonLiberalCredits?: CreditProgress
   electiveLiberalCredits?: CreditProgress
@@ -115,6 +116,49 @@ export type GraduationProgressResponse = {
     requirementType?: string
     detail?: string
   }
+}
+
+export type MajorTrackRequiredCourseProgress = {
+  policyApplied?: boolean
+  requiredCourseCount?: number
+  completedCourseCount?: number
+  satisfied?: boolean
+  completedCourses?: CategoryCourse[]
+  missingCourses?: CategoryCourse[]
+}
+
+export type MajorTrackProgress = {
+  trackType?: MajorType
+  department?: string
+  totalCredits?: CreditProgress
+  requiredCredits?: CreditProgress
+  electiveCredits?: CreditProgress
+  requiredCourseProgress?: MajorTrackRequiredCourseProgress
+  categoryBasis?: string
+  status?: string
+}
+
+export type StudentMajorTracksResponse = {
+  studentId?: number
+  primaryMajor?: string
+  majorType?: MajorType
+  secondaryMajor?: string
+  tracks?: StudentMajorTrack[]
+}
+
+export type MajorOption = {
+  name: string
+}
+
+export type StudentMajorTrackUpdateRequest = {
+  majorType?: MajorType
+  secondaryMajor?: string | null
+  tracks?: Array<{
+    trackType: MajorType
+    departmentCode: string
+    approvedAtSemester?: number
+    teachingCert?: boolean
+  }>
 }
 
 export type TranscriptStatusResponse = {

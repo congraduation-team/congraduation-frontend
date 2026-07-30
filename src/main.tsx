@@ -5,6 +5,7 @@ import { RequireAdmin } from './components/auth/RequireAdmin'
 import { RequireAuth } from './components/auth/RequireAuth'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { AuthProvider } from './context/AuthContext'
+import { MajorTrackProvider } from './context/MajorTrackContext'
 import { AdminPage } from './pages/AdminPage'
 import { CurriculumPage } from './pages/CurriculumPage'
 import { EngineeringPage } from './pages/EngineeringPage'
@@ -17,6 +18,7 @@ import './index.css'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
+      <MajorTrackProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LoginPage />} />
@@ -35,6 +37,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      </MajorTrackProvider>
     </AuthProvider>
   </StrictMode>,
 )
