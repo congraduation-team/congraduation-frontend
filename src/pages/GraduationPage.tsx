@@ -234,139 +234,11 @@ export function GraduationPage() {
   })()
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div>
         <h2 className="text-[22px] font-bold leading-tight text-ink">{displayName}님 졸업요건 현황</h2>
         <p className="mt-1.5 text-sm text-ink-muted">{analysisTermLabel}</p>
       </div>
-
-      {/* 피그마: 학점 요약 | 고전독서 | 미완료 인증 — 약 2:1:1 */}
-      <section className="grid items-stretch gap-5 xl:grid-cols-[2fr_1fr_1fr]">
-        <article className="rounded-[20px] bg-white px-7 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-5 text-lg font-bold text-ink">
-            현재 {totalEarned}/{totalRequired || '-'}학점 이수 완료!
-          </h3>
-
-          <div className="grid grid-cols-[1.15fr_1.15fr_0.85fr] items-start gap-6">
-            <SummaryGauge
-              title="전체 학점"
-              percent={totalPct}
-              size={148}
-              stroke={16}
-            />
-            <SummaryGauge
-              title="전공 학점"
-              percent={majorPct}
-              size={148}
-              stroke={16}
-            />
-            <div className="flex flex-col gap-5">
-              <SummaryGauge
-                title="전공 필수"
-                percent={majorReqPct}
-                size={92}
-                stroke={11}
-                compact
-              />
-              <SummaryGauge
-                title="전공 선택"
-                percent={majorElecPct}
-                size={92}
-                stroke={11}
-                compact
-              />
-            </div>
-          </div>
-        </article>
-
-        <article className="flex flex-col rounded-[20px] bg-white px-6 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="text-lg font-bold text-ink">현재 고전독서인증 완료!</h3>
-          <p className="mt-1 text-sm text-ink-muted">고전독서인증 현황</p>
-          <div className="mt-5 overflow-hidden rounded-xl border border-[#e5e7eb]">
-            <ul>
-              {classicReading.map((item, index) => (
-                <li
-                  key={item.category}
-                  className={`flex items-center justify-between px-4 py-3.5 text-[15px] ${
-                    index < classicReading.length - 1 ? 'border-b border-[#e5e7eb]' : ''
-                  }`}
-                >
-                  <span className="text-ink">{item.category}</span>
-                  <span className="font-bold text-sejong">
-                    {item.current}/{item.required}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <p className="mt-auto pt-6 text-center text-sm font-bold text-sejong">
-            고전독서인증을 모두 완료하였습니다.
-          </p>
-        </article>
-
-        <article className="flex flex-col rounded-[20px] bg-white px-6 py-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-5 text-lg font-bold text-ink">미완료된 인증</h3>
-
-          <div className="mb-6">
-            <p className="mb-3 text-[15px] font-bold text-ink">영어졸업인증(비전공자)</p>
-            <div className="overflow-hidden rounded-xl border border-[#e5e7eb]">
-              {[
-                { name: 'TOEIC', value: '800점 이상' },
-                { name: 'TOEFL iBT', value: '80점 이상' },
-                { name: 'TOEIC Speaking', value: 'IM 1 이상' },
-              ].map((item, index) => (
-                <div
-                  key={item.name}
-                  className={`flex items-center justify-between gap-2 px-3 py-2.5 ${
-                    index < 2 ? 'border-b border-[#e5e7eb]' : ''
-                  }`}
-                >
-                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1 text-[13px] font-medium text-ink">
-                    {item.name}
-                  </span>
-                  <span className="shrink-0 whitespace-nowrap text-sm text-ink">{item.value}</span>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setEnglishOpen(true)}
-              className="mt-2 w-full text-right text-xs text-ink-muted hover:text-sejong"
-            >
-              더보기
-            </button>
-          </div>
-
-          <div>
-            <p className="mb-3 text-[15px] font-bold text-ink">SW코딩졸업인증(비전공자)</p>
-            <div className="overflow-hidden rounded-xl border border-[#e5e7eb]">
-              {[
-                { name: 'TOSC (SW역량테스트)', value: 'Level 5 이상' },
-                { name: 'K-MOOC:코딩과스토리텔링', value: 'P 이상' },
-              ].map((item, index) => (
-                <div
-                  key={item.name}
-                  className={`flex items-center justify-between gap-2 overflow-x-auto px-3 py-2.5 ${
-                    index === 0 ? 'border-b border-[#e5e7eb]' : ''
-                  }`}
-                >
-                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1 text-[12px] font-medium leading-none text-ink">
-                    {item.name}
-                  </span>
-                  <span className="shrink-0 whitespace-nowrap text-sm text-ink">{item.value}</span>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setSwOpen(true)}
-              className="mt-2 w-full text-right text-xs text-ink-muted hover:text-sejong"
-            >
-              더보기
-            </button>
-          </div>
-        </article>
-      </section>
 
       <section>
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
@@ -378,6 +250,123 @@ export function GraduationPage() {
           <GradeStatCard label="전공 성적" value={majorGpa} />
           <GradeStatCard label="교양 성적" value={liberalGpa} />
         </div>
+      </section>
+
+      <section className="grid items-stretch gap-4 xl:grid-cols-[2fr_1fr_1fr]">
+        <article className="rounded-[20px] bg-white px-6 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <h3 className="mb-3 text-base font-bold text-ink">
+            현재 {totalEarned}/{totalRequired || '-'}학점 이수 완료!
+          </h3>
+
+          <div className="grid grid-cols-[1fr_1fr_auto] items-center justify-items-center gap-4">
+            <SummaryGauge title="전체 학점" percent={totalPct} size={136} stroke={15} />
+            <SummaryGauge title="전공 학점" percent={majorPct} size={136} stroke={15} />
+            <div className="flex flex-col items-center gap-3">
+              <SummaryGauge
+                title="전공 필수"
+                percent={majorReqPct}
+                size={78}
+                stroke={10}
+                compact
+              />
+              <SummaryGauge
+                title="전공 선택"
+                percent={majorElecPct}
+                size={78}
+                stroke={10}
+                compact
+              />
+            </div>
+          </div>
+        </article>
+
+        <article className="flex flex-col rounded-[20px] bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <h3 className="text-base font-bold text-ink">현재 고전독서인증 완료!</h3>
+          <p className="mt-0.5 text-xs text-ink-muted">고전독서인증 현황</p>
+          <div className="mt-3 overflow-hidden rounded-lg border border-[#e5e7eb]">
+            <ul>
+              {classicReading.map((item, index) => (
+                <li
+                  key={item.category}
+                  className={`flex items-center justify-between px-3 py-2 text-[13px] ${
+                    index < classicReading.length - 1 ? 'border-b border-[#e5e7eb]' : ''
+                  }`}
+                >
+                  <span className="text-ink">{item.category}</span>
+                  <span className="font-bold text-sejong">
+                    {item.current}/{item.required}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <p className="mt-auto pt-3 text-center text-xs font-bold text-sejong">
+            고전독서인증을 모두 완료하였습니다.
+          </p>
+        </article>
+
+        <article className="flex flex-col rounded-[20px] bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <h3 className="mb-3 text-base font-bold text-ink">미완료된 인증</h3>
+
+          <div className="mb-3">
+            <p className="mb-1.5 text-xs font-bold text-ink">영어졸업인증(비전공자)</p>
+            <div className="overflow-hidden rounded-lg border border-[#e5e7eb]">
+              {[
+                { name: 'TOEIC', value: '800점 이상' },
+                { name: 'TOEFL iBT', value: '80점 이상' },
+                { name: 'TOEIC Speaking', value: 'IM 1 이상' },
+              ].map((item, index) => (
+                <div
+                  key={item.name}
+                  className={`flex items-center justify-between gap-1.5 px-2 py-1.5 ${
+                    index < 2 ? 'border-b border-[#e5e7eb]' : ''
+                  }`}
+                >
+                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[11px] font-medium text-ink">
+                    {item.name}
+                  </span>
+                  <span className="shrink-0 whitespace-nowrap text-[11px] text-ink">{item.value}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setEnglishOpen(true)}
+              className="mt-1 w-full text-right text-[11px] text-ink-muted hover:text-sejong"
+            >
+              더보기
+            </button>
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-xs font-bold text-ink">SW코딩졸업인증(비전공자)</p>
+            <div className="overflow-hidden rounded-lg border border-[#e5e7eb]">
+              {[
+                { name: 'TOSC (SW역량테스트)', value: 'Level 5 이상' },
+                { name: 'K-MOOC:코딩과스토리텔링', value: 'P 이상' },
+              ].map((item, index) => (
+                <div
+                  key={item.name}
+                  className={`flex items-center justify-between gap-1.5 overflow-x-auto px-2 py-1.5 ${
+                    index === 0 ? 'border-b border-[#e5e7eb]' : ''
+                  }`}
+                >
+                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[10px] font-medium leading-none text-ink">
+                    {item.name}
+                  </span>
+                  <span className="shrink-0 whitespace-nowrap text-[11px] text-ink">{item.value}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setSwOpen(true)}
+              className="mt-1 w-full text-right text-[11px] text-ink-muted hover:text-sejong"
+            >
+              더보기
+            </button>
+          </div>
+        </article>
       </section>
 
       <section>
@@ -509,21 +498,25 @@ function SummaryGauge({
   compact?: boolean
 }) {
   return (
-    <div className="flex flex-col items-start">
-      <p className={`mb-1.5 font-bold text-ink ${compact ? 'text-sm' : 'text-[15px]'}`}>{title}</p>
+    <div className="flex w-full flex-col items-center" style={{ maxWidth: size + 24 }}>
+      <p
+        className={`mb-1 w-full text-center font-bold text-ink ${
+          compact ? 'text-xs' : 'text-sm'
+        }`}
+      >
+        {title}
+      </p>
       <ChartLegend
         secondaryLabel="총 학점"
         activeColor="#c8012e"
-        className={`mb-2 w-full justify-start ${compact ? 'scale-[0.85] origin-left' : ''}`}
+        className={`mb-1.5 justify-center ${compact ? 'scale-[0.8]' : 'scale-90'}`}
       />
-      <div className="w-full flex justify-center">
-        <DonutChart
-          percent={percent}
-          size={size}
-          stroke={stroke}
-          label={formatPercentLabel(percent)}
-        />
-      </div>
+      <DonutChart
+        percent={percent}
+        size={size}
+        stroke={stroke}
+        label={formatPercentLabel(percent)}
+      />
     </div>
   )
 }
