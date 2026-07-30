@@ -6,6 +6,7 @@ import type {
   CurriculumCourse,
   FullRoadmapResponse,
   GraduationProgressResponse,
+  OfferedCurriculumResponse,
   StudentLoginResponse,
   TranscriptStatusResponse,
   TranscriptUploadResponse,
@@ -177,4 +178,36 @@ export function getAbeekFullRoadmapByStudent(studentId: string) {
   return apiJson<FullRoadmapResponse>(
     `/api/abeek/full-roadmap/by-student?studentId=${encodeURIComponent(studentId)}`,
   )
+}
+
+export function getAbeekOfferedCourses(options: {
+  departmentCode: string
+  curriculumYear: number
+  termYear?: number
+  semester?: number
+}) {
+  const params = new URLSearchParams({
+    departmentCode: options.departmentCode,
+    curriculumYear: String(options.curriculumYear),
+  })
+  if (options.termYear != null) params.set('termYear', String(options.termYear))
+  if (options.semester != null) params.set('semester', String(options.semester))
+  return apiJson<OfferedCurriculumResponse>(`/api/abeek/offered-courses?${params}`)
+}
+
+export function getAbeekOfferedCoursesByStudent(options: {
+  studentId: string
+  termYear?: number
+  semester?: number
+}) {
+  const params = new URLSearchParams({ studentId: options.studentId })
+  if (options.termYear != null) params.set('termYear', String(options.termYear))
+  if (options.semester != null) params.set('semester', String(options.semester))
+  return apiJson<OfferedCurriculumResponse>(
+    `/api/abeek/offered-courses/by-student?${params}`,
+  )
+}
+
+export function getAbeekTimetableTerms() {
+  return apiJson<Array<Record<string, unknown>>>('/api/abeek/timetable-terms')
 }

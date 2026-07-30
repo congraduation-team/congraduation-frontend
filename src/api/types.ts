@@ -321,6 +321,36 @@ export type FullRoadmapResponse = {
   summary?: RoadmapSummary
 }
 
+export type OfferedCourse = {
+  abeekCourseCode: string
+  courseName: string
+  category?: CurriculumCourseCategory
+  role?: CurriculumCourseRole
+  credits?: number
+  designCredits?: number
+  designLevel?: AbeekDesignLevel
+  recommendedTerm?: string
+}
+
+export type OfferedCurriculumResponse = {
+  departmentCode?: string
+  departmentName?: string
+  curriculumYear?: number
+  termYear?: number
+  semester?: number
+  curriculumCourseCount?: number
+  offeredCourseCount?: number
+  notOfferedCourseCount?: number
+  offeredCourses?: OfferedCourse[]
+  notOfferedCourses?: Array<{
+    abeekCourseCode: string
+    courseName: string
+    category?: CurriculumCourseCategory
+    role?: CurriculumCourseRole
+    recommendedTerm?: string
+  }>
+}
+
 export type AbeekTranscriptEvaluationResponse = {
   studentId?: string
   studentName?: string

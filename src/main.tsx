@@ -12,6 +12,7 @@ import { EngineeringPage } from './pages/EngineeringPage'
 import { GraduationPage } from './pages/GraduationPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyCoursesPage } from './pages/MyCoursesPage'
+import { SimulationPage } from './pages/SimulationPage'
 import { UploadPage } from './pages/UploadPage'
 import './index.css'
 
@@ -30,6 +31,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="courses" element={<MyCoursesPage />} />
             </Route>
             <Route path="/curriculum" element={<CurriculumPage />} />
+            <Route path="/simulation" element={<SimulationPage />} />
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminPage />} />
             </Route>
