@@ -296,29 +296,41 @@ export function EngineeringPage() {
         )}
       </div>
 
-      <div className="mx-auto max-w-[1080px] space-y-5">
-        <article className="rounded-2xl bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-4 text-base font-bold text-ink">인증 요약</h3>
+      <div className="mx-auto max-w-[1080px] space-y-4">
+        <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <h3 className="mb-3 text-base font-bold text-ink">인증 요약</h3>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ReqCreditCard
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <SummaryMiniGauge
               label="전문교양"
+              percent={generalPct}
               earned={generalEarned}
               required={generalRequiredCredits}
             />
-            <ReqCreditCard label="BSM" earned={bsmEarned} required={bsmRequired} />
-            <ReqCreditCard label="전공" earned={majorEarned} required={majorRequired} />
-            <ReqCreditCard
+            <SummaryMiniGauge
+              label="BSM"
+              percent={bsmPct}
+              earned={bsmEarned}
+              required={bsmRequired}
+            />
+            <SummaryMiniGauge
+              label="전공"
+              percent={majorPct}
+              earned={majorEarned}
+              required={majorRequired}
+            />
+            <SummaryMiniGauge
               label="설계"
+              percent={designPct}
               earned={toNumber(designEarned)}
               required={designRequired}
             />
           </div>
 
-          <div className="mt-5 grid gap-5 lg:grid-cols-2">
-            <section className="rounded-xl bg-panel px-4 py-4">
-              <p className="mb-3 text-sm font-bold text-ink">설계 시퀀스</p>
-              <ul className="space-y-2.5">
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            <section className="rounded-xl bg-panel/70 px-3.5 py-3">
+              <p className="mb-2 text-sm font-bold text-ink">설계 시퀀스</p>
+              <ul className="space-y-2">
                 <DesignCheck
                   label="기초설계 (공학설계기초)"
                   done={designDetail?.hasBasicDesign === true}
@@ -333,36 +345,40 @@ export function EngineeringPage() {
                 />
               </ul>
               {designDetail?.sequenceSatisfied === false && (
-                <p className="mt-3 text-xs text-ink-muted">
+                <p className="mt-2 text-[11px] text-ink-muted">
                   기초 → 요소 → 종합 순서를 모두 이수해야 설계 시퀀스가 충족됩니다.
                 </p>
               )}
             </section>
 
-            <section className="rounded-xl bg-panel px-4 py-4">
-              <p className="mb-3 text-sm font-bold text-ink">적용 요건 · 안내</p>
+            <section className="rounded-xl bg-panel/70 px-3.5 py-3">
+              <p className="mb-2 text-sm font-bold text-ink">적용 요건 · 안내</p>
               {evaluation.graduationAbeekBasisLabel && (
                 <p className="mb-2 text-xs font-semibold text-ink">
                   {evaluation.graduationAbeekBasisLabel}
                 </p>
               )}
               {incompleteRequiredCourses.length > 0 && (
-                <div className="mb-3">
-                  <p className="mb-1.5 text-xs font-semibold text-sejong">미이수 인증필수</p>
-                  <ul className="space-y-1">
-                    {incompleteRequiredCourses.map((c) => (
-                      <li key={c.courseCode} className="text-xs text-ink-muted">
+                <div className="mb-2">
+                  <p className="mb-1 text-[11px] font-semibold text-sejong">미이수 인증필수</p>
+                  <ul className="space-y-0.5">
+                    {incompleteRequiredCourses.slice(0, 4).map((c) => (
+                      <li key={c.courseCode} className="text-[11px] text-ink-muted">
                         {c.courseName}
-                        {c.note ? ` · ${c.note}` : ''}
                       </li>
                     ))}
+                    {incompleteRequiredCourses.length > 4 && (
+                      <li className="text-[11px] text-ink-faint">
+                        외 {incompleteRequiredCourses.length - 4}과목
+                      </li>
+                    )}
                   </ul>
                 </div>
               )}
               {requirementNotes.length > 0 ? (
-                <ul className="space-y-2">
-                  {requirementNotes.map((msg) => (
-                    <li key={msg} className="text-xs leading-relaxed text-ink-muted">
+                <ul className="space-y-1">
+                  {requirementNotes.slice(0, 3).map((msg) => (
+                    <li key={msg} className="text-[11px] leading-relaxed text-ink-muted">
                       {msg.replace(/^[·•\s]+/, '')}
                     </li>
                   ))}
@@ -370,30 +386,27 @@ export function EngineeringPage() {
               ) : (
                 !evaluation.graduationAbeekBasisLabel &&
                 incompleteRequiredCourses.length === 0 && (
-                  <p className="text-xs text-ink-muted">
+                  <p className="text-[11px] text-ink-muted">
                     입학 {evaluation.entranceYear ?? '-'}년도 기준으로 평가합니다.
                   </p>
                 )
               )}
 
               {(waivedCourses.length > 0 || waivedNotes.length > 0) && (
-                <div className="mt-4 border-t border-black/5 pt-3">
-                  <p className="mb-2 text-xs font-semibold text-ink">면제 과목</p>
+                <div className="mt-2 border-t border-black/5 pt-2">
+                  <p className="mb-1 text-[11px] font-semibold text-ink">면제 과목</p>
                   {waivedCourses.length > 0 ? (
-                    <ul className="space-y-2">
-                      {waivedCourses.map((c) => (
-                        <li key={c.courseCode} className="text-xs text-ink-muted">
-                          <span className="font-medium text-ink">{c.courseName}</span>
-                          <span className="mt-0.5 block text-ink-faint">
-                            {c.note ?? '졸업연도 신설 필수 · 입학연도 미존재로 면제'}
-                          </span>
+                    <ul className="space-y-1">
+                      {waivedCourses.slice(0, 3).map((c) => (
+                        <li key={c.courseCode} className="text-[11px] text-ink-muted">
+                          {c.courseName}
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <ul className="space-y-2">
-                      {waivedNotes.map((msg) => (
-                        <li key={msg} className="text-xs leading-relaxed text-ink-muted">
+                    <ul className="space-y-1">
+                      {waivedNotes.slice(0, 2).map((msg) => (
+                        <li key={msg} className="text-[11px] text-ink-muted">
                           {msg.replace(/^[·•\s]+/, '')}
                         </li>
                       ))}
@@ -404,111 +417,79 @@ export function EngineeringPage() {
             </section>
           </div>
         </article>
-        <div className="grid items-start gap-5 lg:grid-cols-2">
-          <article className="rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+
+        <div className="grid items-stretch gap-4 lg:grid-cols-2">
+          <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-base font-bold text-ink">
-                {displayName}님 전문교양{' '}
+                전문교양{' '}
                 <span className="text-sejong">
                   {generalEarned}/{generalRequiredCredits || '-'}
                 </span>
-                학점 이수
+                학점
               </h3>
-              <div className="flex flex-wrap gap-2">
-                {(generalRequired.remaining.length > 0 ||
-                  (showCertElective && generalElective.remaining.length > 0)) && (
-                  <RemainingButton
-                    onClick={() =>
-                      setListModal({
-                        title: '전문교양 남은 과목',
-                        subtitle: showCertElective
-                          ? `인증필수 ${generalRequired.remaining.length} · 인증선택 ${generalElective.remaining.length}`
-                          : `인증필수 ${generalRequired.remaining.length}과목`,
-                        courses: [
-                          ...generalRequired.remaining,
-                          ...(showCertElective ? generalElective.remaining : []),
-                        ],
-                      })
-                    }
-                  />
-                )}
-                <CurriculumButton onClick={() => navigate('/curriculum')} />
-              </div>
+              {(generalRequired.remaining.length > 0 ||
+                (showCertElective && generalElective.remaining.length > 0)) && (
+                <RemainingButton
+                  onClick={() =>
+                    setListModal({
+                      title: '전문교양 남은 과목',
+                      subtitle: showCertElective
+                        ? `인증필수 ${generalRequired.remaining.length} · 인증선택 ${generalElective.remaining.length}`
+                        : `인증필수 ${generalRequired.remaining.length}과목`,
+                      courses: [
+                        ...generalRequired.remaining,
+                        ...(showCertElective ? generalElective.remaining : []),
+                      ],
+                    })
+                  }
+                />
+              )}
             </div>
 
-            <div className={`grid items-start gap-4 ${showCertElective ? 'sm:grid-cols-2' : ''}`}>
-              <section>
-                <p className="mb-2 text-center text-sm font-bold text-ink">인증필수</p>
-                <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3 justify-center" />
-                <ChartCourseRow>
-                  <DonutChart
-                    percent={genReqPct}
-                    size={100}
-                    stroke={11}
-                    color="#5b6470"
-                    label={formatPercentLabel(genReqPct)}
-                  />
-                  <CourseMiniList
-                    title="이수한 과목"
-                    courses={generalRequired.completed}
-                    totalValue={genReqEarned}
-                    previewCount={3}
-                    className="w-[200px] shrink-0"
-                    onMoreClick={() =>
-                      setListModal({
-                        title: '인증필수 이수 과목',
-                        subtitle: `${genReqEarned}학점 · ${generalRequired.completed.length}과목`,
-                        courses: generalRequired.completed,
-                      })
-                    }
-                  />
-                </ChartCourseRow>
-              </section>
-
+            <div className={`grid gap-4 ${showCertElective ? 'sm:grid-cols-2' : ''}`}>
+              <AbeekCategoryBlock
+                title="인증필수"
+                percent={genReqPct}
+                courses={generalRequired.completed}
+                totalValue={genReqEarned}
+                legend="최소 이수 학점"
+                onMore={() =>
+                  setListModal({
+                    title: '인증필수 이수 과목',
+                    subtitle: `${genReqEarned}학점 · ${generalRequired.completed.length}과목`,
+                    courses: generalRequired.completed,
+                  })
+                }
+              />
               {showCertElective && (
-                <section>
-                  <p className="mb-2 text-center text-sm font-bold text-ink">인증선택</p>
-                  <ChartLegend secondaryLabel="최소 이수 학점" className="mb-3 justify-center" />
-                  <ChartCourseRow>
-                    <DonutChart
-                      percent={genElecPct}
-                      size={100}
-                      stroke={11}
-                      color="#5b6470"
-                      label={formatPercentLabel(genElecPct)}
-                    />
-                    <CourseMiniList
-                      title="이수한 과목"
-                      courses={generalElective.completed}
-                      totalValue={genElecEarned}
-                      previewCount={3}
-                    className="w-[200px] shrink-0"
-                      onMoreClick={() =>
-                        setListModal({
-                          title: '인증선택 이수 과목',
-                          subtitle: `${genElecEarned}학점 · ${generalElective.completed.length}과목`,
-                          courses: generalElective.completed,
-                        })
-                      }
-                    />
-                  </ChartCourseRow>
-                </section>
+                <AbeekCategoryBlock
+                  title="인증선택"
+                  percent={genElecPct}
+                  courses={generalElective.completed}
+                  totalValue={genElecEarned}
+                  legend="최소 이수 학점"
+                  onMore={() =>
+                    setListModal({
+                      title: '인증선택 이수 과목',
+                      subtitle: `${genElecEarned}학점 · ${generalElective.completed.length}과목`,
+                      courses: generalElective.completed,
+                    })
+                  }
+                />
               )}
             </div>
           </article>
 
-          <article className="rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <h3 className="text-base font-bold text-ink">
-                  BSM{' '}
-                  <span className="text-sejong">
-                    {bsmEarned}/{bsmRequired || '-'}
-                  </span>
-                  학점 이수
-                </h3>
-                <ChartLegend secondaryLabel="총 학점" className="mt-2" />
-              </div>
+          <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-base font-bold text-ink">
+                BSM{' '}
+                <span className="text-sejong">
+                  {bsmEarned}/{bsmRequired || '-'}
+                </span>
+                학점
+              </h3>
               {bsm.remaining.length > 0 && (
                 <RemainingButton
                   onClick={() =>
@@ -521,151 +502,67 @@ export function EngineeringPage() {
                 />
               )}
             </div>
-            <ChartCourseRow>
-              <DonutChart
-                percent={bsmPct}
-                size={100}
-                stroke={11}
-                color="#5b6470"
-                label={formatPercentLabel(bsmPct)}
-              />
-              <CourseMiniList
-                title="이수한 과목"
-                courses={bsm.completed}
-                totalValue={bsmEarned}
-                previewCount={3}
-                    className="w-[200px] shrink-0"
-                onMoreClick={() =>
-                  setListModal({
-                    title: 'BSM 이수 과목',
-                    subtitle: `${bsmEarned}학점 · ${bsm.completed.length}과목`,
-                    courses: bsm.completed,
-                  })
-                }
-              />
-            </ChartCourseRow>
+            <AbeekCategoryBlock
+              percent={bsmPct}
+              courses={bsm.completed}
+              totalValue={bsmEarned}
+              legend="총 학점"
+              onMore={() =>
+                setListModal({
+                  title: 'BSM 이수 과목',
+                  subtitle: `${bsmEarned}학점 · ${bsm.completed.length}과목`,
+                  courses: bsm.completed,
+                })
+              }
+            />
           </article>
         </div>
 
-        <article className="rounded-2xl bg-white px-6 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
+        <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="text-base font-bold text-ink">
                 전공{' '}
                 <span className="text-sejong">
                   {majorEarned}/{majorRequired || '-'}
                 </span>
-                학점 이수
+                학점
               </h3>
-              <p className="mt-1 text-sm text-ink-muted">
-                전공 {majorEarned}학점 · 설계 {designEarned}
-                {designRequired ? `/${designRequired}` : ''}학점 이수
-                {evaluation.designSequenceSatisfied === false ? ' · 설계 시퀀스 미충족' : ''}
+              <p className="mt-0.5 text-xs text-ink-muted">
+                설계 {designEarned}
+                {designRequired ? `/${designRequired}` : ''}학점
+                {evaluation.designSequenceSatisfied === false ? ' · 시퀀스 미충족' : ''}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {(major.remaining.length > 0 || designLists.remaining.length > 0) && (
-                <RemainingButton
-                  onClick={() =>
-                    setListModal({
-                      title: '전공·설계 남은 과목',
-                      subtitle: `전공 ${major.remaining.length} · 설계 ${designLists.remaining.length}`,
-                      courses: [...major.remaining, ...designLists.remaining],
-                    })
-                  }
-                />
-              )}
-              <CurriculumButton onClick={() => navigate('/curriculum')} />
-            </div>
-          </div>
-
-          <div className="grid items-start gap-4 md:grid-cols-2">
-            <section>
-              <p className="mb-2 text-center text-sm font-bold text-ink">전공교과목</p>
-              <ChartLegend secondaryLabel="총 학점" className="mb-3 justify-center" />
-              <ChartCourseRow>
-                <DonutChart
-                  percent={majorPct}
-                  size={100}
-                  stroke={11}
-                  color="#5b6470"
-                  label={formatPercentLabel(majorPct)}
-                />
-                <CourseMiniList
-                  title="이수한 과목"
-                  courses={major.completed}
-                  totalValue={majorEarned}
-                  previewCount={3}
-                    className="w-[200px] shrink-0"
-                  onMoreClick={() => setMajorOpen(true)}
-                  onTitleClick={() => setMajorOpen(true)}
-                />
-              </ChartCourseRow>
-            </section>
-
-            <section>
-              <p className="mb-2 text-center text-sm font-bold text-ink">설계</p>
-              <ChartLegend secondaryLabel="총 학점" className="mb-3 justify-center" />
-              <ChartCourseRow>
-                <DonutChart
-                  percent={designPct}
-                  size={100}
-                  stroke={11}
-                  color="#5b6470"
-                  label={formatPercentLabel(designPct)}
-                />
-                <CourseMiniList
-                  title="이수한 과목"
-                  courses={designLists.completed}
-                  totalValue={designEarned}
-                  previewCount={3}
-                    className="w-[200px] shrink-0"
-                  onMoreClick={() =>
-                    setListModal({
-                      title: '설계 이수 과목',
-                      subtitle: `${designEarned}학점 · ${designLists.completed.length}과목`,
-                      courses: designLists.completed,
-                    })
-                  }
-                />
-              </ChartCourseRow>
-            </section>
-          </div>
-        </article>
-
-        <article className="rounded-2xl bg-white px-6 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-            <div>
-              <h3 className="text-base font-bold text-ink">전공 설계 자세히 보기</h3>
-              <ChartLegend secondaryLabel="총 학점" className="mt-2" />
-            </div>
-            {designLists.remaining.length > 0 && (
+            {(major.remaining.length > 0 || designLists.remaining.length > 0) && (
               <RemainingButton
                 onClick={() =>
                   setListModal({
-                    title: '설계 남은 과목',
-                    subtitle: `${designLists.remaining.length}과목`,
-                    courses: designLists.remaining,
+                    title: '전공·설계 남은 과목',
+                    subtitle: `전공 ${major.remaining.length} · 설계 ${designLists.remaining.length}`,
+                    courses: [...major.remaining, ...designLists.remaining],
                   })
                 }
               />
             )}
           </div>
-          <ChartCourseRow>
-            <DonutChart
-              percent={designPct}
-              size={110}
-              stroke={12}
-              color="#5b6470"
-              label={formatPercentLabel(designPct)}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <AbeekCategoryBlock
+              title="전공교과목"
+              percent={majorPct}
+              courses={major.completed}
+              totalValue={majorEarned}
+              legend="총 학점"
+              onMore={() => setMajorOpen(true)}
             />
-            <CourseMiniList
-              title="이수한 과목"
+            <AbeekCategoryBlock
+              title="설계"
+              percent={designPct}
               courses={designLists.completed}
               totalValue={designEarned}
-              previewCount={3}
-                    className="w-[200px] shrink-0"
-              onMoreClick={() =>
+              legend="총 학점"
+              onMore={() =>
                 setListModal({
                   title: '설계 이수 과목',
                   subtitle: `${designEarned}학점 · ${designLists.completed.length}과목`,
@@ -673,7 +570,7 @@ export function EngineeringPage() {
                 })
               }
             />
-          </ChartCourseRow>
+          </div>
         </article>
 
         <CourseListModal
@@ -700,30 +597,80 @@ function RemainingButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="rounded-full border border-[#e5e7eb] bg-white px-4 py-2 text-sm font-semibold text-ink transition hover:bg-panel"
+      className="rounded-full border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-panel"
     >
       남은 과목 보기
     </button>
   )
 }
 
-function ChartCourseRow({ children }: { children: ReactNode }) {
+function SummaryMiniGauge({
+  label,
+  percent,
+  earned,
+  required,
+}: {
+  label: string
+  percent: number
+  earned: number
+  required: number
+}) {
   return (
-    <div className="flex w-full justify-center">
-      <div className="inline-flex items-start gap-5">{children}</div>
+    <div className="flex flex-col items-center rounded-xl bg-panel/70 px-3 py-3">
+      <p className="mb-1 text-xs font-bold text-ink">{label}</p>
+      <DonutChart
+        percent={percent}
+        size={76}
+        stroke={9}
+        color="#c8012e"
+        label={formatPercentLabel(percent)}
+      />
+      <p className="mt-1.5 text-[11px] font-semibold text-ink-muted">
+        <span className="text-sejong">{earned}</span>/{required || '-'}학점
+      </p>
     </div>
   )
 }
 
-function CurriculumButton({ onClick }: { onClick: () => void }) {
+function AbeekCategoryBlock({
+  title,
+  percent,
+  courses,
+  totalValue,
+  legend,
+  onMore,
+}: {
+  title?: string
+  percent: number
+  courses: Course[]
+  totalValue: number | string
+  legend: '최소 이수 학점' | '총 학점'
+  onMore: () => void
+}) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white transition hover:bg-sejong-dark"
-    >
-      이수체계도 확인
-    </button>
+    <section className="flex flex-col items-center">
+      {title && <p className="mb-1 text-center text-sm font-bold text-ink">{title}</p>}
+      <ChartLegend secondaryLabel={legend} activeColor="#c8012e" className="mb-2 justify-center scale-90" />
+      <div className="flex w-full items-center justify-center gap-4">
+        <DonutChart
+          percent={percent}
+          size={96}
+          stroke={11}
+          color="#c8012e"
+          label={formatPercentLabel(percent)}
+        />
+        <CourseMiniList
+          title="이수한 과목"
+          courses={courses}
+          totalValue={totalValue}
+          previewCount={4}
+          showMoreLink
+          className="min-w-0 max-w-[220px] flex-1"
+          emptyText="이수한 과목이 없습니다."
+          onMoreClick={onMore}
+        />
+      </div>
+    </section>
   )
 }
 
@@ -735,40 +682,25 @@ function MetaChip({ children }: { children: ReactNode }) {
   )
 }
 
-function ReqCreditCard({
-  label,
-  earned,
-  required,
-}: {
-  label: string
-  earned: number
-  required: number
-}) {
-  const met = required > 0 && earned >= required
-  return (
-    <div className="rounded-xl bg-panel px-4 py-3">
-      <p className="text-xs font-semibold text-ink-muted">{label}</p>
-      <p className="mt-1.5 text-lg font-extrabold text-ink">
-        <span className={met ? 'text-emerald-700' : 'text-sejong'}>{earned}</span>
-        <span className="text-sm font-bold text-ink-muted">/{required || '-'}학점</span>
-      </p>
-    </div>
-  )
-}
-
 function DesignCheck({ label, done }: { label: string; done: boolean }) {
   return (
-    <li className="flex items-center gap-2.5 text-sm">
+    <li className="flex items-center gap-2 text-sm">
       <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
           done ? 'bg-emerald-100 text-emerald-700' : 'bg-black/5 text-ink-faint'
         }`}
         aria-hidden
       >
         {done ? '✓' : '–'}
       </span>
-      <span className={done ? 'font-medium text-ink' : 'text-ink-muted'}>{label}</span>
-      <span className={`ml-auto text-xs font-semibold ${done ? 'text-emerald-700' : 'text-sejong'}`}>
+      <span className={done ? 'text-[13px] font-medium text-ink' : 'text-[13px] text-ink-muted'}>
+        {label}
+      </span>
+      <span
+        className={`ml-auto text-[11px] font-semibold ${
+          done ? 'text-emerald-700' : 'text-sejong'
+        }`}
+      >
         {done ? '이수' : '미이수'}
       </span>
     </li>
