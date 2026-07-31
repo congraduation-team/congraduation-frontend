@@ -163,7 +163,11 @@ export function EngineeringPage() {
   )
   const designAll = useMemo(() => roadmapCourses.filter(hasDesign), [roadmapCourses])
 
-  const generalRequired = useMemo(() => splitRoadmap(generalRequiredAll), [generalRequiredAll])
+  /** 전문교양 미이수(로드맵 REQUIRED) — 남은 과목 모달용. 학점·목록 표시는 evaluation.general 사용 */
+  const generalRequiredRemaining = useMemo(
+    () => splitRoadmap(generalRequiredAll).remaining,
+    [generalRequiredAll],
+  )
   const generalElective = useMemo(() => splitRoadmap(generalElectiveAll), [generalElectiveAll])
   const bsm = useMemo(() => splitRoadmap(bsmAll), [bsmAll])
   const major = useMemo(() => splitRoadmap(majorAll), [majorAll])
@@ -186,18 +190,22 @@ export function EngineeringPage() {
   }, [designAll])
 
   const displayName = evaluation?.studentName || roadmap?.studentName || student?.name || '학생'
+
+  // 전문교양 = evaluation.general (로드맵 GENERAL+REQUIRED로 재계산하지 않음)
   const generalEarned = toNumber(evaluation?.general?.earnedCredits)
   const generalRequiredCredits = toNumber(evaluation?.general?.requiredCredits)
   const generalPct = toPercent(evaluation?.general?.progressPercent)
-
-  const genReqEarned = generalRequired.completed.reduce((s, c) => s + c.credits, 0)
-  const genReqNeed =
-    generalRequiredAll.reduce((s, c) => s + toNumber(c.credits), 0) ||
-    Math.max(generalRequiredCredits, 1)
-  const genReqPct =
-    genReqNeed > 0
-      ? Math.max(0, Math.min(100, Math.round((genReqEarned / genReqNeed) * 100)))
-      : generalPct
+  const generalCompleted = useMemo(
+    () =>
+      (evaluation?.general?.completedCourses ?? []).map((c) =>
+        toCourse({
+          courseCode: c.courseCode,
+          courseName: c.courseName,
+          credits: c.credits ?? c.credit,
+        }),
+      ),
+    [evaluation?.general?.completedCourses],
+  )
 
   const genElecEarned = generalElective.completed.reduce((s, c) => s + c.credits, 0)
   const genElecNeed = generalElectiveAll.reduce((s, c) => s + toNumber(c.credits), 0) || 1
@@ -335,7 +343,7 @@ export function EngineeringPage() {
         </div>
         {!evaluation.overallSatisfied && incompleteRequiredCourses.length > 0 && (
           <p className="mt-2 text-sm text-ink-muted">
-            미이수 인증필수:{' '}
+            미이수 인증필수 과목:{' '}
             <span className="font-semibold text-sejong">
               {incompleteRequiredCourses.map((c) => c.courseName).join(', ')}
             </span>
@@ -419,7 +427,7 @@ export function EngineeringPage() {
               )}
               {incompleteRequiredCourses.length > 0 && (
                 <div className="mb-2">
-                  <p className="mb-1 text-[11px] font-semibold text-sejong">미이수 인증필수</p>
+                  <p className="mb-1 text-[11px] font-semibold text-sejong">미이수 인증필수 과목</p>
                   <ul className="space-y-0.5">
                     {incompleteRequiredCourses.slice(0, 4).map((c) => (
                       <li key={c.courseCode} className="text-[11px] text-ink-muted">
@@ -477,40 +485,40 @@ export function EngineeringPage() {
           </div>
         </article>
 
-        {/* 1행: 인증필수 | 인증선택 */}
+        {/* 1행: 전문교양 | 인증선택 */}
         <div className={`grid items-stretch gap-4 ${showCertElective ? 'lg:grid-cols-2' : ''}`}>
           <article className="rounded-[20px] bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-base font-bold text-ink">
-                인증필수{' '}
-                <span className="text-sejong">{genReqEarned}</span>
+                전문교양{' '}
+                <span className="text-sejong">{generalEarned}</span>
                 {generalRequiredCredits ? (
                   <span className="text-ink-muted">/{generalRequiredCredits}</span>
                 ) : null}
                 학점
               </h3>
-              {generalRequired.remaining.length > 0 && (
+              {generalRequiredRemaining.length > 0 && (
                 <RemainingButton
                   onClick={() =>
                     setListModal({
-                      title: '인증필수 남은 과목',
-                      subtitle: `${generalRequired.remaining.length}과목`,
-                      courses: generalRequired.remaining,
+                      title: '전문교양 남은 과목',
+                      subtitle: `${generalRequiredRemaining.length}과목`,
+                      courses: generalRequiredRemaining,
                     })
                   }
                 />
               )}
             </div>
             <AbeekCategoryBlock
-              percent={genReqPct}
-              courses={generalRequired.completed}
-              totalValue={genReqEarned}
+              percent={generalPct}
+              courses={generalCompleted}
+              totalValue={generalEarned}
               legend="최소 이수 학점"
               onMore={() =>
                 setListModal({
-                  title: '인증필수 이수 과목',
-                  subtitle: `${genReqEarned}학점 · ${generalRequired.completed.length}과목`,
-                  courses: generalRequired.completed,
+                  title: '전문교양 이수 과목',
+                  subtitle: `${generalEarned}학점 · ${generalCompleted.length}과목`,
+                  courses: generalCompleted,
                 })
               }
             />

@@ -347,6 +347,13 @@ export type AbeekCategoryProgress = {
   requiredCredits?: string
   satisfied?: boolean
   progressPercent?: string
+  /** 평가에 반영된 이수 과목 (전문교양 등) */
+  completedCourses?: Array<{
+    courseCode: string
+    courseName: string
+    credits?: number | string
+    credit?: string
+  }>
 }
 
 export type AbeekRequiredCourseStatus = {
