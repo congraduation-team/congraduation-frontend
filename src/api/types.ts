@@ -391,6 +391,48 @@ export type FullRoadmapResponse = {
   summary?: RoadmapSummary
 }
 
+/** GET /api/roadmap — 시간표 기반 일반 학과 로드맵 */
+export type StudentRoadmapCourse = {
+  courseCode: string
+  courseName: string
+  /** 시간표 이수구분 원문 (예: 전공필수) */
+  category?: string
+  /** GENERAL | BSM | MAJOR | OTHER */
+  abeekBucket?: string
+  credits?: number
+  completed?: boolean
+  takenYear?: string | null
+  takenSemester?: string | null
+  grade?: string | null
+  sectionCount?: number
+}
+
+export type StudentRoadmapTerm = {
+  termKey: string
+  gradeYear?: number
+  semester?: number
+  termIndex?: number
+  courses?: StudentRoadmapCourse[]
+  categories?: Record<string, StudentRoadmapCourse[]>
+}
+
+export type StudentRoadmapResponse = {
+  studentDbId?: number | null
+  studentNo?: string | null
+  studentName?: string | null
+  departmentName?: string
+  /** 공학인증 대상 학과 여부 */
+  abeekTarget?: boolean
+  abeekDepartmentCode?: string
+  sourceTerms?: Array<{
+    termYear?: number
+    semester?: number
+    offeringCount?: number
+  }>
+  terms?: StudentRoadmapTerm[]
+  summary?: RoadmapSummary
+}
+
 export type OfferedCourse = {
   abeekCourseCode: string
   courseName: string

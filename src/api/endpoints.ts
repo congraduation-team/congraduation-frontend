@@ -9,6 +9,7 @@ import type {
   FullRoadmapResponse,
   GraduationProgressResponse,
   OfferedCurriculumResponse,
+  StudentRoadmapResponse,
   PlannedCoursesResponse,
   StudentLoginResponse,
   TranscriptStatusResponse,
@@ -162,6 +163,20 @@ export function getCurriculumCourses(departmentCode: string, year: number) {
 
 export function getDepartments() {
   return apiJson<string[]>('/api/departments')
+}
+
+/** 학과명 기준 시간표 로드맵 (모든 학과 공통) */
+export function getStudentRoadmap(departmentName: string, studentDbId?: number) {
+  const params = new URLSearchParams({ departmentName })
+  if (studentDbId != null) params.set('studentDbId', String(studentDbId))
+  return apiJson<StudentRoadmapResponse>(`/api/roadmap?${params}`)
+}
+
+/** 로그인한 학생 기준 시간표 로드맵 + 이수 표시 */
+export function getStudentRoadmapByStudent(studentDbId: number) {
+  return apiJson<StudentRoadmapResponse>(
+    `/api/roadmap/by-student?studentDbId=${encodeURIComponent(String(studentDbId))}`,
+  )
 }
 
 export function getAbeekFullRoadmap(options: {

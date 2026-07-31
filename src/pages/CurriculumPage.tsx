@@ -2,19 +2,26 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEven
 import {
   getAbeekFullRoadmap,
   getAbeekFullRoadmapByStudent,
-  getDepartments,
+  getMajorOptions,
+  getStudentRoadmap,
+  getStudentRoadmapByStudent,
 } from '../api/endpoints'
-import type { FullRoadmapResponse, RoadmapCourse } from '../api/types'
+import type {
+  FullRoadmapResponse,
+  RoadmapCourse,
+  StudentRoadmapCourse,
+  StudentRoadmapResponse,
+} from '../api/types'
 import { flattenRoadmapCourses } from '../api/types'
 import { Sidebar } from '../components/layout/Sidebar'
 import { MajorTrackSwitcher } from '../components/modals/MajorTrackSwitcher'
 import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
 
-const YEARS = [2026, 2025, 2024, 2023, 2022, 2021, 2020]
 const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'] as const
 
 type MapCategory = 'liberal' | 'bsm' | 'major-required' | 'major-elective'
+type ViewKind = 'general' | 'abeek'
 
 type MapCourse = {
   id: string
@@ -41,7 +48,12 @@ const categoryStyle: Record<MapCategory, string> = {
 const rowDefs = [
   { key: 'liberal', label: '전문교양', categories: ['liberal'] as const, border: 'border-[#c5c9d0]' },
   { key: 'bsm', label: 'BSM', categories: ['bsm'] as const, border: 'border-[#4a5568]' },
-  { key: 'major', label: '전공', categories: ['major-required', 'major-elective'] as const, border: 'border-sejong' },
+  {
+    key: 'major',
+    label: '전공',
+    categories: ['major-required', 'major-elective'] as const,
+    border: 'border-sejong',
+  },
 ]
 
 type NodePos = { x1: number; y1: number; x2: number; y2: number; cx: number; cy: number }
@@ -55,14 +67,23 @@ function buildOrthogonalPath(from: NodePos, to: NodePos, bendOffset: number) {
   return `M ${startX} ${startY} H ${midX} V ${endY} H ${endX}`
 }
 
-function mapCategory(course: RoadmapCourse): MapCategory {
+function mapAbeekCategory(course: RoadmapCourse): MapCategory {
   if (course.category === 'GENERAL') return 'liberal'
   if (course.category === 'BSM') return 'bsm'
   if (course.role === 'REQUIRED') return 'major-required'
   return 'major-elective'
 }
 
-function toMapCourse(course: RoadmapCourse): MapCourse | null {
+function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
+  const bucket = (course.abeekBucket || '').toUpperCase()
+  const label = course.category || ''
+  if (bucket === 'GENERAL' || label.includes('교양')) return 'liberal'
+  if (bucket === 'BSM') return 'bsm'
+  if (label.includes('필수') || label.includes('기초')) return 'major-required'
+  return 'major-elective'
+}
+
+function abeekToMapCourse(course: RoadmapCourse): MapCourse | null {
   const semester = (course.recommendedTerm || '').trim()
   if (!semester || !(SEMESTERS as readonly string[]).includes(semester)) return null
 
@@ -73,13 +94,51 @@ function toMapCourse(course: RoadmapCourse): MapCourse | null {
     id: course.abeekCourseCode,
     name: course.courseName,
     hours: `${course.credits}학점${design}`,
-    category: mapCategory(course),
+    category: mapAbeekCategory(course),
     semester,
     completed: course.completed === true,
   }
 }
 
-function buildEdges(courses: RoadmapCourse[]): MapEdge[] {
+function generalToMapCourse(course: StudentRoadmapCourse, termKey: string): MapCourse | null {
+  const semester = termKey.trim()
+  if (!semester || !(SEMESTERS as readonly string[]).includes(semester)) return null
+  if (!course.courseCode) return null
+
+  return {
+    id: course.courseCode,
+    name: course.courseName,
+    hours: `${course.credits ?? 0}학점`,
+    category: mapGeneralCategory(course),
+    semester,
+    completed: course.completed === true,
+  }
+}
+
+function flattenStudentRoadmapCourses(
+  roadmap: StudentRoadmapResponse | null | undefined,
+): Array<{ course: StudentRoadmapCourse; termKey: string }> {
+  if (!roadmap) return []
+  const list: Array<{ course: StudentRoadmapCourse; termKey: string }> = []
+  const seen = new Set<string>()
+
+  for (const term of roadmap.terms ?? []) {
+    const termKey = term.termKey || ''
+    const fromCourses = term.courses ?? []
+    const fromCategories = Object.values(term.categories ?? {}).flat()
+    const merged = fromCourses.length > 0 ? fromCourses : fromCategories
+
+    for (const course of merged) {
+      const key = `${termKey}:${course.courseCode}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      list.push({ course, termKey })
+    }
+  }
+  return list
+}
+
+function buildAbeekEdges(courses: RoadmapCourse[]): MapEdge[] {
   const ids = new Set(courses.map((c) => c.abeekCourseCode))
   const edges: MapEdge[] = []
   for (const course of courses) {
@@ -94,20 +153,16 @@ function buildEdges(courses: RoadmapCourse[]): MapEdge[] {
 export function CurriculumPage() {
   const { student } = useAuth()
   const { active } = useMajorTrack()
-  const defaultYear =
-    student?.admissionYear && YEARS.includes(student.admissionYear)
-      ? student.admissionYear
-      : 2024
-  const defaultDept =
-    student?.tracks?.find((t) => t.departmentCode === active?.department)?.departmentCode ||
-    student?.tracks?.[0]?.departmentCode ||
-    'CSE'
 
-  const [year, setYear] = useState(defaultYear)
-  const [departmentCode, setDepartmentCode] = useState(defaultDept)
-  const [departments, setDepartments] = useState<string[]>([defaultDept])
-  const [roadmap, setRoadmap] = useState<FullRoadmapResponse | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [viewKind, setViewKind] = useState<ViewKind>('general')
+  const [departmentName, setDepartmentName] = useState(student?.major || '')
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>(
+    student?.major ? [student.major] : [],
+  )
+  const [generalRoadmap, setGeneralRoadmap] = useState<StudentRoadmapResponse | null>(null)
+  const [abeekRoadmap, setAbeekRoadmap] = useState<FullRoadmapResponse | null>(null)
+  const [generalLoading, setGeneralLoading] = useState(true)
+  const [abeekLoading, setAbeekLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mode, setMode] = useState<'all' | 'mine'>('all')
   const [filter, setFilter] = useState<string | null>(null)
@@ -124,20 +179,28 @@ export function CurriculumPage() {
   panRef.current = pan
   zoomRef.current = zoom
 
+  const abeekTarget = generalRoadmap?.abeekTarget === true
+  const abeekDepartmentCode =
+    generalRoadmap?.abeekDepartmentCode ||
+    student?.tracks?.find((t) => t.departmentCode === active?.department)?.departmentCode ||
+    student?.tracks?.[0]?.departmentCode
+
   const resetView = () => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }
 
   useEffect(() => {
-    if (!active?.department) return
-    const matched = student?.tracks?.find((t) => t.departmentCode === active.department)
-    if (matched?.departmentCode) setDepartmentCode(matched.departmentCode)
-  }, [active?.department, student?.tracks])
+    if (student?.major) setDepartmentName((prev) => prev || student.major)
+  }, [student?.major])
 
   useEffect(() => {
     resetView()
-  }, [year, departmentCode])
+  }, [viewKind, departmentName])
+
+  useEffect(() => {
+    if (viewKind === 'abeek' && !abeekTarget) setViewKind('general')
+  }, [viewKind, abeekTarget])
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -174,12 +237,15 @@ export function CurriculumPage() {
     let cancelled = false
     ;(async () => {
       try {
-        const list = await getDepartments()
+        const list = await getMajorOptions()
         if (cancelled || !Array.isArray(list) || list.length === 0) return
-        setDepartments(list)
-        setDepartmentCode((prev) =>
-          list.includes(prev) ? prev : list.includes('CSE') ? 'CSE' : list[0],
-        )
+        const names = list.map((d) => d.name).filter(Boolean)
+        setDepartmentOptions(names)
+        setDepartmentName((prev) => {
+          if (prev && names.includes(prev)) return prev
+          if (student?.major && names.includes(student.major)) return student.major
+          return names[0] || prev
+        })
       } catch {
         // keep default
       }
@@ -187,74 +253,131 @@ export function CurriculumPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [student?.major])
 
+  // 기본: 시간표 기반 일반 로드맵
   useEffect(() => {
+    if (!departmentName && !student?.id) {
+      setGeneralLoading(false)
+      return
+    }
+
     let cancelled = false
     ;(async () => {
-      setLoading(true)
+      setGeneralLoading(true)
       setError(null)
       try {
-        const studentId = student?.studentNo || (student ? String(student.id) : undefined)
-        let data: FullRoadmapResponse
-        if (studentId) {
+        let data: StudentRoadmapResponse
+        if (student?.id && (!departmentName || departmentName === student.major)) {
           try {
-            data = await getAbeekFullRoadmapByStudent(studentId)
+            data = await getStudentRoadmapByStudent(student.id)
           } catch {
-            data = await getAbeekFullRoadmap({
-              departmentCode,
-              curriculumYear: year,
-              studentId,
-            })
+            if (!departmentName) throw new Error('학과 정보를 확인할 수 없습니다.')
+            data = await getStudentRoadmap(departmentName, student.id)
           }
+        } else if (departmentName) {
+          data = await getStudentRoadmap(departmentName, student?.id)
         } else {
-          data = await getAbeekFullRoadmap({ departmentCode, curriculumYear: year })
+          throw new Error('학과를 선택해 주세요.')
         }
 
-        // 학과/연도 탭과 응답이 다르면 탭 기준으로 다시 요청
-        if (
-          data.departmentCode &&
-          data.departmentCode !== departmentCode
-        ) {
-          data = await getAbeekFullRoadmap({
-            departmentCode,
-            curriculumYear: year,
-            studentId,
-          })
-        } else if (data.curriculumYear && data.curriculumYear !== year) {
-          data = await getAbeekFullRoadmap({
-            departmentCode,
-            curriculumYear: year,
-            studentId,
-          })
+        if (!cancelled) {
+          setGeneralRoadmap(data)
+          if (data.departmentName && !departmentName) {
+            setDepartmentName(data.departmentName)
+          }
+          if (data.departmentName) {
+            setDepartmentOptions((prev) =>
+              prev.includes(data.departmentName!) ? prev : [...prev, data.departmentName!],
+            )
+          }
         }
-
-        if (!cancelled) setRoadmap(data)
       } catch (err) {
         if (!cancelled) {
-          setRoadmap(null)
-          setError(err instanceof Error ? err.message : '이수체계도를 불러오지 못했습니다.')
+          setGeneralRoadmap(null)
+          setError(err instanceof Error ? err.message : '로드맵을 불러오지 못했습니다.')
         }
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setGeneralLoading(false)
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [departmentCode, year, student])
+  }, [departmentName, student?.id, student?.major])
 
-  const rawCourses = useMemo(() => flattenRoadmapCourses(roadmap), [roadmap])
-  const edges = useMemo(() => buildEdges(rawCourses), [rawCourses])
+  // 공학인증 로드맵 (버튼으로 전환 시에만)
+  useEffect(() => {
+    if (viewKind !== 'abeek') {
+      setAbeekRoadmap(null)
+      setAbeekLoading(false)
+      return
+    }
 
-  const allCourses = useMemo(
-    () => rawCourses.map(toMapCourse).filter((c): c is MapCourse => c != null),
-    [rawCourses],
+    let cancelled = false
+    ;(async () => {
+      setAbeekLoading(true)
+      setError(null)
+      try {
+        const abeekId = student?.studentNo || (student ? String(student.id) : undefined)
+        let data: FullRoadmapResponse
+
+        if (abeekId) {
+          try {
+            data = await getAbeekFullRoadmapByStudent(abeekId)
+          } catch {
+            if (!abeekDepartmentCode) throw new Error('공학인증 학과 코드가 없습니다.')
+            data = await getAbeekFullRoadmap({
+              departmentCode: abeekDepartmentCode,
+              curriculumYear: student?.admissionYear || new Date().getFullYear(),
+              studentId: abeekId,
+            })
+          }
+        } else {
+          if (!abeekDepartmentCode) throw new Error('공학인증 학과 코드가 없습니다.')
+          data = await getAbeekFullRoadmap({
+            departmentCode: abeekDepartmentCode,
+            curriculumYear: new Date().getFullYear(),
+          })
+        }
+
+        if (!cancelled) setAbeekRoadmap(data)
+      } catch (err) {
+        if (!cancelled) {
+          setAbeekRoadmap(null)
+          setError(err instanceof Error ? err.message : '공학인증 로드맵을 불러오지 못했습니다.')
+        }
+      } finally {
+        if (!cancelled) setAbeekLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [viewKind, student, abeekDepartmentCode])
+
+  const loading = viewKind === 'abeek' ? abeekLoading : generalLoading
+
+  const abeekRawCourses = useMemo(() => flattenRoadmapCourses(abeekRoadmap), [abeekRoadmap])
+  const generalFlat = useMemo(() => flattenStudentRoadmapCourses(generalRoadmap), [generalRoadmap])
+
+  const edges = useMemo(
+    () => (viewKind === 'abeek' ? buildAbeekEdges(abeekRawCourses) : []),
+    [viewKind, abeekRawCourses],
   )
 
+  const allCourses = useMemo(() => {
+    if (viewKind === 'abeek') {
+      return abeekRawCourses.map(abeekToMapCourse).filter((c): c is MapCourse => c != null)
+    }
+    return generalFlat
+      .map(({ course, termKey }) => generalToMapCourse(course, termKey))
+      .filter((c): c is MapCourse => c != null)
+  }, [viewKind, abeekRawCourses, generalFlat])
+
   const hasCompletionData = useMemo(
-    () => rawCourses.some((c) => c.completed === true),
-    [rawCourses],
+    () => allCourses.some((c) => c.completed === true),
+    [allCourses],
   )
 
   const courses = useMemo(() => {
@@ -280,7 +403,6 @@ export function CurriculumPage() {
 
     const update = () => {
       const boardRect = board.getBoundingClientRect()
-      // getBoundingClientRect는 scale 반영 → SVG 로컬 좌표로 환산
       const scaleX = board.offsetWidth > 0 ? boardRect.width / board.offsetWidth : 1
       const scaleY = board.offsetHeight > 0 ? boardRect.height / board.offsetHeight : 1
       const positions: Record<string, NodePos> = {}
@@ -327,7 +449,7 @@ export function CurriculumPage() {
       observer.disconnect()
       window.removeEventListener('scroll', update, true)
     }
-  }, [visibleEdges, courses, mode, filter, year, departmentCode])
+  }, [visibleEdges, courses, mode, filter, viewKind, departmentName])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -359,6 +481,11 @@ export function CurriculumPage() {
     return () => viewport.removeEventListener('wheel', onWheel)
   }, [loading, error, allCourses.length])
 
+  const titleLabel =
+    viewKind === 'abeek'
+      ? `${departmentName || '학과'} 공학인증 로드맵`
+      : `${departmentName || '학과'} 로드맵`
+
   return (
     <div className="flex min-h-screen bg-surface">
       <Sidebar />
@@ -386,38 +513,52 @@ export function CurriculumPage() {
             <label className="flex items-center gap-2 text-sm font-semibold text-ink">
               학과
               <select
-                value={departmentCode}
-                onChange={(e) => setDepartmentCode(e.target.value)}
+                value={departmentName}
+                onChange={(e) => {
+                  setDepartmentName(e.target.value)
+                  setViewKind('general')
+                }}
                 className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-sejong/30"
               >
-                {departments.map((code) => (
-                  <option key={code} value={code}>
-                    {code}
+                {departmentOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
                   </option>
                 ))}
               </select>
             </label>
+            {abeekTarget && (
+              <div className="flex overflow-hidden rounded-full border border-[#ddd] text-sm font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setViewKind('general')}
+                  className={`px-4 py-1.5 ${
+                    viewKind === 'general' ? 'bg-ink text-white' : 'bg-white text-ink'
+                  }`}
+                >
+                  일반 로드맵
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewKind('abeek')}
+                  className={`px-4 py-1.5 ${
+                    viewKind === 'abeek' ? 'bg-sejong text-white' : 'bg-white text-ink'
+                  }`}
+                >
+                  공학인증
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="mt-5 flex flex-wrap gap-6 border-b border-[#e5e5ea]">
-          {YEARS.map((y) => (
-            <button
-              key={y}
-              type="button"
-              onClick={() => setYear(y)}
-              className={`pb-2.5 text-[15px] font-semibold ${
-                year === y
-                  ? 'border-b-[3px] border-sejong text-sejong'
-                  : 'border-b-[3px] border-transparent text-ink'
-              }`}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
+        <p className="mt-3 text-sm text-ink-muted">
+          {viewKind === 'abeek'
+            ? '공학인증(ABEEK) 이수체계도입니다.'
+            : '강의 시간표 기준 학과 로드맵입니다.'}
+        </p>
 
-        <div className="mt-0 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#e5e5ea] py-3.5">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#e5e5ea] py-3.5">
           <span className="shrink-0 text-sm font-medium text-ink">체계표 안내</span>
           <div className="flex flex-wrap items-center gap-2">
             <LegendPill
@@ -446,76 +587,83 @@ export function CurriculumPage() {
             />
           </div>
           <div className="ml-auto flex flex-wrap items-end gap-4">
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-xs text-ink">필수 선수과목</span>
-              <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
-                <line x1="0" y1="6" x2="46" y2="6" stroke="#222" strokeWidth="1.8" />
-                <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
-              </svg>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-xs text-ink">선택 선수과목</span>
-              <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
-                <line
-                  x1="0"
-                  y1="6"
-                  x2="46"
-                  y2="6"
-                  stroke="#222"
-                  strokeWidth="1.8"
-                  strokeDasharray="4 3"
-                />
-                <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
-              </svg>
-            </div>
+            {viewKind === 'abeek' && (
+              <>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-xs text-ink">필수 선수과목</span>
+                  <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
+                    <line x1="0" y1="6" x2="46" y2="6" stroke="#222" strokeWidth="1.8" />
+                    <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
+                  </svg>
+                </div>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-xs text-ink">선택 선수과목</span>
+                  <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
+                    <line
+                      x1="0"
+                      y1="6"
+                      x2="46"
+                      y2="6"
+                      stroke="#222"
+                      strokeWidth="1.8"
+                      strokeDasharray="4 3"
+                    />
+                    <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
+                  </svg>
+                </div>
+              </>
+            )}
             <p className="pb-0.5 text-xs text-ink-muted">휠: 확대/축소 · 드래그: 이동</p>
           </div>
         </div>
 
         <div className="mt-6 overflow-hidden rounded-2xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           {loading ? (
-            <p className="py-16 text-center text-sm text-ink-muted">이수체계도를 불러오는 중...</p>
+            <p className="py-16 text-center text-sm text-ink-muted">{titleLabel}을 불러오는 중...</p>
           ) : error ? (
             <p className="py-16 text-center text-sm text-sejong">{error}</p>
           ) : allCourses.length === 0 ? (
             <p className="py-16 text-center text-sm text-ink-muted">
-              {departmentCode} {year}년 커리큘럼 과목이 없습니다.
+              {departmentName || '선택 학과'} 로드맵 과목이 없습니다.
             </p>
           ) : (
             <>
-              <div className="flex items-center justify-end gap-2 border-b border-[#eee] px-4 py-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = Math.max(0.45, zoomRef.current / 1.12)
-                    zoomRef.current = next
-                    setZoom(next)
-                  }}
-                  className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
-                >
-                  −
-                </button>
-                <span className="min-w-12 text-center text-xs font-semibold text-ink-muted">
-                  {Math.round(zoom * 100)}%
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = Math.min(2.5, zoomRef.current * 1.12)
-                    zoomRef.current = next
-                    setZoom(next)
-                  }}
-                  className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
-                >
-                  +
-                </button>
-                <button
-                  type="button"
-                  onClick={resetView}
-                  className="rounded-lg border border-[#e5e7eb] px-3 py-1 text-xs font-semibold text-ink hover:bg-surface"
-                >
-                  초기화
-                </button>
+              <div className="flex items-center justify-between gap-2 border-b border-[#eee] px-4 py-2">
+                <p className="text-sm font-semibold text-ink">{titleLabel}</p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = Math.max(0.45, zoomRef.current / 1.12)
+                      zoomRef.current = next
+                      setZoom(next)
+                    }}
+                    className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
+                  >
+                    −
+                  </button>
+                  <span className="min-w-12 text-center text-xs font-semibold text-ink-muted">
+                    {Math.round(zoom * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = Math.min(2.5, zoomRef.current * 1.12)
+                      zoomRef.current = next
+                      setZoom(next)
+                    }}
+                    className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
+                  >
+                    +
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetView}
+                    className="rounded-lg border border-[#e5e7eb] px-3 py-1 text-xs font-semibold text-ink hover:bg-surface"
+                  >
+                    초기화
+                  </button>
+                </div>
               </div>
 
               <div
@@ -536,116 +684,118 @@ export function CurriculumPage() {
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   }}
                 >
-              <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
-                <defs>
-                  <marker
-                    id="arrow-required"
-                    viewBox="0 0 10 10"
-                    refX="9"
-                    refY="5"
-                    markerWidth="7"
-                    markerHeight="7"
-                    orient="auto-start-reverse"
-                  >
-                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#555" />
-                  </marker>
-                  <marker
-                    id="arrow-optional"
-                    viewBox="0 0 10 10"
-                    refX="9"
-                    refY="5"
-                    markerWidth="7"
-                    markerHeight="7"
-                    orient="auto-start-reverse"
-                  >
-                    <path d="M 0 0 L 10 5 L 0 10 z" fill="#888" />
-                  </marker>
-                </defs>
-                {paths.map((path) => (
-                  <path
-                    key={path.key}
-                    d={path.d}
-                    fill="none"
-                    stroke={path.type === 'required' ? '#555' : '#888'}
-                    strokeWidth="1.5"
-                    strokeDasharray={path.type === 'optional' ? '5 4' : undefined}
-                    markerEnd={`url(#arrow-${path.type})`}
-                  />
-                ))}
-              </svg>
-
-              <div className="relative z-10 mb-3 grid grid-cols-[72px_repeat(8,1fr)] gap-2">
-                <div />
-                {SEMESTERS.map((s) => (
-                  <div key={s} className="text-center text-sm font-bold text-ink">
-                    {s}
-                  </div>
-                ))}
-              </div>
-
-              {rowDefs.map((row) => (
-                <div
-                  key={row.key}
-                  className="relative z-10 mb-5 grid grid-cols-[72px_repeat(8,1fr)] gap-2"
-                >
-                  <div className="flex items-center justify-center">
-                    <span
-                      className={`rounded-full border px-2 py-8 text-center text-[11px] font-bold text-ink ${row.border}`}
-                      style={{ writingMode: 'vertical-rl' }}
-                    >
-                      {row.label}
-                    </span>
-                  </div>
-                  {SEMESTERS.map((semester) => {
-                    const cellCourses = courses.filter(
-                      (c) =>
-                        c.semester === semester &&
-                        (row.categories as readonly MapCategory[]).includes(c.category),
-                    )
-                    const isFirstMajor = row.key === 'major' && semester === '1-1'
-
-                    return (
-                      <div
-                        key={`${row.key}-${semester}`}
-                        className={`relative min-h-[130px] space-y-2.5 rounded-xl p-1.5 ${
-                          isFirstMajor ? 'border border-dashed border-sejong bg-sejong-light/40' : ''
-                        }`}
+                  <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
+                    <defs>
+                      <marker
+                        id="arrow-required"
+                        viewBox="0 0 10 10"
+                        refX="9"
+                        refY="5"
+                        markerWidth="7"
+                        markerHeight="7"
+                        orient="auto-start-reverse"
                       >
-                        {isFirstMajor && (
-                          <p className="mb-1 text-center text-[10px] font-semibold text-sejong">
-                            모든 전공의 선수 과목
-                          </p>
-                        )}
-                        {cellCourses.map((course) => (
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#555" />
+                      </marker>
+                      <marker
+                        id="arrow-optional"
+                        viewBox="0 0 10 10"
+                        refX="9"
+                        refY="5"
+                        markerWidth="7"
+                        markerHeight="7"
+                        orient="auto-start-reverse"
+                      >
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#888" />
+                      </marker>
+                    </defs>
+                    {paths.map((path) => (
+                      <path
+                        key={path.key}
+                        d={path.d}
+                        fill="none"
+                        stroke={path.type === 'required' ? '#555' : '#888'}
+                        strokeWidth="1.5"
+                        strokeDasharray={path.type === 'optional' ? '5 4' : undefined}
+                        markerEnd={`url(#arrow-${path.type})`}
+                      />
+                    ))}
+                  </svg>
+
+                  <div className="relative z-10 mb-3 grid grid-cols-[72px_repeat(8,1fr)] gap-2">
+                    <div />
+                    {SEMESTERS.map((s) => (
+                      <div key={s} className="text-center text-sm font-bold text-ink">
+                        {s}
+                      </div>
+                    ))}
+                  </div>
+
+                  {rowDefs.map((row) => (
+                    <div
+                      key={row.key}
+                      className="relative z-10 mb-5 grid grid-cols-[72px_repeat(8,1fr)] gap-2"
+                    >
+                      <div className="flex items-center justify-center">
+                        <span
+                          className={`rounded-full border px-2 py-8 text-center text-[11px] font-bold text-ink ${row.border}`}
+                          style={{ writingMode: 'vertical-rl' }}
+                        >
+                          {row.label}
+                        </span>
+                      </div>
+                      {SEMESTERS.map((semester) => {
+                        const cellCourses = courses.filter(
+                          (c) =>
+                            c.semester === semester &&
+                            (row.categories as readonly MapCategory[]).includes(c.category),
+                        )
+                        const isFirstMajor = row.key === 'major' && semester === '1-1'
+
+                        return (
                           <div
-                            key={course.id}
-                            ref={(el) => {
-                              nodeRefs.current[course.id] = el
-                            }}
-                            className={`rounded-full px-2.5 py-2 text-center text-[11px] font-semibold leading-tight shadow-sm ${
-                              categoryStyle[course.category]
-                            } ${
-                              hasCompletionData && !course.completed && mode === 'all'
-                                ? 'opacity-45'
+                            key={`${row.key}-${semester}`}
+                            className={`relative min-h-[130px] space-y-2.5 rounded-xl p-1.5 ${
+                              isFirstMajor
+                                ? 'border border-dashed border-sejong bg-sejong-light/40'
                                 : ''
                             }`}
                           >
-                            <div>{course.name}</div>
-                            <div className="mt-0.5 text-[10px] font-medium opacity-80">
-                              {course.hours}
-                            </div>
-                            {course.name.toLowerCase().includes('capstone') && (
-                              <span className="mt-1 inline-flex size-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-sejong">
-                                !
-                              </span>
+                            {isFirstMajor && (
+                              <p className="mb-1 text-center text-[10px] font-semibold text-sejong">
+                                모든 전공의 선수 과목
+                              </p>
                             )}
+                            {cellCourses.map((course) => (
+                              <div
+                                key={`${course.id}-${course.semester}`}
+                                ref={(el) => {
+                                  nodeRefs.current[course.id] = el
+                                }}
+                                className={`rounded-full px-2.5 py-2 text-center text-[11px] font-semibold leading-tight shadow-sm ${
+                                  categoryStyle[course.category]
+                                } ${
+                                  hasCompletionData && !course.completed && mode === 'all'
+                                    ? 'opacity-45'
+                                    : ''
+                                }`}
+                              >
+                                <div>{course.name}</div>
+                                <div className="mt-0.5 text-[10px] font-medium opacity-80">
+                                  {course.hours}
+                                </div>
+                                {course.name.toLowerCase().includes('capstone') && (
+                                  <span className="mt-1 inline-flex size-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-sejong">
+                                    !
+                                  </span>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
+                        )
+                      })}
+                    </div>
+                  ))}
                 </div>
               </div>
             </>
