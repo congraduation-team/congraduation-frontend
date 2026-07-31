@@ -2,12 +2,14 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type P
 import {
   getAbeekFullRoadmap,
   getAbeekFullRoadmapByStudent,
+  getGraduationProgress,
   getMajorOptions,
   getStudentRoadmap,
   getStudentRoadmapByStudent,
 } from '../api/endpoints'
 import type {
   FullRoadmapResponse,
+  GraduationProgressResponse,
   RoadmapCourse,
   StudentRoadmapCourse,
   StudentRoadmapResponse,
@@ -17,6 +19,7 @@ import { Sidebar } from '../components/layout/Sidebar'
 import { MajorTrackSwitcher } from '../components/modals/MajorTrackSwitcher'
 import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
+import { toNumber } from '../utils/number'
 
 const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'] as const
 
@@ -38,6 +41,13 @@ type MapEdge = {
   type: 'required' | 'optional'
 }
 
+type RowDef = {
+  key: string
+  label: string
+  categories: readonly MapCategory[]
+  border: string
+}
+
 const categoryStyle: Record<MapCategory, string> = {
   liberal: 'bg-[#e8eaee] text-ink',
   bsm: 'bg-[#4a5568] text-white',
@@ -45,13 +55,26 @@ const categoryStyle: Record<MapCategory, string> = {
   'major-elective': 'bg-sejong-pink text-ink',
 }
 
-const rowDefs = [
-  { key: 'liberal', label: '전문교양', categories: ['liberal'] as const, border: 'border-[#c5c9d0]' },
-  { key: 'bsm', label: 'BSM', categories: ['bsm'] as const, border: 'border-[#4a5568]' },
+/** 일반(시간표) 로드맵: 교양 / 교양필수 / 전공 */
+const generalRowDefs: RowDef[] = [
+  { key: 'liberal', label: '교양', categories: ['liberal'], border: 'border-[#c5c9d0]' },
+  { key: 'foundation', label: '교양필수', categories: ['bsm'], border: 'border-[#4a5568]' },
   {
     key: 'major',
     label: '전공',
-    categories: ['major-required', 'major-elective'] as const,
+    categories: ['major-required', 'major-elective'],
+    border: 'border-sejong',
+  },
+]
+
+/** 공학인증 로드맵: 전문교양 / BSM / 전공 */
+const abeekRowDefs: RowDef[] = [
+  { key: 'liberal', label: '전문교양', categories: ['liberal'], border: 'border-[#c5c9d0]' },
+  { key: 'bsm', label: 'BSM', categories: ['bsm'], border: 'border-[#4a5568]' },
+  {
+    key: 'major',
+    label: '전공',
+    categories: ['major-required', 'major-elective'],
     border: 'border-sejong',
   },
 ]
@@ -74,13 +97,56 @@ function mapAbeekCategory(course: RoadmapCourse): MapCategory {
   return 'major-elective'
 }
 
+/** 일반 로드맵: 공학인증 bucket(BSM/GENERAL) 무시, 시간표 이수구분 기준 */
 function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
-  const bucket = (course.abeekBucket || '').toUpperCase()
   const label = course.category || ''
-  if (bucket === 'GENERAL' || label.includes('교양')) return 'liberal'
-  if (bucket === 'BSM') return 'bsm'
-  if (label.includes('필수') || label.includes('기초')) return 'major-required'
-  return 'major-elective'
+
+  if (label.includes('전공')) {
+    if (label.includes('선택')) return 'major-elective'
+    return 'major-required'
+  }
+
+  const isRequiredLiberal =
+    label.includes('교양필수') ||
+    label.includes('공통교양') ||
+    label.includes('기초필수') ||
+    label.includes('대학필수') ||
+    label.includes('필수교양') ||
+    (label.includes('교양') && label.includes('필수')) ||
+    (label.includes('공통') && label.includes('필수')) ||
+    (label.includes('기초') && label.includes('필수'))
+
+  if (isRequiredLiberal) return 'bsm'
+
+  if (
+    label.includes('교양') ||
+    label.includes('균형') ||
+    label.includes('일반선택') ||
+    label.includes('자유선택') ||
+    label.includes('기타')
+  ) {
+    return 'liberal'
+  }
+
+  // 비전공 과목은 교양 행으로
+  return 'liberal'
+}
+
+function toTermKeyFromTaken(
+  takenYear: number | string | null | undefined,
+  takenSemester: number | string | null | undefined,
+  admissionYear?: number,
+): string | null {
+  const year = toNumber(takenYear)
+  const semester = toNumber(takenSemester)
+  if (!year || !semester) return null
+  const base = admissionYear && admissionYear > 0 ? admissionYear : year
+  let grade = year - base + 1
+  if (grade < 1) grade = 1
+  if (grade > 4) grade = 4
+  const sem = semester >= 2 ? 2 : 1
+  const key = `${grade}-${sem}`
+  return (SEMESTERS as readonly string[]).includes(key) ? key : null
 }
 
 function abeekToMapCourse(course: RoadmapCourse): MapCourse | null {
@@ -105,14 +171,91 @@ function generalToMapCourse(course: StudentRoadmapCourse, termKey: string): MapC
   if (!semester || !(SEMESTERS as readonly string[]).includes(semester)) return null
   if (!course.courseCode) return null
 
+  // 전공만 시간표 로드맵에서 배치. 교양·교양필수는 졸업진행(기이수)에서 합친다.
+  const mapped = mapGeneralCategory(course)
+  if (mapped === 'liberal' || mapped === 'bsm') {
+    // 시간표에 비전공 과목이 있으면 그대로 표시
+  }
+
   return {
     id: course.courseCode,
     name: course.courseName,
     hours: `${course.credits ?? 0}학점`,
-    category: mapGeneralCategory(course),
+    category: mapped,
     semester,
     completed: course.completed === true,
   }
+}
+
+/** 졸업진행의 교양/교양필수 이수 과목을 학기 칸에 배치 */
+function liberalCoursesFromProgress(
+  progress: GraduationProgressResponse | null | undefined,
+  excludeCodes: Set<string>,
+): MapCourse[] {
+  if (!progress) return []
+  const admissionYear = progress.admissionYear
+  const result: MapCourse[] = []
+  const seen = new Set<string>()
+
+  const pushCompleted = (
+    courses: Array<Record<string, unknown>> | undefined,
+    category: MapCategory,
+    fallbackTerm: string,
+  ) => {
+    for (const raw of courses ?? []) {
+      const code = String(raw.courseCode ?? '')
+      const name = String(raw.courseName ?? '')
+      if (!code || !name || excludeCodes.has(code) || seen.has(code)) continue
+      const term =
+        toTermKeyFromTaken(
+          raw.takenYear as string | number | null | undefined,
+          raw.takenSemester as string | number | null | undefined,
+          admissionYear,
+        ) || fallbackTerm
+      seen.add(code)
+      result.push({
+        id: code,
+        name,
+        hours: `${toNumber((raw.credits ?? raw.credit) as string | number | undefined)}학점`,
+        category,
+        semester: term,
+        completed: true,
+      })
+    }
+  }
+
+  // 교양필수(공통교양)
+  pushCompleted(
+    progress.commonLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+    'bsm',
+    '1-1',
+  )
+  // 교양(선택·균형 등 비전공)
+  pushCompleted(
+    progress.electiveLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+    'liberal',
+    '1-2',
+  )
+  for (const area of progress.balancedLiberalAreaProgresses ?? []) {
+    pushCompleted(area.courses as unknown as Array<Record<string, unknown>>, 'liberal', '2-1')
+  }
+
+  for (const summary of progress.categorySummaries ?? []) {
+    const label = summary.category || ''
+    if (label.includes('전공')) continue
+    const isRequired =
+      label.includes('교양필수') ||
+      label.includes('공통교양') ||
+      label.includes('기초필수') ||
+      (label.includes('교양') && label.includes('필수'))
+    const category: MapCategory = isRequired ? 'bsm' : 'liberal'
+    if (!isRequired && !label.includes('교양') && !label.includes('균형') && !label.includes('선택')) {
+      continue
+    }
+    pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, category, isRequired ? '1-1' : '2-1')
+  }
+
+  return result
 }
 
 function flattenStudentRoadmapCourses(
@@ -180,6 +323,7 @@ export function CurriculumPage() {
   )
   const [generalRoadmap, setGeneralRoadmap] = useState<StudentRoadmapResponse | null>(null)
   const [abeekRoadmap, setAbeekRoadmap] = useState<FullRoadmapResponse | null>(null)
+  const [graduation, setGraduation] = useState<GraduationProgressResponse | null>(null)
   const [generalLoading, setGeneralLoading] = useState(true)
   const [abeekLoading, setAbeekLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -215,11 +359,31 @@ export function CurriculumPage() {
 
   useEffect(() => {
     resetView()
+    setFilter(null)
   }, [viewKind, departmentName])
 
   useEffect(() => {
     if (viewKind === 'abeek' && !abeekTarget) setViewKind('general')
   }, [viewKind, abeekTarget])
+
+  useEffect(() => {
+    if (!student?.id) {
+      setGraduation(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const data = await getGraduationProgress(student.id)
+        if (!cancelled) setGraduation(data)
+      } catch {
+        if (!cancelled) setGraduation(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [student?.id])
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -389,10 +553,27 @@ export function CurriculumPage() {
     if (viewKind === 'abeek') {
       return abeekRawCourses.map(abeekToMapCourse).filter((c): c is MapCourse => c != null)
     }
-    return generalFlat
+
+    const fromTimetable = generalFlat
       .map(({ course, termKey }) => generalToMapCourse(course, termKey))
       .filter((c): c is MapCourse => c != null)
-  }, [viewKind, abeekRawCourses, generalFlat])
+
+    // 전공 시간표에 이미 있는 학수번호는 교양 쪽으로 중복 추가하지 않음
+    const majorCodes = new Set(
+      fromTimetable.filter((c) => c.category.startsWith('major')).map((c) => c.id),
+    )
+    const liberalExtra = liberalCoursesFromProgress(graduation, majorCodes)
+    const existing = new Set(fromTimetable.map((c) => c.id))
+    const merged = [...fromTimetable]
+    for (const course of liberalExtra) {
+      if (existing.has(course.id)) continue
+      existing.add(course.id)
+      merged.push(course)
+    }
+    return merged
+  }, [viewKind, abeekRawCourses, generalFlat, graduation])
+
+  const activeRowDefs = viewKind === 'abeek' ? abeekRowDefs : generalRowDefs
 
   const hasCompletionData = useMemo(
     () => allCourses.some((c) => c.completed === true),
@@ -573,25 +754,44 @@ export function CurriculumPage() {
 
         <p className="mt-3 text-sm text-ink-muted">
           {viewKind === 'abeek'
-            ? '공학인증(ABEEK) 이수체계도입니다.'
-            : '강의 시간표 기준 학과 로드맵입니다.'}
+            ? '공학인증(ABEEK) 이수체계도입니다. 전문교양·BSM·전공을 표시합니다.'
+            : '강의 시간표 기준 학과 로드맵입니다. 교양·교양필수는 기이수(비전공) 과목 기준으로 표시합니다.'}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#e5e5ea] py-3.5">
           <span className="shrink-0 text-sm font-medium text-ink">체계표 안내</span>
           <div className="flex flex-wrap items-center gap-2">
-            <LegendPill
-              active={filter === 'liberal'}
-              onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-              className="bg-[#e8eaee] text-ink"
-              label="전문교양"
-            />
-            <LegendPill
-              active={filter === 'bsm'}
-              onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-              className="bg-[#4a5568] text-white"
-              label="BSM(기초수학, 과학)"
-            />
+            {viewKind === 'abeek' ? (
+              <>
+                <LegendPill
+                  active={filter === 'liberal'}
+                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
+                  className="bg-[#e8eaee] text-ink"
+                  label="전문교양"
+                />
+                <LegendPill
+                  active={filter === 'bsm'}
+                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
+                  className="bg-[#4a5568] text-white"
+                  label="BSM(기초수학, 과학)"
+                />
+              </>
+            ) : (
+              <>
+                <LegendPill
+                  active={filter === 'liberal'}
+                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
+                  className="bg-[#e8eaee] text-ink"
+                  label="교양"
+                />
+                <LegendPill
+                  active={filter === 'bsm'}
+                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
+                  className="bg-[#4a5568] text-white"
+                  label="교양필수"
+                />
+              </>
+            )}
             <LegendPill
               active={filter === 'major-required'}
               onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
@@ -750,7 +950,7 @@ export function CurriculumPage() {
                     ))}
                   </div>
 
-                  {rowDefs.map((row) => (
+                  {activeRowDefs.map((row) => (
                     <div
                       key={row.key}
                       className="relative z-10 mb-4 grid grid-cols-[auto_repeat(8,minmax(140px,1fr))] items-start gap-2"
