@@ -477,68 +477,130 @@ export function EngineeringPage() {
           </div>
         </article>
 
-        <div className="grid items-stretch gap-4 lg:grid-cols-2">
+        <div className={`grid items-stretch gap-4 ${showCertElective ? 'lg:grid-cols-2' : ''}`}>
           <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-base font-bold text-ink">
-                전문교양{' '}
+                인증필수{' '}
                 <span className="text-sejong">
-                  {generalEarned}/{generalRequiredCredits || '-'}
+                  {genReqEarned}/{genReqNeed || '-'}
                 </span>
                 학점
               </h3>
-              {(generalRequired.remaining.length > 0 ||
-                (showCertElective && generalElective.remaining.length > 0)) && (
+              {generalRequired.remaining.length > 0 && (
                 <RemainingButton
                   onClick={() =>
                     setListModal({
-                      title: '전문교양 남은 과목',
-                      subtitle: showCertElective
-                        ? `인증필수 ${generalRequired.remaining.length} · 인증선택 ${generalElective.remaining.length}`
-                        : `인증필수 ${generalRequired.remaining.length}과목`,
-                      courses: [
-                        ...generalRequired.remaining,
-                        ...(showCertElective ? generalElective.remaining : []),
-                      ],
+                      title: '인증필수 남은 과목',
+                      subtitle: `${generalRequired.remaining.length}과목`,
+                      courses: generalRequired.remaining,
                     })
                   }
                 />
               )}
             </div>
+            <AbeekCategoryBlock
+              percent={genReqPct}
+              courses={generalRequired.completed}
+              totalValue={genReqEarned}
+              legend="최소 이수 학점"
+              onMore={() =>
+                setListModal({
+                  title: '인증필수 이수 과목',
+                  subtitle: `${genReqEarned}학점 · ${generalRequired.completed.length}과목`,
+                  courses: generalRequired.completed,
+                })
+              }
+            />
+          </article>
 
-            <div className={`grid gap-4 ${showCertElective ? 'sm:grid-cols-2' : ''}`}>
+          {showCertElective && (
+            <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-bold text-ink">
+                  인증선택{' '}
+                  <span className="text-sejong">
+                    {genElecEarned}/{genElecNeed || '-'}
+                  </span>
+                  학점
+                </h3>
+                {generalElective.remaining.length > 0 && (
+                  <RemainingButton
+                    onClick={() =>
+                      setListModal({
+                        title: '인증선택 남은 과목',
+                        subtitle: `${generalElective.remaining.length}과목`,
+                        courses: generalElective.remaining,
+                      })
+                    }
+                  />
+                )}
+              </div>
               <AbeekCategoryBlock
-                title="인증필수"
-                percent={genReqPct}
-                courses={generalRequired.completed}
-                totalValue={genReqEarned}
+                percent={genElecPct}
+                courses={generalElective.completed}
+                totalValue={genElecEarned}
                 legend="최소 이수 학점"
                 onMore={() =>
                   setListModal({
-                    title: '인증필수 이수 과목',
-                    subtitle: `${genReqEarned}학점 · ${generalRequired.completed.length}과목`,
-                    courses: generalRequired.completed,
+                    title: '인증선택 이수 과목',
+                    subtitle: `${genElecEarned}학점 · ${generalElective.completed.length}과목`,
+                    courses: generalElective.completed,
                   })
                 }
               />
-              {showCertElective && (
-                <AbeekCategoryBlock
-                  title="인증선택"
-                  percent={genElecPct}
-                  courses={generalElective.completed}
-                  totalValue={genElecEarned}
-                  legend="최소 이수 학점"
-                  onMore={() =>
-                    setListModal({
-                      title: '인증선택 이수 과목',
-                      subtitle: `${genElecEarned}학점 · ${generalElective.completed.length}과목`,
-                      courses: generalElective.completed,
-                    })
-                  }
-                />
-              )}
-            </div>
-          </article>
+            </article>
+          )}
+        </div>
+
+        <div className={`grid items-stretch gap-4 ${showBalancedLiberal ? 'lg:grid-cols-2' : ''}`}>
+          {showBalancedLiberal && (
+            <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-bold text-ink">
+                    균필(균형교양){' '}
+                    <span className="text-sejong">
+                      {balancedLiberal.earned}/{balancedLiberal.required || '-'}
+                    </span>
+                    학점
+                  </h3>
+                  {balancedLiberal.requiredAreas > 0 && (
+                    <p className="mt-0.5 text-xs text-ink-muted">
+                      영역 {balancedLiberal.completedAreas}/{balancedLiberal.requiredAreas} 충족
+                    </p>
+                  )}
+                </div>
+                {balancedLiberal.remaining.length > 0 && (
+                  <RemainingButton
+                    onClick={() =>
+                      setListModal({
+                        title: '균필 미충족 영역',
+                        subtitle:
+                          balancedLiberal.requiredAreas > 0
+                            ? `${balancedLiberal.completedAreas}/${balancedLiberal.requiredAreas}개 영역`
+                            : `${balancedLiberal.remaining.length}개`,
+                        courses: balancedLiberal.remaining,
+                      })
+                    }
+                  />
+                )}
+              </div>
+              <AbeekCategoryBlock
+                percent={balancedLiberal.percent}
+                courses={balancedLiberal.completed}
+                totalValue={balancedLiberal.earned}
+                legend="총 학점"
+                onMore={() =>
+                  setListModal({
+                    title: '균필(균형교양) 이수 과목',
+                    subtitle: `${balancedLiberal.earned}학점 · ${balancedLiberal.completed.length}과목`,
+                    courses: balancedLiberal.completed,
+                  })
+                }
+              />
+            </article>
+          )}
 
           <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -576,54 +638,6 @@ export function EngineeringPage() {
             />
           </article>
         </div>
-
-        {showBalancedLiberal && (
-          <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="text-base font-bold text-ink">
-                  균필(균형교양){' '}
-                  <span className="text-sejong">
-                    {balancedLiberal.earned}/{balancedLiberal.required || '-'}
-                  </span>
-                  학점
-                </h3>
-                {balancedLiberal.requiredAreas > 0 && (
-                  <p className="mt-0.5 text-xs text-ink-muted">
-                    영역 {balancedLiberal.completedAreas}/{balancedLiberal.requiredAreas} 충족
-                  </p>
-                )}
-              </div>
-              {balancedLiberal.remaining.length > 0 && (
-                <RemainingButton
-                  onClick={() =>
-                    setListModal({
-                      title: '균필 미충족 영역',
-                      subtitle:
-                        balancedLiberal.requiredAreas > 0
-                          ? `${balancedLiberal.completedAreas}/${balancedLiberal.requiredAreas}개 영역`
-                          : `${balancedLiberal.remaining.length}개`,
-                      courses: balancedLiberal.remaining,
-                    })
-                  }
-                />
-              )}
-            </div>
-            <AbeekCategoryBlock
-              percent={balancedLiberal.percent}
-              courses={balancedLiberal.completed}
-              totalValue={balancedLiberal.earned}
-              legend="총 학점"
-              onMore={() =>
-                setListModal({
-                  title: '균필(균형교양) 이수 과목',
-                  subtitle: `${balancedLiberal.earned}학점 · ${balancedLiberal.completed.length}과목`,
-                  courses: balancedLiberal.completed,
-                })
-              }
-            />
-          </article>
-        )}
 
         <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
