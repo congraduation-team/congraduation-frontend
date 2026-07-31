@@ -620,13 +620,13 @@ function SummaryMiniGauge({
       <p className="mb-1 text-xs font-bold text-ink">{label}</p>
       <DonutChart
         percent={percent}
-        size={76}
-        stroke={9}
-        color="#c8012e"
+        size={84}
+        stroke={10}
+        color="#5b6470"
         label={formatPercentLabel(percent)}
       />
       <p className="mt-1.5 text-[11px] font-semibold text-ink-muted">
-        <span className="text-sejong">{earned}</span>/{required || '-'}학점
+        <span className="text-ink">{earned}</span>/{required || '-'}학점
       </p>
     </div>
   )
@@ -648,24 +648,32 @@ function AbeekCategoryBlock({
   onMore: () => void
 }) {
   return (
-    <section className="flex flex-col items-center">
-      {title && <p className="mb-1 text-center text-sm font-bold text-ink">{title}</p>}
-      <ChartLegend secondaryLabel={legend} activeColor="#c8012e" className="mb-2 justify-center scale-90" />
-      <div className="flex w-full items-center justify-center gap-4">
-        <DonutChart
-          percent={percent}
-          size={96}
-          stroke={11}
-          color="#c8012e"
-          label={formatPercentLabel(percent)}
-        />
+    <section className="w-full">
+      <div className="flex w-full items-center gap-5">
+        <div className="flex shrink-0 flex-col items-center self-center pl-1">
+          {title && (
+            <p className="mb-1 text-center text-sm font-bold text-ink">{title}</p>
+          )}
+          <ChartLegend
+            secondaryLabel={legend}
+            activeColor="#5b6470"
+            className="mb-2 justify-center scale-90"
+          />
+          <DonutChart
+            percent={percent}
+            size={120}
+            stroke={13}
+            color="#5b6470"
+            label={formatPercentLabel(percent)}
+          />
+        </div>
         <CourseMiniList
           title="이수한 과목"
           courses={courses}
           totalValue={totalValue}
           previewCount={4}
           showMoreLink
-          className="min-w-0 max-w-[220px] flex-1"
+          className="min-w-0 flex-1"
           emptyText="이수한 과목이 없습니다."
           onMoreClick={onMore}
         />
