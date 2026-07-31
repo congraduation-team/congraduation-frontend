@@ -72,10 +72,10 @@ function courseBadgeClass(course: MapCourse, hasCompletionData: boolean): string
   return `${categoryStyle[course.category]} ${hasCompletionData ? 'opacity-55' : ''}`
 }
 
-/** 일반(시간표) 로드맵: 교양 / 교양필수 / 전공 */
+/** 일반(시간표) 로드맵: 교양 / 기초필수 / 전공 */
 const generalRowDefs: RowDef[] = [
   { key: 'liberal', label: '교양', categories: ['liberal'], border: 'border-[#c5c9d0]' },
-  { key: 'foundation', label: '교양필수', categories: ['bsm'], border: 'border-[#4a5568]' },
+  { key: 'foundation', label: '기초필수', categories: ['bsm'], border: 'border-[#4a5568]' },
   {
     key: 'major',
     label: '전공',
@@ -115,6 +115,20 @@ function mapAbeekCategory(course: RoadmapCourse): MapCategory {
 }
 
 /** 일반 로드맵: 공학인증 bucket(BSM/GENERAL) 무시, 시간표 이수구분 기준 */
+function isFoundationRequiredLabel(label: string) {
+  return (
+    label.includes('기초필수') ||
+    label.includes('교양필수') ||
+    label.includes('공통교양') ||
+    label.includes('대학필수') ||
+    label.includes('필수교양') ||
+    label.includes('학문기초') ||
+    (label.includes('기초') && label.includes('필수')) ||
+    (label.includes('교양') && label.includes('필수')) ||
+    (label.includes('공통') && label.includes('필수'))
+  )
+}
+
 function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
   const label = course.category || ''
 
@@ -123,29 +137,9 @@ function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
     return 'major-required'
   }
 
-  const isRequiredLiberal =
-    label.includes('교양필수') ||
-    label.includes('공통교양') ||
-    label.includes('기초필수') ||
-    label.includes('대학필수') ||
-    label.includes('필수교양') ||
-    (label.includes('교양') && label.includes('필수')) ||
-    (label.includes('공통') && label.includes('필수')) ||
-    (label.includes('기초') && label.includes('필수'))
+  if (isFoundationRequiredLabel(label)) return 'bsm'
 
-  if (isRequiredLiberal) return 'bsm'
-
-  if (
-    label.includes('교양') ||
-    label.includes('균형') ||
-    label.includes('일반선택') ||
-    label.includes('자유선택') ||
-    label.includes('기타')
-  ) {
-    return 'liberal'
-  }
-
-  // 비전공 과목은 교양 행으로
+  // 전공·기초필수가 아닌 과목 → 교양
   return 'liberal'
 }
 
@@ -166,9 +160,32 @@ function toTermKeyFromTaken(
   return (SEMESTERS as readonly string[]).includes(key) ? key : null
 }
 
-function abeekToMapCourse(course: RoadmapCourse): MapCourse | null {
-  const semester = (course.recommendedTerm || '').trim()
-  if (!semester || !(SEMESTERS as readonly string[]).includes(semester)) return null
+/** 이수했다면 실제 수강 학기, 아니면 권장(대상) 학기 */
+function resolveDisplayTerm(
+  recommendedTerm: string,
+  takenYear: number | string | null | undefined,
+  takenSemester: number | string | null | undefined,
+  completed: boolean | undefined,
+  admissionYear?: number,
+): string | null {
+  const recommended = recommendedTerm.trim()
+  if (completed) {
+    const taken = toTermKeyFromTaken(takenYear, takenSemester, admissionYear)
+    if (taken) return taken
+  }
+  if (recommended && (SEMESTERS as readonly string[]).includes(recommended)) return recommended
+  return null
+}
+
+function abeekToMapCourse(course: RoadmapCourse, admissionYear?: number): MapCourse | null {
+  const semester = resolveDisplayTerm(
+    course.recommendedTerm || '',
+    course.takenYear,
+    course.takenSemester,
+    course.completed,
+    admissionYear,
+  )
+  if (!semester) return null
 
   const design =
     course.designCredits && course.designCredits > 0 ? `·설계${course.designCredits}` : ''
@@ -183,28 +200,37 @@ function abeekToMapCourse(course: RoadmapCourse): MapCourse | null {
   }
 }
 
-function generalToMapCourse(course: StudentRoadmapCourse, termKey: string): MapCourse | null {
-  const semester = termKey.trim()
-  if (!semester || !(SEMESTERS as readonly string[]).includes(semester)) return null
+function generalToMapCourse(
+  course: StudentRoadmapCourse,
+  termKey: string,
+  admissionYear?: number,
+): MapCourse | null {
   if (!course.courseCode) return null
 
-  // 전공만 시간표 로드맵에서 배치. 교양·교양필수는 졸업진행(기이수)에서 합친다.
-  const mapped = mapGeneralCategory(course)
-  if (mapped === 'liberal' || mapped === 'bsm') {
-    // 시간표에 비전공 과목이 있으면 그대로 표시
-  }
+  const semester = resolveDisplayTerm(
+    termKey,
+    course.takenYear,
+    course.takenSemester,
+    course.completed,
+    admissionYear,
+  )
+  if (!semester) return null
 
   return {
     id: course.courseCode,
     name: course.courseName,
     hours: `${course.credits ?? 0}학점`,
-    category: mapped,
+    category: mapGeneralCategory(course),
     semester,
     completed: course.completed === true,
   }
 }
 
-/** 졸업진행의 교양/교양필수 이수 과목을 학기 칸에 배치 */
+/**
+ * 졸업진행 기이수:
+ * - 기초필수: 공통교양/기초필수 등
+ * - 교양: 전공도 기초필수도 아닌 이수 과목
+ */
 function liberalCoursesFromProgress(
   progress: GraduationProgressResponse | null | undefined,
   excludeCodes: Set<string>,
@@ -241,13 +267,21 @@ function liberalCoursesFromProgress(
     }
   }
 
-  // 교양필수(공통교양)
+  // 기초필수
   pushCompleted(
     progress.commonLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
     'bsm',
     '1-1',
   )
-  // 교양(선택·균형 등 비전공)
+  pushCompleted(
+    progress.academicFoundationCredits?.completedCourses as
+      | Array<Record<string, unknown>>
+      | undefined,
+    'bsm',
+    '1-1',
+  )
+
+  // 교양(선택·균형 등 — 전공/기초필수 제외)
   pushCompleted(
     progress.electiveLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
     'liberal',
@@ -260,16 +294,11 @@ function liberalCoursesFromProgress(
   for (const summary of progress.categorySummaries ?? []) {
     const label = summary.category || ''
     if (label.includes('전공')) continue
-    const isRequired =
-      label.includes('교양필수') ||
-      label.includes('공통교양') ||
-      label.includes('기초필수') ||
-      (label.includes('교양') && label.includes('필수'))
-    const category: MapCategory = isRequired ? 'bsm' : 'liberal'
-    if (!isRequired && !label.includes('교양') && !label.includes('균형') && !label.includes('선택')) {
+    if (isFoundationRequiredLabel(label)) {
+      pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, 'bsm', '1-1')
       continue
     }
-    pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, category, isRequired ? '1-1' : '2-1')
+    pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, 'liberal', '2-1')
   }
 
   return result
@@ -567,15 +596,19 @@ export function CurriculumPage() {
   )
 
   const allCourses = useMemo(() => {
+    const admissionYear = graduation?.admissionYear ?? student?.admissionYear
+
     if (viewKind === 'abeek') {
-      return abeekRawCourses.map(abeekToMapCourse).filter((c): c is MapCourse => c != null)
+      return abeekRawCourses
+        .map((c) => abeekToMapCourse(c, admissionYear))
+        .filter((c): c is MapCourse => c != null)
     }
 
     const fromTimetable = generalFlat
-      .map(({ course, termKey }) => generalToMapCourse(course, termKey))
+      .map(({ course, termKey }) => generalToMapCourse(course, termKey, admissionYear))
       .filter((c): c is MapCourse => c != null)
 
-    // 전공 시간표에 이미 있는 학수번호는 교양 쪽으로 중복 추가하지 않음
+    // 전공 시간표에 이미 있는 학수번호는 교양/기초필수 쪽으로 중복 추가하지 않음
     const majorCodes = new Set(
       fromTimetable.filter((c) => c.category.startsWith('major')).map((c) => c.id),
     )
@@ -588,7 +621,7 @@ export function CurriculumPage() {
       merged.push(course)
     }
     return merged
-  }, [viewKind, abeekRawCourses, generalFlat, graduation])
+  }, [viewKind, abeekRawCourses, generalFlat, graduation, student?.admissionYear])
 
   const activeRowDefs = viewKind === 'abeek' ? abeekRowDefs : generalRowDefs
 
@@ -772,7 +805,7 @@ export function CurriculumPage() {
         <p className="mt-3 text-sm text-ink-muted">
           {viewKind === 'abeek'
             ? '공학인증(ABEEK) 이수체계도입니다. 전문교양·BSM·전공을 표시합니다.'
-            : '강의 시간표 기준 학과 로드맵입니다. 교양·교양필수는 기이수(비전공) 과목 기준으로 표시합니다.'}
+            : '강의 시간표 기준 학과 로드맵입니다. 기초필수·교양은 기이수 기준으로 표시하며, 이수한 과목은 실제 수강 학기에 배치됩니다.'}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#e5e5ea] py-3.5">
@@ -805,7 +838,7 @@ export function CurriculumPage() {
                   active={filter === 'bsm'}
                   onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
                   className="bg-[#4a5568] text-white"
-                  label="교양필수"
+                  label="기초필수"
                 />
               </>
             )}
