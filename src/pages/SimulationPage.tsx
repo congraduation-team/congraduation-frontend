@@ -156,6 +156,24 @@ function normalizeGrade(value?: string | null): Grade {
   return 'A0'
 }
 
+/**
+ * 계획 학기가 없으면 4-2까지 가능한 만큼만 순차 생성.
+ * API는 4학년 2학기 이후 추가를 거부하므로 count 일괄 요청은 피한다.
+ */
+async function ensurePlannedSemesters(studentId: number): Promise<PlannedCoursesResponse> {
+  let planned = await getPlannedCourses(studentId)
+  if (planned.semesters?.length) return planned
+
+  for (let i = 0; i < 8; i++) {
+    try {
+      planned = await addNextPlannedSemesters(studentId, 1)
+    } catch {
+      break
+    }
+  }
+  return getPlannedCourses(studentId)
+}
+
 export function SimulationPage() {
   const { student } = useAuth()
   const { active } = useMajorTrack()
@@ -186,10 +204,7 @@ export function SimulationPage() {
   const refreshAll = useCallback(async () => {
     if (!student) return
     const abeekId = student.studentNo || String(student.id)
-    let plannedData = await getPlannedCourses(student.id)
-    if (!plannedData.semesters?.length) {
-      plannedData = await addNextPlannedSemesters(student.id, 4)
-    }
+    const plannedData = await ensurePlannedSemesters(student.id)
     const [prog, evalData] = await Promise.all([
       getGraduationProgress(student.id),
       getAbeekEvaluation(abeekId).catch(() => null),
@@ -456,7 +471,7 @@ export function SimulationPage() {
       for (const sem of current.semesters ?? []) {
         await deletePlannedSemester(student.id, sem.plannedSemesterId)
       }
-      await addNextPlannedSemesters(student.id, 4)
+      await ensurePlannedSemesters(student.id)
     })
   }
 
@@ -542,7 +557,7 @@ export function SimulationPage() {
             <h2 className="mb-4 text-base font-bold text-ink">남은 학기 로드맵</h2>
             {semesters.length === 0 ? (
               <p className="py-10 text-center text-sm text-ink-muted">
-                계획 학기가 없습니다. 계획 초기화로 학기를 생성해 주세요.
+                추가할 수 있는 남은 학기가 없습니다. (최대 4학년 2학기)
               </p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
