@@ -212,26 +212,54 @@ function isPastMaxPlannableTerm(lastCompleted?: string) {
   return parsed.gradeYear > 8 || (parsed.gradeYear === 8 && parsed.semester >= 2)
 }
 
+function isSemesterAfterLast(
+  gradeYear: number,
+  semester: number,
+  lastCompleted?: string | null,
+) {
+  const last = parseTermKey(lastCompleted)
+  if (!last) return true
+  return (
+    gradeYear > last.gradeYear ||
+    (gradeYear === last.gradeYear && semester > last.semester)
+  )
+}
+
 function normalizeGrade(value?: string | null): Grade {
   if (value && (GRADES as readonly string[]).includes(value)) return value as Grade
   return 'A0'
 }
 
 /**
- * 계획 학기가 없으면 가능한 만큼 순차 생성 (최대 8학년 2학기).
- * count 일괄 요청은 API 한도에 걸릴 수 있어 1개씩 추가한다.
+ * 마지막 이수 다음 학기가 계획에 있도록 보장.
+ * 예: lastCompleted=4-1 → 4-2가 생길 때까지 next 호출.
+ * (이미 학기가 있어도 미래 학기가 없으면 계속 추가)
  */
 async function ensurePlannedSemesters(studentId: number): Promise<PlannedCoursesResponse> {
   let planned = await getPlannedCourses(studentId)
-  if (planned.semesters?.length) return planned
 
   for (let i = 0; i < 16; i++) {
+    const lastKey = planned.lastCompletedSemester
+    if (isPastMaxPlannableTerm(lastKey)) return planned
+
+    const semesters = planned.semesters ?? []
+    const hasFuture = semesters.some((s) =>
+      isSemesterAfterLast(s.gradeYear, s.semester, lastKey),
+    )
+    if (hasFuture) return planned
+
+    const beforeIds = new Set(semesters.map((s) => s.plannedSemesterId))
     try {
       planned = await addNextPlannedSemesters(studentId, 1)
     } catch {
       break
     }
+
+    const after = planned.semesters ?? []
+    const added = after.some((s) => !beforeIds.has(s.plannedSemesterId))
+    if (!added) break
   }
+
   return getPlannedCourses(studentId)
 }
 
@@ -360,7 +388,12 @@ export function SimulationPage() {
     [codeByName],
   )
 
-  const semesters = planned?.semesters ?? []
+  const semesters = useMemo(() => {
+    const all = planned?.semesters ?? []
+    const lastKey = planned?.lastCompletedSemester
+    // 마지막 이수 이후 학기만 계획 대상으로 표시 (4-1 이수 후 4-2만 등)
+    return all.filter((s) => isSemesterAfterLast(s.gradeYear, s.semester, lastKey))
+  }, [planned])
   const plannedCourses = useMemo(
     () => semesters.flatMap((s) => s.courses ?? []),
     [semesters],
@@ -628,7 +661,7 @@ export function SimulationPage() {
           <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
             <h2 className="mb-4 text-base font-bold text-ink">남은 학기 로드맵</h2>
             {semesters.length === 0 ? (
-              <div className="space-y-2 py-10 text-center text-sm leading-relaxed text-ink-muted">
+              <div className="space-y-3 py-10 text-center text-sm leading-relaxed text-ink-muted">
                 {pastPlannable ? (
                   <p>
                     계획 가능한 학기 한도(
@@ -637,7 +670,26 @@ export function SimulationPage() {
                     {lastCompletedLabel || planned?.lastCompletedSemester || '-'}
                   </p>
                 ) : (
-                  <p>추가할 수 있는 남은 학기가 없습니다.</p>
+                  <>
+                    <p>
+                      마지막 이수(
+                      {lastCompletedLabel || planned?.lastCompletedSemester || '-'})
+                      다음 학기 계획이 없습니다.
+                    </p>
+                    <button
+                      type="button"
+                      disabled={saving || !student}
+                      onClick={() => {
+                        if (!student) return
+                        void runAction(async () => {
+                          await addNextPlannedSemesters(student.id, 1)
+                        })
+                      }}
+                      className="rounded-full bg-sejong px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                    >
+                      다음 학기 추가
+                    </button>
+                  </>
                 )}
               </div>
             ) : (
