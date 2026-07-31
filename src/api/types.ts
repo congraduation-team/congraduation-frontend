@@ -456,6 +456,8 @@ export type RoadmapCourse = {
   completed?: boolean
   takenYear?: number | null
   takenSemester?: number | null
+  /** 실제 이수 순번 학기 */
+  standingTermKey?: string | null
   prerequisiteCourseCodes?: string[]
 }
 
@@ -500,6 +502,9 @@ export type StudentRoadmapCourse = {
   completed?: boolean
   takenYear?: string | null
   takenSemester?: string | null
+  /** 실제 이수 순번 학기 (있으면 배치에 우선) */
+  standingTermKey?: string | null
+  completedTermKey?: string | null
   grade?: string | null
   sectionCount?: number
 }
