@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import {
   getAbeekFullRoadmap,
   getAbeekFullRoadmapByStudent,
@@ -148,6 +148,25 @@ function buildAbeekEdges(courses: RoadmapCourse[]): MapEdge[] {
     }
   }
   return edges
+}
+
+/** 긴 과목명: 괄호·영한 경계·구분자 앞에서만 줄바꿈 */
+function CourseNameText({ name }: { name: string }) {
+  const parts = name
+    .split(
+      /(?=[(\[])|(?<=[·/,:])|(?<=[A-Za-z0-9])(?=[가-힣])|(?<=[가-힣])(?=[A-Za-z0-9])/,
+    )
+    .filter(Boolean)
+  return (
+    <span className="break-keep [word-break:keep-all] [overflow-wrap:normal]">
+      {parts.map((part, index) => (
+        <Fragment key={`${part}-${index}`}>
+          {index > 0 ? <wbr /> : null}
+          {part}
+        </Fragment>
+      ))}
+    </span>
+  )
 }
 
 export function CurriculumPage() {
@@ -679,7 +698,7 @@ export function CurriculumPage() {
               >
                 <div
                   ref={boardRef}
-                  className="relative min-w-[1200px] origin-top-left will-change-transform"
+                  className="relative min-w-[1480px] origin-top-left will-change-transform"
                   style={{
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   }}
@@ -722,7 +741,7 @@ export function CurriculumPage() {
                     ))}
                   </svg>
 
-                  <div className="relative z-10 mb-3 grid grid-cols-[auto_repeat(8,minmax(0,1fr))] gap-2">
+                  <div className="relative z-10 mb-3 grid grid-cols-[auto_repeat(8,minmax(140px,1fr))] gap-2">
                     <div />
                     {SEMESTERS.map((s) => (
                       <div key={s} className="text-center text-sm font-bold text-ink">
@@ -734,7 +753,7 @@ export function CurriculumPage() {
                   {rowDefs.map((row) => (
                     <div
                       key={row.key}
-                      className="relative z-10 mb-4 grid grid-cols-[auto_repeat(8,minmax(0,1fr))] items-start gap-2"
+                      className="relative z-10 mb-4 grid grid-cols-[auto_repeat(8,minmax(140px,1fr))] items-start gap-2"
                     >
                       <div className="flex items-start justify-center pt-1">
                         <span
@@ -772,7 +791,8 @@ export function CurriculumPage() {
                                 ref={(el) => {
                                   nodeRefs.current[course.id] = el
                                 }}
-                                className={`flex flex-wrap items-center justify-center gap-x-1 rounded-full px-2.5 py-1.5 text-center text-[11px] font-semibold leading-snug shadow-sm ${
+                                title={`${course.name} ${course.hours}`}
+                                className={`flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-center shadow-sm ${
                                   categoryStyle[course.category]
                                 } ${
                                   hasCompletionData && !course.completed && mode === 'all'
@@ -780,15 +800,21 @@ export function CurriculumPage() {
                                     : ''
                                 }`}
                               >
-                                <span>{course.name}</span>
-                                <span className="text-[10px] font-medium opacity-80">
-                                  {course.hours}
-                                </span>
-                                {course.name.toLowerCase().includes('capstone') && (
-                                  <span className="inline-flex size-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-sejong">
-                                    !
-                                  </span>
-                                )}
+                                <p
+                                  className={`w-full font-semibold leading-snug ${
+                                    course.name.length >= 14 ? 'text-[10px]' : 'text-[10.5px]'
+                                  }`}
+                                >
+                                  <CourseNameText name={course.name} />
+                                </p>
+                                <div className="flex items-center justify-center gap-1 whitespace-nowrap text-[10px] font-medium opacity-90">
+                                  <span>{course.hours}</span>
+                                  {course.name.toLowerCase().includes('capstone') && (
+                                    <span className="inline-flex size-3.5 items-center justify-center rounded-full bg-white text-[9px] font-bold text-sejong">
+                                      !
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
