@@ -27,8 +27,8 @@ const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'] as co
 const ROADMAP_GRID =
   'grid grid-cols-[5.5rem_repeat(8,minmax(132px,1fr))] gap-2 items-start'
 
-/** 뷰포트 끝에서 항상 보이는 여백 (브라우저 줌과 무관) */
-const VIEW_MARGIN = 56
+/** 뷰포트 끝에서 보이는 최소 여백 (잘림 방지, 과한 공백 축소) */
+const VIEW_MARGIN = 20
 const BOARD_MIN_WIDTH = 1480
 
 type MapCategory = 'liberal' | 'bsm' | 'major-required' | 'major-elective'
@@ -554,8 +554,26 @@ export function CurriculumPage() {
     const viewport = viewportRef.current
     if (!viewport) return
     e.preventDefault()
-    viewport.scrollLeft = dragRef.current.scrollLeft - (e.clientX - dragRef.current.x)
-    viewport.scrollTop = dragRef.current.scrollTop - (e.clientY - dragRef.current.y)
+
+    const maxLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth)
+    const maxTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight)
+    let nextLeft = dragRef.current.scrollLeft - (e.clientX - dragRef.current.x)
+    let nextTop = dragRef.current.scrollTop - (e.clientY - dragRef.current.y)
+
+    // 끝에서는 더 이상 이동하지 않음 (일반·공학인증 공통)
+    if (nextLeft < 0 || nextLeft > maxLeft) {
+      nextLeft = Math.max(0, Math.min(maxLeft, nextLeft))
+      dragRef.current.scrollLeft = nextLeft
+      dragRef.current.x = e.clientX
+    }
+    if (nextTop < 0 || nextTop > maxTop) {
+      nextTop = Math.max(0, Math.min(maxTop, nextTop))
+      dragRef.current.scrollTop = nextTop
+      dragRef.current.y = e.clientY
+    }
+
+    viewport.scrollLeft = nextLeft
+    viewport.scrollTop = nextTop
   }
 
   const endPan = (e: PointerEvent<HTMLDivElement>) => {
@@ -858,10 +876,10 @@ export function CurriculumPage() {
     if (!board || loading || error || allCourses.length === 0) return
 
     const update = () => {
-      setBoardSize({
-        w: Math.max(board.scrollWidth, board.offsetWidth, BOARD_MIN_WIDTH),
-        h: Math.max(board.scrollHeight, board.offsetHeight, 420),
-      })
+      // transform 이전 레이아웃 크기 — minWidth만으로 불필요하게 키우지 않음
+      const w = Math.max(board.scrollWidth, board.offsetWidth)
+      const h = Math.max(board.scrollHeight, board.offsetHeight, 280)
+      setBoardSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }))
     }
     update()
     const observer = new ResizeObserver(update)
@@ -1097,14 +1115,14 @@ export function CurriculumPage() {
                 onPointerUp={endPan}
                 onPointerCancel={endPan}
                 onDragStart={(e) => e.preventDefault()}
-                className={`relative h-[min(72vh,760px)] touch-none select-none overflow-auto ${
+                className={`relative h-[min(72vh,760px)] touch-none select-none overflow-auto overscroll-none ${
                   panning ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
               >
                 <div
                   style={{
                     boxSizing: 'border-box',
-                    width: boardSize.w * zoom + VIEW_MARGIN * 2,
+                    width: Math.max(boardSize.w, BOARD_MIN_WIDTH) * zoom + VIEW_MARGIN * 2,
                     height: boardSize.h * zoom + VIEW_MARGIN * 2,
                     padding: VIEW_MARGIN,
                   }}
@@ -1113,12 +1131,12 @@ export function CurriculumPage() {
                     ref={boardRef}
                     className="relative origin-top-left will-change-transform"
                     style={{
-                      width: boardSize.w,
+                      width: Math.max(boardSize.w, BOARD_MIN_WIDTH),
                       minWidth: BOARD_MIN_WIDTH,
                       transform: `scale(${zoom})`,
                       transformOrigin: '0 0',
-                      paddingRight: 24,
-                      paddingBottom: 32,
+                      paddingRight: 12,
+                      paddingBottom: 16,
                     }}
                   >
                   <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
