@@ -17,11 +17,15 @@ import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 function toUiCourses(courses?: CategoryCourse[] | Array<Record<string, unknown>>) {
   return (courses ?? []).map((c) => {
     const row = c as Record<string, unknown>
-    return {
-      name: String(row.courseName ?? ''),
+    const base: { name: string; credits: number; code: string; semester?: string } = {
+      name: String(row.courseName ?? row.name ?? ''),
       credits: toNumber((row.credit ?? row.credits) as string | number | undefined),
-      code: String(row.courseCode ?? ''),
+      code: String(row.courseCode ?? row.code ?? ''),
     }
+    if (row.recommendedTerm != null && String(row.recommendedTerm) !== '') {
+      base.semester = String(row.recommendedTerm)
+    }
+    return base
   })
 }
 
@@ -78,33 +82,29 @@ export function GraduationPage() {
   }, [progress?.majorTracks, active])
 
   const majorRequired = useMemo(() => {
+    const summary = progress?.categorySummaries?.find(
+      (c) => c.category.includes('전공필수') || c.category === '전필',
+    )
+    const remainingFromApi =
+      progress?.remainingMajorRequiredCourses ??
+      activeTrack?.requiredCourseProgress?.missingCourses ??
+      summary?.remainingCourses ??
+      summary?.missingCourses ??
+      []
+
     if (activeTrack?.requiredCourseProgress) {
       return {
         category: '전공필수',
         courses:
-          activeTrack.requiredCourseProgress.completedCourses ??
-          progress?.categorySummaries?.find(
-            (c) => c.category.includes('전공필수') || c.category === '전필',
-          )?.courses ??
-          [],
-        remaining:
-          activeTrack.requiredCourseProgress.missingCourses ??
-          progress?.categorySummaries?.find(
-            (c) => c.category.includes('전공필수') || c.category === '전필',
-          )?.remainingCourses ??
-          progress?.categorySummaries?.find(
-            (c) => c.category.includes('전공필수') || c.category === '전필',
-          )?.missingCourses ??
-          [],
+          activeTrack.requiredCourseProgress.completedCourses ?? summary?.courses ?? [],
+        remaining: remainingFromApi,
       }
     }
-    const found = progress?.categorySummaries?.find(
-      (c) => c.category.includes('전공필수') || c.category === '전필',
-    )
+
     return {
-      category: found?.category ?? '전공필수',
-      courses: found?.courses ?? [],
-      remaining: found?.remainingCourses ?? found?.missingCourses ?? [],
+      category: summary?.category ?? '전공필수',
+      courses: summary?.courses ?? [],
+      remaining: remainingFromApi,
     }
   }, [progress, activeTrack])
 
@@ -112,10 +112,16 @@ export function GraduationPage() {
     const found = progress?.categorySummaries?.find(
       (c) => c.category.includes('전공선택') || c.category === '전선',
     )
+    const remainingFromApi =
+      progress?.remainingMajorElectiveCourses ??
+      found?.remainingCourses ??
+      found?.missingCourses ??
+      []
+
     return {
       category: found?.category ?? '전공선택',
       courses: found?.courses ?? [],
-      remaining: found?.remainingCourses ?? found?.missingCourses ?? [],
+      remaining: remainingFromApi,
     }
   }, [progress])
 
@@ -131,7 +137,11 @@ export function GraduationPage() {
       earned: toNumber(fromCredits?.earnedCredits ?? fromSummary?.earnedCredits),
       required: toNumber(fromCredits?.requiredCredits ?? fromSummary?.requiredCredits),
       percent: toPercent(fromCredits?.progressPercent ?? fromSummary?.progressPercent),
-      courses: fromCredits?.completedCourses ?? fromSummary?.courses ?? [],
+      courses:
+        fromCredits?.completedCourses ??
+        fromSummary?.courses ??
+        progress?.commonLiberalCourses ??
+        [],
       remaining:
         fromCredits?.remainingCourses ??
         fromCredits?.missingCourses ??
@@ -240,6 +250,34 @@ export function GraduationPage() {
       progress?.majorCredits?.requiredMajorElectiveCredits,
   )
 
+  const readingStatus = progress?.readingStatus ?? student?.readingStatus
+  const hasReadingApi = readingStatus != null
+  const readingAreas = useMemo(() => {
+    if (readingStatus?.areas?.length) {
+      return readingStatus.areas.map((area) => ({
+        category: area.name,
+        current: area.certifiedCount ?? area.completedCount ?? 0,
+        required: area.requiredCount ?? 0,
+        satisfied: area.satisfied === true,
+      }))
+    }
+    // API 데이터 없으면 기존 기준(영역·필요 권수)만 표시
+    return classicReading.map((item) => ({
+      category: item.category,
+      current: 0,
+      required: item.required,
+      satisfied: false,
+    }))
+  }, [readingStatus])
+  const readingCompleted = hasReadingApi && readingStatus?.completed === true
+
+  const englishCert = progress?.englishCertification
+  const swCert = progress?.swCodingCertification
+  const englishSatisfied = englishCert?.satisfied === true
+  const swSatisfied = swCert?.satisfied === true
+  const englishApplicable = englishCert == null || englishCert.applicable !== false
+  const swApplicable = swCert == null || swCert.applicable !== false
+
   const totalGpa = toNumber(progress?.averageGradePoint)
   const majorGpa = toNumber(progress?.majorGradePoint)
   const liberalGpa = toNumber(progress?.liberalGradePoint)
@@ -323,91 +361,149 @@ export function GraduationPage() {
         </article>
 
         <article className="flex flex-col rounded-[20px] bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="text-base font-bold text-ink">현재 고전독서인증 완료!</h3>
-          <p className="mt-0.5 text-xs text-ink-muted">고전독서인증 현황</p>
+          <h3 className="text-base font-bold text-ink">
+            {readingCompleted
+              ? readingStatus?.title || '현재 고전독서인증 완료!'
+              : readingStatus?.title || '고전독서인증 현황'}
+          </h3>
+          <p className="mt-0.5 text-xs text-ink-muted">
+            {readingStatus?.subtitle || '고전독서인증 현황'}
+            {!hasReadingApi ? ' · 기준 안내' : ''}
+          </p>
           <div className="mt-3 overflow-hidden rounded-lg border border-[#e5e7eb]">
             <ul>
-              {classicReading.map((item, index) => (
+              {readingAreas.map((item, index) => (
                 <li
                   key={item.category}
                   className={`flex items-center justify-between px-3 py-2 text-[13px] ${
-                    index < classicReading.length - 1 ? 'border-b border-[#e5e7eb]' : ''
+                    index < readingAreas.length - 1 ? 'border-b border-[#e5e7eb]' : ''
                   }`}
                 >
                   <span className="text-ink">{item.category}</span>
-                  <span className="font-bold text-sejong">
+                  <span
+                    className={`font-bold ${
+                      item.current >= item.required ? 'text-sejong' : 'text-ink-muted'
+                    }`}
+                  >
                     {item.current}/{item.required}
                   </span>
                 </li>
               ))}
             </ul>
           </div>
-          <p className="mt-auto pt-3 text-center text-xs font-bold text-sejong">
-            고전독서인증을 모두 완료하였습니다.
-          </p>
+          {readingCompleted ? (
+            <p className="mt-auto pt-3 text-center text-xs font-bold text-sejong">
+              {readingStatus?.message || '고전독서인증을 모두 완료하였습니다.'}
+            </p>
+          ) : (
+            <p className="mt-auto pt-3 text-center text-xs font-semibold text-ink-muted">
+              {readingStatus?.message || '영역별 필요 권수를 충족하면 인증이 완료됩니다.'}
+            </p>
+          )}
         </article>
 
         <article className="flex flex-col rounded-[20px] bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <h3 className="mb-3 text-base font-bold text-ink">미완료된 인증</h3>
+          <h3 className="mb-3 text-base font-bold text-ink">
+            {englishSatisfied && swSatisfied ? '인증 완료' : '미완료된 인증'}
+          </h3>
 
-          <div className="mb-3">
-            <p className="mb-1.5 text-xs font-bold text-ink">영어졸업인증(비전공자)</p>
-            <div className="overflow-hidden rounded-lg border border-[#e5e7eb]">
-              {[
-                { name: 'TOEIC', value: '800점 이상' },
-                { name: 'TOEFL iBT', value: '80점 이상' },
-                { name: 'TOEIC Speaking', value: 'IM 1 이상' },
-              ].map((item, index) => (
-                <div
-                  key={item.name}
-                  className={`flex items-center justify-between gap-1.5 px-2 py-1.5 ${
-                    index < 2 ? 'border-b border-[#e5e7eb]' : ''
-                  }`}
-                >
-                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[11px] font-medium text-ink">
-                    {item.name}
-                  </span>
-                  <span className="shrink-0 whitespace-nowrap text-[11px] text-ink">{item.value}</span>
+          {englishApplicable && (
+            <div className="mb-3">
+              <p className="mb-1.5 text-xs font-bold text-ink">영어졸업인증</p>
+              {englishSatisfied ? (
+                <div className="rounded-lg border border-sejong/20 bg-sejong/5 px-3 py-3 text-center">
+                  <p className="text-sm font-bold text-sejong">영어졸업인증 이수 완료</p>
+                  {englishCert?.detail && (
+                    <p className="mt-1 text-[11px] leading-snug text-ink-muted">{englishCert.detail}</p>
+                  )}
                 </div>
-              ))}
+              ) : (
+                <>
+                  <div className="overflow-hidden rounded-lg border border-[#e5e7eb]">
+                    {[
+                      { name: 'TOEIC', value: '800점 이상' },
+                      { name: 'TOEFL iBT', value: '80점 이상' },
+                      { name: 'TOEIC Speaking', value: 'IM 1 이상' },
+                    ].map((item, index) => (
+                      <div
+                        key={item.name}
+                        className={`flex items-center justify-between gap-1.5 px-2 py-1.5 ${
+                          index < 2 ? 'border-b border-[#e5e7eb]' : ''
+                        }`}
+                      >
+                        <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[11px] font-medium text-ink">
+                          {item.name}
+                        </span>
+                        <span className="shrink-0 whitespace-nowrap text-[11px] text-ink">
+                          {item.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {englishCert?.primaryRequirement && (
+                    <p className="mt-1 text-[11px] text-ink-muted">{englishCert.primaryRequirement}</p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setEnglishOpen(true)}
+                    className="mt-1 w-full text-right text-[11px] text-ink-muted hover:text-sejong"
+                  >
+                    더보기
+                  </button>
+                </>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => setEnglishOpen(true)}
-              className="mt-1 w-full text-right text-[11px] text-ink-muted hover:text-sejong"
-            >
-              더보기
-            </button>
-          </div>
+          )}
 
-          <div>
-            <p className="mb-1.5 text-xs font-bold text-ink">SW코딩졸업인증(비전공자)</p>
-            <div className="overflow-hidden rounded-lg border border-[#e5e7eb]">
-              {[
-                { name: 'TOSC (SW역량테스트)', value: 'Level 5 이상' },
-                { name: 'K-MOOC:코딩과스토리텔링', value: 'P 이상' },
-              ].map((item, index) => (
-                <div
-                  key={item.name}
-                  className={`flex items-center justify-between gap-1.5 overflow-x-auto px-2 py-1.5 ${
-                    index === 0 ? 'border-b border-[#e5e7eb]' : ''
-                  }`}
-                >
-                  <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[10px] font-medium leading-none text-ink">
-                    {item.name}
-                  </span>
-                  <span className="shrink-0 whitespace-nowrap text-[11px] text-ink">{item.value}</span>
+          {swApplicable && (
+            <div>
+              <p className="mb-1.5 text-xs font-bold text-ink">SW코딩졸업인증</p>
+              {swSatisfied ? (
+                <div className="rounded-lg border border-sejong/20 bg-sejong/5 px-3 py-3 text-center">
+                  <p className="text-sm font-bold text-sejong">SW코딩졸업인증 이수 완료</p>
+                  {swCert?.detail && (
+                    <p className="mt-1 text-[11px] leading-snug text-ink-muted">{swCert.detail}</p>
+                  )}
                 </div>
-              ))}
+              ) : (
+                <>
+                  <div className="overflow-hidden rounded-lg border border-[#e5e7eb]">
+                    {[
+                      {
+                        name: 'TOSC (SW역량테스트)',
+                        value: swCert?.primaryRequirement || 'Level 5 이상',
+                      },
+                      {
+                        name: '대체이수',
+                        value: swCert?.substituteRequirement || 'K-MOOC:코딩과스토리텔링 P 이상',
+                      },
+                    ].map((item, index) => (
+                      <div
+                        key={item.name}
+                        className={`flex items-center justify-between gap-1.5 overflow-x-auto px-2 py-1.5 ${
+                          index === 0 ? 'border-b border-[#e5e7eb]' : ''
+                        }`}
+                      >
+                        <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[10px] font-medium leading-none text-ink">
+                          {item.name}
+                        </span>
+                        <span className="shrink-0 whitespace-nowrap text-[11px] text-ink">
+                          {item.value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSwOpen(true)}
+                    className="mt-1 w-full text-right text-[11px] text-ink-muted hover:text-sejong"
+                  >
+                    더보기
+                  </button>
+                </>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => setSwOpen(true)}
-              className="mt-1 w-full text-right text-[11px] text-ink-muted hover:text-sejong"
-            >
-              더보기
-            </button>
-          </div>
+          )}
         </article>
       </section>
 
@@ -542,8 +638,21 @@ export function GraduationPage() {
         </div>
       </section>
 
-      <EnglishCertModal open={englishOpen} onClose={() => setEnglishOpen(false)} />
-      <SWCodingCertModal open={swOpen} onClose={() => setSwOpen(false)} />
+      <EnglishCertModal
+        open={englishOpen}
+        onClose={() => setEnglishOpen(false)}
+        satisfied={englishSatisfied}
+        detail={englishCert?.detail}
+        primaryRequirement={englishCert?.primaryRequirement}
+      />
+      <SWCodingCertModal
+        open={swOpen}
+        onClose={() => setSwOpen(false)}
+        satisfied={swSatisfied}
+        detail={swCert?.detail}
+        primaryRequirement={swCert?.primaryRequirement}
+        substituteRequirement={swCert?.substituteRequirement}
+      />
       <CourseListModal
         open={listModal != null}
         onClose={() => setListModal(null)}

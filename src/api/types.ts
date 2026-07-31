@@ -32,6 +32,54 @@ export type StudentLoginResponse = {
   role?: UserRole
   /** role 대신 boolean으로 주는 경우 */
   isAdmin?: boolean
+  /** 로그인 응답의 세종 고전독서 인증 현황 */
+  readingStatus?: SejongReadingStatus
+}
+
+export type SejongReadingAreaStatus = {
+  name: string
+  completedCount?: number
+  certifiedCount?: number
+  requiredCount?: number
+  satisfied?: boolean
+}
+
+export type SejongReadingStatus = {
+  completed?: boolean
+  title?: string
+  subtitle?: string
+  message?: string
+  areas?: SejongReadingAreaStatus[]
+  totalCompletedCount?: number
+  totalCertifiedCount?: number
+  totalRequiredCount?: number
+}
+
+export type EnglishCertificationProgress = {
+  applicable?: boolean
+  satisfied?: boolean
+  status?: string
+  policyType?: string
+  primaryRequirement?: string
+  detail?: string
+}
+
+export type SwCodingCertificationProgress = {
+  applicable?: boolean
+  satisfied?: boolean
+  status?: string
+  studentGroup?: string
+  graduationRule?: string
+  primaryRequirement?: string
+  substituteRequirement?: string
+  detail?: string
+}
+
+export type RequirementCourse = {
+  courseCode: string
+  courseName: string
+  credit?: string
+  recommendedTerm?: string
 }
 
 export type AdminUploadResponse = {
@@ -100,6 +148,8 @@ export type GraduationProgressResponse = {
   majorTracks?: MajorTrackProgress[]
   totalCredits?: CreditProgress
   commonLiberalCredits?: CreditProgress
+  /** 공통교양(공필/교필) 상세 과목 목록 */
+  commonLiberalCourses?: CategoryCourse[]
   electiveLiberalCredits?: CreditProgress
   balancedLiberalCredits?: CreditProgress
   academicFoundationCredits?: CreditProgress
@@ -109,6 +159,11 @@ export type GraduationProgressResponse = {
   liberalGradePoint?: string
   majorCredits?: MajorCreditSummary
   categorySummaries?: CategorySummary[]
+  /** 주전공 필수 미이수 과목 */
+  remainingMajorRequiredCourses?: RequirementCourse[]
+  /** 주전공 선택 미이수 과목 (있으면 사용) */
+  remainingMajorElectiveCourses?: RequirementCourse[]
+  missingBalancedLiberalAreas?: string[]
   balancedLiberalAreaProgresses?: Array<{
     area: string
     earnedCredits: string
@@ -124,6 +179,10 @@ export type GraduationProgressResponse = {
     requirementType?: string
     detail?: string
   }
+  englishCertification?: EnglishCertificationProgress
+  swCodingCertification?: SwCodingCertificationProgress
+  /** 일부 배포에서 graduation-progress에 포함될 수 있음 */
+  readingStatus?: SejongReadingStatus
   /** 계획 과목 반영 후 졸업 가능 여부 */
   graduationEligible?: boolean
   /** 아직 부족한 조건 목록 */
