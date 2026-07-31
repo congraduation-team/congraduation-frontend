@@ -210,45 +210,35 @@ function isSemesterKey(term: string | null | undefined): term is string {
 }
 
 /**
- * 같은 캘린더 학기(takenYear-Semester)에 이수한 과목들이 어느 termKey에 묶여 있는지 투표.
- * → 휴학 등으로 캘린더≠순번이어도 (2024-1 → 2-1) 매핑 가능.
+ * 실제 수강 캘린더 학기를 시간순으로 정렬해 이수 순번(1-1…4-2)에 매핑.
+ * 백엔드 termKey가 권장학기(4-2)여도, 3-2에 미리 들었으면 3-2로 표시 가능.
+ * 휴학 갭이 있어도 들은 학기 순서만으로 순번이 매겨짐.
  */
-function buildCalendarStandingMap(
+function buildStandingByTakenOrder(
   items: Array<{
-    termKey: string
     completed?: boolean
     takenYear?: number | string | null
     takenSemester?: number | string | null
   }>,
 ): Map<string, string> {
-  const votes = new Map<string, Map<string, number>>()
-
+  const keys = new Set<string>()
   for (const item of items) {
     if (item.completed !== true) continue
-    const standing = item.termKey.trim()
-    if (!isSemesterKey(standing)) continue
     const cal = takenCalendarKey(item.takenYear, item.takenSemester)
-    if (!cal) continue
-    const bucket = votes.get(cal) ?? new Map<string, number>()
-    bucket.set(standing, (bucket.get(standing) ?? 0) + 1)
-    votes.set(cal, bucket)
+    if (cal) keys.add(cal)
   }
 
+  const sorted = [...keys].sort((a, b) => {
+    const [ay, as] = a.split('-').map(Number)
+    const [by, bs] = b.split('-').map(Number)
+    return ay === by ? as - bs : ay - by
+  })
+
   const result = new Map<string, string>()
-  for (const [cal, bucket] of votes) {
-    let best: string | null = null
-    let bestCount = -1
-    for (const [term, count] of bucket) {
-      const better =
-        count > bestCount ||
-        (count === bestCount && best != null && semesterOrder(term) < semesterOrder(best))
-      if (better) {
-        best = term
-        bestCount = count
-      }
-    }
-    if (best) result.set(cal, best)
-  }
+  sorted.forEach((cal, index) => {
+    if (index < SEMESTERS.length) result.set(cal, SEMESTERS[index])
+    else result.set(cal, '4-2')
+  })
   return result
 }
 
@@ -260,54 +250,36 @@ function pickGeneralDisplayTerm(termKeys: string[]): string | null {
 }
 
 /**
- * 이수 과목 배치: 실제 들은 순번 학기.
- * 권장(4-2) 과목을 3-2에 미리 들었어도 3-2에 표시.
+ * 이수 과목 배치: 실제 들은 순번 학기 (권장학기 아님).
  */
 function pickCompletedDisplayTerm(options: {
   termKeys: string[]
   takenYear?: number | string | null
   takenSemester?: number | string | null
   courseStanding?: string | null
-  calendarStanding: Map<string, string>
+  standingByTaken: Map<string, string>
   admissionYear?: number
 }): string | null {
-  const {
-    termKeys,
-    takenYear,
-    takenSemester,
-    courseStanding,
-    calendarStanding,
-    admissionYear,
-  } = options
+  const { termKeys, takenYear, takenSemester, courseStanding, standingByTaken, admissionYear } =
+    options
 
   if (isSemesterKey(courseStanding)) return courseStanding.trim()
 
-  const calc = toTermKeyFromTaken(takenYear, takenSemester, admissionYear)
-  const recommended = pickGeneralDisplayTerm(termKeys)
   const cal = takenCalendarKey(takenYear, takenSemester)
-  const fromCal = cal ? calendarStanding.get(cal) : undefined
+  if (cal && standingByTaken.has(cal)) return standingByTaken.get(cal)!
 
-  // 미리 이수: 입학 기준 환산 순번이 권장/추론 칸보다 이르면 그때 들은 학기로
-  if (calc && recommended && semesterOrder(calc) < semesterOrder(recommended)) return calc
-  if (calc && fromCal && semesterOrder(calc) < semesterOrder(fromCal)) return calc
-
-  // 같은 캘린더 학기 이수 과목들이 가리키는 순번 (휴학 복학 매핑)
-  if (fromCal) return fromCal
-
-  // 캘린더 환산이 API 칸과 일치
-  if (calc && termKeys.some((k) => k.trim() === calc)) return calc
-
-  // 휴학 복학 등: 환산이 권장보다 늦으면 API 이수순번 칸 유지
-  if (recommended && calc && semesterOrder(calc) > semesterOrder(recommended)) return recommended
-
+  // taken은 있는데 순번 맵에 없으면 입학년 환산 폴백
+  const calc = toTermKeyFromTaken(takenYear, takenSemester, admissionYear)
   if (calc) return calc
-  return recommended ?? fromCal ?? null
+
+  // taken 없음 → 권장/API 칸 (백엔드가 taken을 안 준 경우)
+  return pickGeneralDisplayTerm(termKeys)
 }
 
-/** CompletedCourseDto 등 takenYear/takenSemester가 있는 목록에서 학수번호→학기 맵 생성 */
+/** CompletedCourseDto 등에서 학수번호→학기 맵 */
 function buildTakenTermMap(
   progress: GraduationProgressResponse | null | undefined,
-  calendarStanding?: Map<string, string>,
+  standingByTaken?: Map<string, string>,
 ): Map<string, string> {
   const map = new Map<string, string>()
   if (!progress) return map
@@ -321,9 +293,8 @@ function buildTakenTermMap(
         raw.takenYear as string | number | null | undefined,
         raw.takenSemester as string | number | null | undefined,
       )
-      const fromStanding = cal ? calendarStanding?.get(cal) : undefined
       const term =
-        fromStanding ||
+        (cal ? standingByTaken?.get(cal) : undefined) ||
         toTermKeyFromTaken(
           raw.takenYear as string | number | null | undefined,
           raw.takenSemester as string | number | null | undefined,
@@ -356,7 +327,7 @@ function resolveDisplayTerm(
   admissionYear?: number,
   _takenTermByCode?: Map<string, string>,
   _courseCode?: string,
-  calendarStanding?: Map<string, string>,
+  standingByTaken?: Map<string, string>,
   courseStanding?: string | null,
 ): string | null {
   const recommended = recommendedTerm.trim()
@@ -367,7 +338,7 @@ function resolveDisplayTerm(
       takenYear,
       takenSemester,
       courseStanding,
-      calendarStanding: calendarStanding ?? new Map(),
+      standingByTaken: standingByTaken ?? new Map(),
       admissionYear,
     })
   }
@@ -380,7 +351,7 @@ function abeekToMapCourse(
   course: RoadmapCourse,
   admissionYear?: number,
   takenTermByCode?: Map<string, string>,
-  calendarStanding?: Map<string, string>,
+  standingByTaken?: Map<string, string>,
   termKey?: string,
 ): MapCourse | null {
   const semester = resolveDisplayTerm(
@@ -391,7 +362,7 @@ function abeekToMapCourse(
     admissionYear,
     takenTermByCode,
     course.abeekCourseCode,
-    calendarStanding,
+    standingByTaken,
     course.standingTermKey,
   )
   if (!semester) return null
@@ -438,7 +409,7 @@ function liberalCoursesFromProgress(
   progress: GraduationProgressResponse | null | undefined,
   excludeCodes: Set<string>,
   takenTermByCode: Map<string, string>,
-  calendarStanding?: Map<string, string>,
+  standingByTaken?: Map<string, string>,
 ): MapCourse[] {
   if (!progress) return []
   const admissionYear = progress.admissionYear
@@ -458,7 +429,7 @@ function liberalCoursesFromProgress(
         raw.takenSemester as string | number | null | undefined,
       )
       const term =
-        (cal ? calendarStanding?.get(cal) : undefined) ||
+        (cal ? standingByTaken?.get(cal) : undefined) ||
         takenTermByCode.get(code) ||
         toTermKeyFromTaken(
           raw.takenYear as string | number | null | undefined,
@@ -572,6 +543,44 @@ function CourseNameText({ name }: { name: string }) {
       ))}
     </span>
   )
+}
+
+function collectProgressTakenItems(
+  progress: GraduationProgressResponse | null | undefined,
+): Array<{
+  completed: boolean
+  takenYear?: number | string | null
+  takenSemester?: number | string | null
+}> {
+  if (!progress) return []
+  const out: Array<{
+    completed: boolean
+    takenYear?: number | string | null
+    takenSemester?: number | string | null
+  }> = []
+
+  const ingest = (courses?: Array<Record<string, unknown>>) => {
+    for (const raw of courses ?? []) {
+      out.push({
+        completed: true,
+        takenYear: raw.takenYear as string | number | null | undefined,
+        takenSemester: raw.takenSemester as string | number | null | undefined,
+      })
+    }
+  }
+
+  ingest(progress.commonLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined)
+  ingest(progress.electiveLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined)
+  ingest(
+    progress.academicFoundationCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+  )
+  ingest(
+    progress.majorFoundationCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+  )
+  ingest(
+    progress.balancedLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+  )
+  return out
 }
 
 export function CurriculumPage() {
@@ -843,15 +852,16 @@ export function CurriculumPage() {
 
   const allCourses = useMemo(() => {
     const admissionYear = graduation?.admissionYear ?? student?.admissionYear
+    const progressTaken = collectProgressTakenItems(graduation)
 
-    const generalCalendarStanding = buildCalendarStandingMap(
-      generalFlat.map(({ course, termKey }) => ({
-        termKey,
+    const generalStandingByTaken = buildStandingByTakenOrder([
+      ...generalFlat.map(({ course }) => ({
         completed: course.completed,
         takenYear: course.takenYear,
         takenSemester: course.takenSemester,
       })),
-    )
+      ...progressTaken,
+    ])
 
     const abeekTermItems: Array<{
       course: RoadmapCourse
@@ -870,19 +880,18 @@ export function CurriculumPage() {
       abeekTermItems.push({ course, termKey: course.recommendedTerm || '' })
     }
 
-    const abeekCalendarStanding = buildCalendarStandingMap(
-      abeekTermItems.map(({ course, termKey }) => ({
-        termKey: termKey || course.recommendedTerm || '',
+    const abeekStandingByTaken = buildStandingByTakenOrder([
+      ...abeekTermItems.map(({ course }) => ({
         completed: course.completed,
         takenYear: course.takenYear,
         takenSemester: course.takenSemester,
       })),
-    )
+      ...progressTaken,
+    ])
 
-    const takenTermByCode = buildTakenTermMap(
-      graduation,
-      viewKind === 'abeek' ? abeekCalendarStanding : generalCalendarStanding,
-    )
+    const standingByTaken =
+      viewKind === 'abeek' ? abeekStandingByTaken : generalStandingByTaken
+    const takenTermByCode = buildTakenTermMap(graduation, standingByTaken)
 
     // ABEEK 뷰용: 이수 과목 taken → 순번 보강
     for (const { course, termKey } of abeekTermItems) {
@@ -894,7 +903,7 @@ export function CurriculumPage() {
         takenYear: course.takenYear,
         takenSemester: course.takenSemester,
         courseStanding: course.standingTermKey,
-        calendarStanding: abeekCalendarStanding,
+        standingByTaken: abeekStandingByTaken,
         admissionYear,
       })
       if (term) takenTermByCode.set(course.abeekCourseCode, term)
@@ -907,7 +916,7 @@ export function CurriculumPage() {
           course,
           admissionYear,
           takenTermByCode,
-          abeekCalendarStanding,
+          abeekStandingByTaken,
           termKey || course.recommendedTerm,
         )
         if (!mapped) continue
@@ -915,7 +924,6 @@ export function CurriculumPage() {
         if (!existing || (mapped.completed && !existing.completed)) {
           byId.set(mapped.id, mapped)
         } else if (mapped.completed && existing.completed) {
-          // 이수 과목은 실제 이수학기 우선 (이미 pickCompletedDisplayTerm 반영)
           byId.set(mapped.id, mapped)
         }
       }
@@ -943,7 +951,7 @@ export function CurriculumPage() {
           takenSemester: completedInst.course.takenSemester,
           courseStanding:
             completedInst.course.standingTermKey || completedInst.course.completedTermKey,
-          calendarStanding: generalCalendarStanding,
+          standingByTaken: generalStandingByTaken,
           admissionYear,
         })
         if (!semester) continue
@@ -972,19 +980,17 @@ export function CurriculumPage() {
       graduation,
       majorCodes,
       takenTermByCode,
-      generalCalendarStanding,
+      generalStandingByTaken,
     )
     for (const course of liberalExtra) {
       const existing = byId.get(course.id)
       if (existing) {
         if (existing.category.startsWith('major') && !course.category.startsWith('major')) {
           existing.category = course.category
-          existing.completed = existing.completed || course.completed
         }
-        // 로드맵에 이미 있으면 학기 배치는 pickCompletedDisplayTerm 유지
-        if (!existing.completed && course.completed) {
+        if (course.completed && course.semester) {
           existing.completed = true
-          if (course.semester) existing.semester = course.semester
+          existing.semester = course.semester
         }
         continue
       }
