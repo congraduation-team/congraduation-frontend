@@ -57,22 +57,63 @@ const kindLabel: Record<CourseKind, string> = {
   pass: 'P/NP',
 }
 
+/** API 카테고리 enum / 한글 라벨 → UI 구분 */
 function classifyByCategory(category?: string, grade?: string): { kind: CourseKind; label: string } {
   if (grade === 'P' || grade === 'NP') return { kind: 'pass', label: 'P/NP' }
   const c = category || ''
-  if (c.includes('설계') || c.toLowerCase().includes('capstone')) {
+  const upper = c.toUpperCase()
+
+  if (
+    c.includes('설계') ||
+    upper.includes('DESIGN') ||
+    upper.includes('CAPSTONE')
+  ) {
     return { kind: 'design', label: '설계' }
   }
-  if (c.includes('교양') || c.includes('균형') || c.includes('공통')) {
+  if (
+    c.includes('교양') ||
+    c.includes('균형') ||
+    c.includes('공통') ||
+    upper.includes('LIBERAL') ||
+    upper.includes('GENERAL') ||
+    upper.startsWith('LIB_')
+  ) {
     return { kind: 'general', label: '교양' }
   }
-  if (c.includes('필수') || c.includes('전필') || c.includes('기초') || c.includes('BSM')) {
-    return { kind: 'required', label: c.includes('BSM') || c.includes('기초') ? '기초/BSM' : '전필' }
+  if (upper.includes('BSM') || (c.includes('기초') && !c.includes('설계'))) {
+    return { kind: 'required', label: '기초/BSM' }
   }
-  if (c.includes('선택') || c.includes('전선')) {
+  if (
+    c.includes('필수') ||
+    c.includes('전필') ||
+    upper.includes('REQUIRED') ||
+    upper.includes('MAJOR_REQ')
+  ) {
+    return { kind: 'required', label: '전필' }
+  }
+  if (
+    c.includes('선택') ||
+    c.includes('전선') ||
+    upper.includes('ELECTIVE') ||
+    upper.includes('MAJOR_ELE')
+  ) {
     return { kind: 'elective', label: '전선' }
   }
+  // MAJ_* 같은 enum은 그대로 노출하지 않음
+  if (/^[A-Z][A-Z0-9_]+$/.test(c)) {
+    return { kind: 'elective', label: '전공' }
+  }
   return { kind: 'elective', label: c || '기타' }
+}
+
+/** 학수번호 여부 (MAJ_BASIC_DESIGN 같은 카테고리 enum 제외) */
+function isAcademicCourseCode(code?: string | null): boolean {
+  if (!code) return false
+  const trimmed = code.trim()
+  if (!trimmed) return false
+  if (/^[A-Z][A-Z0-9_]*$/.test(trimmed) && trimmed.includes('_')) return false
+  if (/^[A-Z]{2,}_/.test(trimmed)) return false
+  return true
 }
 
 function toCatalogItem(course: PlannableCourse): CatalogItem | null {
@@ -104,6 +145,7 @@ export function SimulationPage() {
   const [evaluation, setEvaluation] = useState<AbeekEvaluationResponse | null>(null)
   const [planned, setPlanned] = useState<PlannedCoursesResponse | null>(null)
   const [catalog, setCatalog] = useState<CatalogItem[]>([])
+  const [codeByName, setCodeByName] = useState<Map<string, string>>(() => new Map())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -164,6 +206,30 @@ export function SimulationPage() {
   useEffect(() => {
     if (!student) return
     let cancelled = false
+    ;(async () => {
+      try {
+        const res = await getPlannedCourseCatalog({
+          departmentName: student.major || undefined,
+        })
+        if (cancelled) return
+        const map = new Map<string, string>()
+        for (const item of (res.courses ?? []).map(toCatalogItem)) {
+          if (!item) continue
+          if (!map.has(item.name)) map.set(item.name, item.code)
+        }
+        setCodeByName(map)
+      } catch {
+        /* 학수번호 보조 조회 실패는 무시 */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [student])
+
+  useEffect(() => {
+    if (!student) return
+    let cancelled = false
     const timer = window.setTimeout(async () => {
       try {
         const res = await getPlannedCourseCatalog({
@@ -175,6 +241,13 @@ export function SimulationPage() {
           .map(toCatalogItem)
           .filter((c): c is CatalogItem => c != null)
         setCatalog(items)
+        setCodeByName((prev) => {
+          const next = new Map(prev)
+          for (const item of items) {
+            if (!next.has(item.name)) next.set(item.name, item.code)
+          }
+          return next
+        })
       } catch {
         if (!cancelled) setCatalog([])
       }
@@ -184,6 +257,14 @@ export function SimulationPage() {
       window.clearTimeout(timer)
     }
   }, [student, query])
+
+  const resolveCourseCode = useCallback(
+    (course: PlannedCourseItem) => {
+      if (isAcademicCourseCode(course.courseCode)) return course.courseCode
+      return codeByName.get(course.courseName) || ''
+    },
+    [codeByName],
+  )
 
   const semesters = planned?.semesters ?? []
   const plannedCourses = useMemo(
@@ -480,13 +561,13 @@ export function SimulationPage() {
                         if (moving) handleMoveCourse(moving, plan.plannedSemesterId)
                         setDragId(null)
                       }}
-                      className={`flex min-h-[260px] flex-col rounded-xl border p-3 transition ${
+                      className={`flex h-[320px] flex-col rounded-xl border p-3 transition ${
                         activeCard
                           ? 'border-sejong bg-sejong-light/30'
                           : 'border-[#eceff3] bg-panel/40'
                       }`}
                     >
-                      <div className="mb-2 flex w-full items-center justify-between gap-2">
+                      <div className="mb-2 flex shrink-0 w-full items-center justify-between gap-2">
                         <button
                           type="button"
                           onClick={() => setActiveSemesterId(plan.plannedSemesterId)}
@@ -505,50 +586,36 @@ export function SimulationPage() {
                           </button>
                         </div>
                       </div>
-                      <ul className="flex-1 space-y-2 overflow-y-auto">
+                      <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
                         {courses.map((course) => {
                           const { kind, label } = classifyByCategory(
                             course.category,
                             course.expectedGrade,
                           )
+                          const courseNo = resolveCourseCode(course)
                           return (
                             <li
                               key={course.id}
                               draggable
                               onDragStart={() => setDragId(course.id)}
                               onDragEnd={() => setDragId(null)}
-                              className="rounded-lg border border-[#e8ebf0] bg-white px-2.5 py-2 shadow-sm"
+                              className="rounded-lg border border-[#e8ebf0] bg-white px-2 py-1.5"
                             >
-                              <div className="flex items-start gap-2">
-                                <span className="mt-0.5 cursor-grab text-ink-faint" aria-hidden>
+                              <div className="flex items-center gap-1.5">
+                                <span className="shrink-0 cursor-grab text-[10px] leading-none text-ink-faint" aria-hidden>
                                   ⋮⋮
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-[13px] font-semibold text-ink">
-                                    {course.courseName}
-                                  </p>
-                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                    <span
-                                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${kindStyle[kind]}`}
-                                    >
-                                      {label}
-                                    </span>
-                                    <span className="text-[11px] text-ink-muted">
-                                      {toNumber(course.credit)}학점
-                                    </span>
-                                    {course.retake && (
-                                      <span className="rounded-full bg-panel px-2 py-0.5 text-[10px] font-semibold text-ink-muted">
-                                        재수강
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="mt-1.5 flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="min-w-0 flex-1 truncate text-[12px] font-semibold text-ink">
+                                      {course.courseName}
+                                    </p>
                                     <select
                                       value={normalizeGrade(course.expectedGrade)}
                                       onChange={(e) =>
                                         handleUpdateGrade(course.id, e.target.value as Grade)
                                       }
-                                      className="rounded-md border border-[#e5e7eb] bg-panel px-2 py-1 text-[11px] font-semibold outline-none"
+                                      className="shrink-0 rounded border border-[#e5e7eb] bg-panel px-1 py-0.5 text-[10px] font-semibold outline-none"
                                     >
                                       {GRADES.map((g) => (
                                         <option key={g} value={g}>
@@ -559,10 +626,30 @@ export function SimulationPage() {
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveCourse(course.id)}
-                                      className="text-[11px] font-semibold text-ink-faint hover:text-sejong"
+                                      className="shrink-0 text-[10px] font-semibold text-ink-faint hover:text-sejong"
                                     >
                                       삭제
                                     </button>
+                                  </div>
+                                  <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                                    {courseNo && (
+                                      <span className="text-[10px] tabular-nums text-ink-faint">
+                                        {courseNo}
+                                      </span>
+                                    )}
+                                    <span
+                                      className={`rounded-full px-1.5 py-px text-[9px] font-bold ${kindStyle[kind]}`}
+                                    >
+                                      {label}
+                                    </span>
+                                    <span className="text-[10px] text-ink-muted">
+                                      {toNumber(course.credit)}학점
+                                    </span>
+                                    {course.retake && (
+                                      <span className="rounded-full bg-panel px-1.5 py-px text-[9px] font-semibold text-ink-muted">
+                                        재수강
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -571,17 +658,10 @@ export function SimulationPage() {
                         })}
                         {courses.length === 0 && (
                           <li className="py-8 text-center text-xs text-ink-faint">
-                            과목을 검색해 추가하세요
+                            오른쪽에서 과목을 검색해 추가하세요
                           </li>
                         )}
                       </ul>
-                      <button
-                        type="button"
-                        onClick={() => setActiveSemesterId(plan.plannedSemesterId)}
-                        className="mt-2 rounded-lg border border-dashed border-[#d5dae1] py-2 text-xs font-semibold text-ink-muted hover:border-sejong hover:text-sejong"
-                      >
-                        + 과목 추가
-                      </button>
                     </article>
                   )
                 })}
