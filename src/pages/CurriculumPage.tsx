@@ -69,7 +69,8 @@ function courseBadgeClass(course: MapCourse, hasCompletionData: boolean): string
     return `${categoryStyle['major-elective']} ${hasCompletionData ? 'opacity-55' : ''}`
   }
 
-  return `${categoryStyle[course.category]} ${hasCompletionData ? 'opacity-55' : ''}`
+  // 교양·기초필수(BSM): 카테고리 고유 색 유지 (미이수 opacity로 회색빛 나지 않게)
+  return categoryStyle[course.category]
 }
 
 /** 일반(시간표) 로드맵: 교양 / 기초필수 / 전공 */
@@ -876,7 +877,10 @@ export function CurriculumPage() {
               <div className="flex overflow-hidden rounded-full border border-[#ddd] text-sm font-semibold">
                 <button
                   type="button"
-                  onClick={() => setViewKind('general')}
+                  onClick={() => {
+                    setViewKind('general')
+                    setFilter(null)
+                  }}
                   className={`px-4 py-1.5 ${
                     viewKind === 'general' ? 'bg-ink text-white' : 'bg-white text-ink'
                   }`}
@@ -900,43 +904,25 @@ export function CurriculumPage() {
         <p className="mt-3 text-sm text-ink-muted">
           {viewKind === 'abeek'
             ? '공학인증(ABEEK) 이수체계도입니다. 전문교양·BSM·전공을 표시합니다.'
-            : '강의 시간표 기준 학과 로드맵입니다. 기초필수(BSM)는 시간표에서, 교양은 기이수 성적 기준으로 표시합니다. 전문교양 전체 커리큘럼은 공학인증 보기에서 확인하세요.'}
+            : '강의 시간표 기준 학과 로드맵입니다. 이수한 과목은 빨간색으로 표시됩니다.'}
         </p>
 
+        {viewKind === 'abeek' && (
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#e5e5ea] py-3.5">
           <span className="shrink-0 text-sm font-medium text-ink">체계표 안내</span>
           <div className="flex flex-wrap items-center gap-2">
-            {viewKind === 'abeek' ? (
-              <>
-                <LegendPill
-                  active={filter === 'liberal'}
-                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-                  className="bg-[#e8eaee] text-ink"
-                  label="전문교양"
-                />
-                <LegendPill
-                  active={filter === 'bsm'}
-                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-                  className="bg-[#4a5568] text-white"
-                  label="BSM(기초수학, 과학)"
-                />
-              </>
-            ) : (
-              <>
-                <LegendPill
-                  active={filter === 'liberal'}
-                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-                  className="bg-[#e8eaee] text-ink"
-                  label="교양"
-                />
-                <LegendPill
-                  active={filter === 'bsm'}
-                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-                  className="bg-[#4a5568] text-white"
-                  label="기초필수"
-                />
-              </>
-            )}
+            <LegendPill
+              active={filter === 'liberal'}
+              onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
+              className="bg-[#e8eaee] text-ink"
+              label="전문교양"
+            />
+            <LegendPill
+              active={filter === 'bsm'}
+              onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
+              className="bg-[#4a5568] text-white"
+              label="BSM(기초수학, 과학)"
+            />
             <LegendPill
               active={filter === 'major-required'}
               onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
@@ -956,35 +942,32 @@ export function CurriculumPage() {
             )}
           </div>
           <div className="ml-auto flex flex-wrap items-end gap-4">
-            {viewKind === 'abeek' && (
-              <>
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-xs text-ink">필수 선수과목</span>
-                  <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
-                    <line x1="0" y1="6" x2="46" y2="6" stroke="#222" strokeWidth="1.8" />
-                    <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
-                  </svg>
-                </div>
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-xs text-ink">선택 선수과목</span>
-                  <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
-                    <line
-                      x1="0"
-                      y1="6"
-                      x2="46"
-                      y2="6"
-                      stroke="#222"
-                      strokeWidth="1.8"
-                      strokeDasharray="4 3"
-                    />
-                    <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
-                  </svg>
-                </div>
-              </>
-            )}
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-xs text-ink">필수 선수과목</span>
+              <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
+                <line x1="0" y1="6" x2="46" y2="6" stroke="#222" strokeWidth="1.8" />
+                <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
+              </svg>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-xs text-ink">선택 선수과목</span>
+              <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
+                <line
+                  x1="0"
+                  y1="6"
+                  x2="46"
+                  y2="6"
+                  stroke="#222"
+                  strokeWidth="1.8"
+                  strokeDasharray="4 3"
+                />
+                <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
+              </svg>
+            </div>
             <p className="pb-0.5 text-xs text-ink-muted">휠: 확대/축소 · 드래그: 이동</p>
           </div>
         </div>
+        )}
 
         <div className="mt-6 overflow-hidden rounded-2xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           {loading ? (
