@@ -51,8 +51,25 @@ type RowDef = {
 const categoryStyle: Record<MapCategory, string> = {
   liberal: 'bg-[#e8eaee] text-ink',
   bsm: 'bg-[#4a5568] text-white',
-  'major-required': 'bg-sejong text-white',
+  'major-required': 'border-2 border-sejong bg-white text-sejong',
   'major-elective': 'bg-sejong-pink text-ink',
+}
+
+function courseBadgeClass(course: MapCourse, hasCompletionData: boolean): string {
+  // 이수한 과목은 카테고리와 무관하게 빨간색
+  if (course.completed) {
+    return 'bg-sejong text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]'
+  }
+
+  if (course.category === 'major-required') {
+    return `${categoryStyle['major-required']} ${hasCompletionData ? 'opacity-70' : ''}`
+  }
+
+  if (course.category === 'major-elective') {
+    return `${categoryStyle['major-elective']} ${hasCompletionData ? 'opacity-55' : ''}`
+  }
+
+  return `${categoryStyle[course.category]} ${hasCompletionData ? 'opacity-55' : ''}`
 }
 
 /** 일반(시간표) 로드맵: 교양 / 교양필수 / 전공 */
@@ -795,15 +812,20 @@ export function CurriculumPage() {
             <LegendPill
               active={filter === 'major-required'}
               onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
-              className="bg-sejong text-white"
-              label="전공(인필)"
+              className="border-2 border-sejong bg-white text-sejong"
+              label="전공필수"
             />
             <LegendPill
               active={filter === 'major-elective'}
               onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
-              className="bg-sejong-pink text-white"
-              label="전공(인선)"
+              className="bg-sejong-pink text-ink"
+              label="전공선택"
             />
+            {hasCompletionData && (
+              <span className="rounded-full bg-sejong px-3.5 py-1.5 text-xs font-semibold text-white">
+                이수 과목
+              </span>
+            )}
           </div>
           <div className="ml-auto flex flex-wrap items-end gap-4">
             {viewKind === 'abeek' && (
@@ -969,7 +991,8 @@ export function CurriculumPage() {
                             (row.categories as readonly MapCategory[]).includes(c.category),
                         )
                         const isFirstMajor = row.key === 'major' && semester === '1-1'
-                        const showPrereqBox = isFirstMajor && cellCourses.length > 0
+                        const showPrereqBox =
+                          viewKind === 'abeek' && isFirstMajor && cellCourses.length > 0
 
                         return (
                           <div
@@ -991,15 +1014,28 @@ export function CurriculumPage() {
                                 ref={(el) => {
                                   nodeRefs.current[course.id] = el
                                 }}
-                                title={`${course.name} ${course.hours}`}
-                                className={`flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-center shadow-sm ${
-                                  categoryStyle[course.category]
-                                } ${
-                                  hasCompletionData && !course.completed && mode === 'all'
-                                    ? 'opacity-45'
+                                title={`${course.name} ${course.hours}${
+                                  course.completed ? ' · 이수' : ''
+                                }${
+                                  course.category === 'major-required' && !course.completed
+                                    ? ' · 전공필수'
                                     : ''
                                 }`}
+                                className={`relative flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-center shadow-sm ${courseBadgeClass(
+                                  course,
+                                  hasCompletionData,
+                                )}`}
                               >
+                                {course.category === 'major-required' && !course.completed && (
+                                  <span className="absolute -top-1.5 right-1 rounded-full bg-sejong px-1.5 py-[1px] text-[9px] font-bold leading-none text-white">
+                                    필수
+                                  </span>
+                                )}
+                                {course.completed && (
+                                  <span className="absolute -top-1.5 right-1 rounded-full bg-white px-1.5 py-[1px] text-[9px] font-bold leading-none text-sejong">
+                                    이수
+                                  </span>
+                                )}
                                 <p
                                   className={`w-full font-semibold leading-snug ${
                                     course.name.length >= 14 ? 'text-[10px]' : 'text-[10.5px]'
@@ -1010,7 +1046,13 @@ export function CurriculumPage() {
                                 <div className="flex items-center justify-center gap-1 whitespace-nowrap text-[10px] font-medium opacity-90">
                                   <span>{course.hours}</span>
                                   {course.name.toLowerCase().includes('capstone') && (
-                                    <span className="inline-flex size-3.5 items-center justify-center rounded-full bg-white text-[9px] font-bold text-sejong">
+                                    <span
+                                      className={`inline-flex size-3.5 items-center justify-center rounded-full text-[9px] font-bold ${
+                                        course.completed
+                                          ? 'bg-white text-sejong'
+                                          : 'bg-sejong text-white'
+                                      }`}
+                                    >
                                       !
                                     </span>
                                   )}
