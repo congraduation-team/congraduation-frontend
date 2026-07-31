@@ -137,8 +137,8 @@ function toCatalogItem(course: PlannableCourse): CatalogItem | null {
   }
 }
 
-function semesterLabel(sem: PlannedSemester) {
-  return `${sem.gradeYear}-${sem.semester}학기`
+function semesterLabel(sem: PlannedSemester, admissionYear?: number) {
+  return formatGradeTerm(sem.gradeYear, sem.semester, admissionYear)
 }
 
 /** "2026-1" / "2025-2" → "1학기" / "2학기" */
@@ -149,6 +149,37 @@ function formatOfferedSemester(term?: string) {
   if (term.includes('1')) return '1학기'
   if (term.includes('2')) return '2학기'
   return term
+}
+
+function parseTermKey(value?: string | null): { gradeYear: number; semester: number } | null {
+  if (!value) return null
+  const m = String(value).trim().match(/^(\d+)\s*[-_/]\s*([12])/)
+  if (!m) return null
+  return { gradeYear: Number(m[1]), semester: Number(m[2]) }
+}
+
+/** 입학년 기준 상대학년 → 표시 라벨 (5학년+는 연도-학기) */
+function formatGradeTerm(gradeYear: number, semester: number, admissionYear?: number) {
+  if (gradeYear >= 1 && gradeYear <= 4) return `${gradeYear}-${semester}학기`
+  if (admissionYear && gradeYear > 0) {
+    return `${admissionYear + gradeYear - 1}-${semester}학기`
+  }
+  return `${gradeYear}년차 ${semester}학기`
+}
+
+function formatLastCompletedLabel(value?: string, admissionYear?: number) {
+  const parsed = parseTermKey(value)
+  if (!parsed) return value || null
+  const label = formatGradeTerm(parsed.gradeYear, parsed.semester, admissionYear)
+  if (parsed.gradeYear > 4) return `${label} · 초과학년`
+  return label
+}
+
+function isPastMaxPlannableTerm(lastCompleted?: string) {
+  const parsed = parseTermKey(lastCompleted)
+  if (!parsed) return false
+  // API 한도: 4-2. 마지막 이수가 4-2 이상이면 다음 학기 생성 불가
+  return parsed.gradeYear > 4 || (parsed.gradeYear === 4 && parsed.semester >= 2)
 }
 
 function normalizeGrade(value?: string | null): Grade {
@@ -374,20 +405,28 @@ export function SimulationPage() {
   }, [progress?.graduationBlockers, projectedMajor, requiredMajor, projectedTotal, requiredTotal, evaluation])
 
   const recommendations = useMemo(() => {
+    const admit = student?.admissionYear ?? progress?.admissionYear
     const tips: string[] = []
     const empty = semesters.find((s) => (s.courses?.length ?? 0) === 0)
-    if (empty) tips.push(`${semesterLabel(empty)}에 과목을 배정하세요.`)
+    if (empty) tips.push(`${semesterLabel(empty, admit)}에 과목을 배정하세요.`)
     const heavy = semesters.find((s) => toNumber(s.totalCredits) > 21)
-    if (heavy) tips.push(`${semesterLabel(heavy)} 학점이 21을 초과합니다. 분산을 권장합니다.`)
+    if (heavy) tips.push(`${semesterLabel(heavy, admit)} 학점이 21을 초과합니다. 분산을 권장합니다.`)
     if (plannedCourses.some((c) => c.retake)) {
       tips.push('재수강 계획이 있습니다. 기존 성적 대체 여부를 확인하세요.')
     }
-    if (planned?.lastCompletedSemester) {
-      tips.push(`마지막 이수 학기: ${planned.lastCompletedSemester} 이후부터 계획 중입니다.`)
+    const lastLabel = formatLastCompletedLabel(planned?.lastCompletedSemester, admit)
+    if (lastLabel) {
+      tips.push(`마지막 이수 학기: ${lastLabel} 이후부터 계획 중입니다.`)
     }
     if (tips.length === 0) tips.push('현재 계획 균형이 양호합니다. 개설 학기를 한 번 더 확인하세요.')
     return tips.slice(0, 4)
-  }, [semesters, plannedCourses, planned?.lastCompletedSemester])
+  }, [
+    semesters,
+    plannedCourses,
+    planned?.lastCompletedSemester,
+    student?.admissionYear,
+    progress?.admissionYear,
+  ])
 
   const searchResults = useMemo(() => {
     return catalog
@@ -481,6 +520,12 @@ export function SimulationPage() {
   )
   const displayName = student?.name || '학생'
   const majorLabel = active?.label || student?.major || ''
+  const admissionYear = student?.admissionYear ?? progress?.admissionYear
+  const lastCompletedLabel = formatLastCompletedLabel(
+    planned?.lastCompletedSemester,
+    admissionYear,
+  )
+  const pastPlannable = isPastMaxPlannableTerm(planned?.lastCompletedSemester)
 
   if (loading) {
     return (
@@ -522,9 +567,9 @@ export function SimulationPage() {
                   {active ? `${trackTypeLabel(active.trackType)} · ${majorLabel}` : majorLabel}
                 </span>
               )}
-              {planned?.lastCompletedSemester && (
+              {lastCompletedLabel && (
                 <span className="rounded-full bg-panel px-3 py-1 text-xs font-semibold text-ink-muted">
-                  마지막 이수 {planned.lastCompletedSemester}
+                  마지막 이수 {lastCompletedLabel}
                 </span>
               )}
               <span className="rounded-full bg-sejong px-3 py-1 text-xs font-semibold text-white">
@@ -556,9 +601,25 @@ export function SimulationPage() {
           <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
             <h2 className="mb-4 text-base font-bold text-ink">남은 학기 로드맵</h2>
             {semesters.length === 0 ? (
-              <p className="py-10 text-center text-sm text-ink-muted">
-                추가할 수 있는 남은 학기가 없습니다. (최대 4학년 2학기)
-              </p>
+              <div className="space-y-2 py-10 text-center text-sm leading-relaxed text-ink-muted">
+                {pastPlannable ? (
+                  <>
+                    <p>
+                      서버가 계획 학기를{' '}
+                      <span className="font-semibold text-ink">4학년 2학기까지</span>만 허용하는데,
+                      마지막 이수가 그 이후(
+                      {lastCompletedLabel || planned?.lastCompletedSemester})로 잡혀 다음 학기를 만들 수
+                      없습니다.
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      입학년도 기준으로 재학 연차가 5학년 이상으로 계산된 상태입니다. 초과학년
+                      학기 계획(예: 2026-2)은 백엔드에서 4-2 제한을 해제해야 추가됩니다.
+                    </p>
+                  </>
+                ) : (
+                  <p>추가할 수 있는 남은 학기가 없습니다.</p>
+                )}
+              </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
                 {semesters.map((plan) => {
@@ -592,7 +653,9 @@ export function SimulationPage() {
                       }`}
                     >
                       <div className="mb-2 flex shrink-0 w-full items-center justify-between gap-2">
-                        <p className="text-left text-sm font-bold text-ink">{semesterLabel(plan)}</p>
+                        <p className="text-left text-sm font-bold text-ink">
+                          {semesterLabel(plan, admissionYear)}
+                        </p>
                         <span className="text-xs font-semibold text-sejong">예상 {credits}학점</span>
                       </div>
                       <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
@@ -698,7 +761,9 @@ export function SimulationPage() {
               </div>
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <p className="rounded-lg border border-sejong/30 bg-sejong-light px-3 py-1.5 text-xs font-bold text-sejong">
-                  {activeSemester ? `${semesterLabel(activeSemester)}에 추가` : '왼쪽에서 학기를 선택하세요'}
+                  {activeSemester
+                    ? `${semesterLabel(activeSemester, admissionYear)}에 추가`
+                    : '왼쪽에서 학기를 선택하세요'}
                 </p>
                 <select
                   value={kindFilter}
