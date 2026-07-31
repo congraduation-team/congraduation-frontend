@@ -30,7 +30,7 @@ import { formatPercentLabel, toNumber } from '../utils/number'
 const GRADES = ['A+', 'A0', 'B+', 'B0', 'C+', 'C0', 'D+', 'D0', 'F', 'P', 'NP'] as const
 type Grade = (typeof GRADES)[number]
 
-type CourseKind = 'required' | 'elective' | 'general' | 'design' | 'pass'
+type CourseKind = 'required' | 'elective' | 'foundation' | 'general' | 'design' | 'pass'
 
 type CatalogItem = {
   code: string
@@ -42,19 +42,27 @@ type CatalogItem = {
 }
 
 const kindStyle: Record<CourseKind, string> = {
-  required: 'bg-sejong-light text-sejong',
+  required: 'bg-sejong text-white',
   elective: 'bg-[#fde8ec] text-[#b01030]',
-  general: 'bg-[#eef1f4] text-ink-muted',
+  foundation: 'bg-[#4a5568] text-white',
+  general: 'bg-[#e8eaee] text-[#4a5568]',
   design: 'bg-[#fff1e6] text-[#c45c12]',
   pass: 'bg-[#e8f1fb] text-[#2b6cb0]',
 }
 
-const kindLabel: Record<CourseKind, string> = {
-  required: '전필',
-  elective: '전선',
-  general: '교양',
-  design: '설계',
-  pass: 'P/NP',
+/** 긴 과목명: 괄호 앞에서 줄바꿈 */
+function CourseNameText({ name, className = '' }: { name: string; className?: string }) {
+  const idx = name.indexOf('(')
+  if (idx <= 0) {
+    return <span className={`break-keep ${className}`}>{name}</span>
+  }
+  return (
+    <span className={`break-keep ${className}`}>
+      {name.slice(0, idx)}
+      <wbr />
+      {name.slice(idx)}
+    </span>
+  )
 }
 
 /** API 카테고리 enum / 한글 라벨 → UI 구분 */
@@ -81,7 +89,7 @@ function classifyByCategory(category?: string, grade?: string): { kind: CourseKi
     return { kind: 'general', label: '교양' }
   }
   if (upper.includes('BSM') || (c.includes('기초') && !c.includes('설계'))) {
-    return { kind: 'required', label: '기초/BSM' }
+    return { kind: 'foundation', label: '기초' }
   }
   if (
     c.includes('필수') ||
@@ -452,6 +460,10 @@ export function SimulationPage() {
     })
   }
 
+  const activeSemester = useMemo(
+    () => semesters.find((p) => p.plannedSemesterId === activeSemesterId) ?? null,
+    [semesters, activeSemesterId],
+  )
   const displayName = student?.name || '학생'
   const majorLabel = active?.label || student?.major || ''
 
@@ -568,10 +580,7 @@ export function SimulationPage() {
                         <p className="text-left text-sm font-bold text-ink">{semesterLabel(plan)}</p>
                         <span className="text-xs font-semibold text-sejong">예상 {credits}학점</span>
                       </div>
-                      <ul
-                        className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
                         {courses.map((course) => {
                           const { kind, label } = classifyByCategory(
                             course.category,
@@ -591,12 +600,13 @@ export function SimulationPage() {
                                   ⋮⋮
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <p className="min-w-0 flex-1 truncate text-[12px] font-semibold text-ink">
-                                      {course.courseName}
+                                  <div className="flex items-start gap-1.5">
+                                    <p className="min-w-0 flex-1 text-[12px] font-semibold leading-snug text-ink">
+                                      <CourseNameText name={course.courseName} />
                                     </p>
                                     <select
                                       value={normalizeGrade(course.expectedGrade)}
+                                      onClick={(e) => e.stopPropagation()}
                                       onChange={(e) =>
                                         handleUpdateGrade(course.id, e.target.value as Grade)
                                       }
@@ -610,7 +620,10 @@ export function SimulationPage() {
                                     </select>
                                     <button
                                       type="button"
-                                      onClick={() => handleRemoveCourse(course.id)}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleRemoveCourse(course.id)
+                                      }}
                                       className="shrink-0 text-[10px] font-semibold text-ink-faint hover:text-sejong"
                                     >
                                       삭제
@@ -652,16 +665,6 @@ export function SimulationPage() {
                 })}
               </div>
             )}
-            <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eee] pt-3">
-              {(Object.keys(kindLabel) as CourseKind[]).map((k) => (
-                <span
-                  key={k}
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${kindStyle[k]}`}
-                >
-                  {kindLabel[k]}
-                </span>
-              ))}
-            </div>
           </section>
 
           <div className="space-y-5">
@@ -678,25 +681,18 @@ export function SimulationPage() {
                   ⌕
                 </span>
               </div>
-              <div className="mb-3 flex flex-wrap gap-2">
-                <select
-                  value={activeSemesterId ?? ''}
-                  onChange={(e) => setActiveSemesterId(Number(e.target.value))}
-                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-semibold"
-                >
-                  {semesters.map((p) => (
-                    <option key={p.plannedSemesterId} value={p.plannedSemesterId}>
-                      {semesterLabel(p)}에 추가
-                    </option>
-                  ))}
-                </select>
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <p className="rounded-lg border border-sejong/30 bg-sejong-light px-3 py-1.5 text-xs font-bold text-sejong">
+                  {activeSemester ? `${semesterLabel(activeSemester)}에 추가` : '왼쪽에서 학기를 선택하세요'}
+                </p>
                 <select
                   value={kindFilter}
                   onChange={(e) => setKindFilter(e.target.value)}
                   className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-semibold"
                 >
                   <option value="all">전체 구분</option>
-                  <option value="required">전필/기초</option>
+                  <option value="required">전필</option>
+                  <option value="foundation">기초</option>
                   <option value="elective">전선</option>
                   <option value="general">교양</option>
                   <option value="design">설계</option>
@@ -729,7 +725,9 @@ export function SimulationPage() {
                       return (
                         <tr key={`${course.code}-${course.name}`} className="border-t border-[#f0f0f3]">
                           <td className="px-3 py-2">
-                            <p className="font-semibold text-ink">{course.name}</p>
+                            <p className="font-semibold leading-snug text-ink">
+                              <CourseNameText name={course.name} />
+                            </p>
                             <p className="text-[10px] text-ink-faint">{course.code}</p>
                           </td>
                           <td className="px-2 py-2">
