@@ -11,6 +11,7 @@ import type {
   OfferedCurriculumResponse,
   StudentRoadmapResponse,
   PlannedCoursesResponse,
+  PlannableCourseCatalogResponse,
   StudentLoginResponse,
   TranscriptStatusResponse,
   TranscriptUploadResponse,
@@ -228,6 +229,26 @@ export function getAbeekOfferedCoursesByStudent(options: {
 
 export function getAbeekTimetableTerms() {
   return apiJson<Array<Record<string, unknown>>>('/api/abeek/timetable-terms')
+}
+
+/** 계획용 교과목 카탈로그 (시간표 기반) */
+export function getPlannedCourseCatalog(options: {
+  keyword?: string
+  targetGrade?: string
+  offeredTerm?: string
+  departmentName?: string
+  category?: string
+} = {}) {
+  const params = new URLSearchParams()
+  if (options.keyword) params.set('keyword', options.keyword)
+  if (options.targetGrade) params.set('targetGrade', options.targetGrade)
+  if (options.offeredTerm) params.set('offeredTerm', options.offeredTerm)
+  if (options.departmentName) params.set('departmentName', options.departmentName)
+  if (options.category) params.set('category', options.category)
+  const qs = params.toString()
+  return apiJson<PlannableCourseCatalogResponse>(
+    `/api/planned-courses/catalog${qs ? `?${qs}` : ''}`,
+  )
 }
 
 /** 계획 학기/과목 조회 */

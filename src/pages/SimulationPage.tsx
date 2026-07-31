@@ -1,17 +1,24 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  addNextPlannedSemesters,
+  addPlannedCourse,
+  deletePlannedCourse,
+  deletePlannedSemester,
   getAbeekEvaluation,
-  getAbeekFullRoadmapByStudent,
-  getAbeekOfferedCoursesByStudent,
   getGraduationProgress,
+  getPlannedCourseCatalog,
+  getPlannedCourses,
+  updatePlannedCourseExpectedGrade,
 } from '../api/endpoints'
 import type {
   AbeekEvaluationResponse,
+  ExpectedGrade,
   GraduationProgressResponse,
-  OfferedCourse,
-  RoadmapCourse,
+  PlannableCourse,
+  PlannedCourseItem,
+  PlannedCoursesResponse,
+  PlannedSemester,
 } from '../api/types'
-import { flattenRoadmapCourses } from '../api/types'
 import { DonutChart } from '../components/charts/DonutChart'
 import { Sidebar } from '../components/layout/Sidebar'
 import { MajorTrackSwitcher } from '../components/modals/MajorTrackSwitcher'
@@ -20,28 +27,18 @@ import { useMajorTrack } from '../context/MajorTrackContext'
 import { trackTypeLabel } from '../utils/majorTrack'
 import { formatPercentLabel, toNumber } from '../utils/number'
 
-const GRADES = ['A+', 'A0', 'A-', 'B+', 'B0', 'B-', 'C+', 'C0', 'C-', 'D+', 'D0', 'F', 'P', 'NP'] as const
+const GRADES = ['A+', 'A0', 'B+', 'B0', 'C+', 'C0', 'D+', 'D0', 'F', 'P', 'NP'] as const
 type Grade = (typeof GRADES)[number]
 
 type CourseKind = 'required' | 'elective' | 'general' | 'design' | 'pass'
 
-type PlannedCourse = {
-  id: string
+type CatalogItem = {
   code: string
   name: string
+  category: string
   credits: number
-  designCredits: number
-  kind: CourseKind
-  categoryLabel: string
-  grade: Grade
-}
-
-type SemesterPlan = {
-  key: string
-  label: string
-  year: number
-  semester: 1 | 2
-  courses: PlannedCourse[]
+  offeredTerms: string[]
+  targetGrades: string[]
 }
 
 const kindStyle: Record<CourseKind, string> = {
@@ -60,93 +57,44 @@ const kindLabel: Record<CourseKind, string> = {
   pass: 'P/NP',
 }
 
-function nextSemesters(
-  count: number,
-  admissionYear?: number,
-  from = new Date(),
-): Omit<SemesterPlan, 'courses'>[] {
-  let year = from.getFullYear()
-  let semester: 1 | 2 = from.getMonth() + 1 >= 8 ? 2 : 1
-  if (semester === 2) {
-    year += 1
-    semester = 1
-  } else {
-    semester = 2
+function classifyByCategory(category?: string, grade?: string): { kind: CourseKind; label: string } {
+  if (grade === 'P' || grade === 'NP') return { kind: 'pass', label: 'P/NP' }
+  const c = category || ''
+  if (c.includes('설계') || c.toLowerCase().includes('capstone')) {
+    return { kind: 'design', label: '설계' }
   }
-
-  const list: Omit<SemesterPlan, 'courses'>[] = []
-  for (let i = 0; i < count; i++) {
-    const gy = admissionYear ? year - admissionYear + 1 : null
-    list.push({
-      key: `${year}-${semester}`,
-      label: gy && gy >= 1 && gy <= 6 ? `${gy}-${semester}학기` : `${year}-${semester}학기`,
-      year,
-      semester,
-    })
-    if (semester === 1) semester = 2
-    else {
-      year += 1
-      semester = 1
-    }
+  if (c.includes('교양') || c.includes('균형') || c.includes('공통')) {
+    return { kind: 'general', label: '교양' }
   }
-  return list
+  if (c.includes('필수') || c.includes('전필') || c.includes('기초') || c.includes('BSM')) {
+    return { kind: 'required', label: c.includes('BSM') || c.includes('기초') ? '기초/BSM' : '전필' }
+  }
+  if (c.includes('선택') || c.includes('전선')) {
+    return { kind: 'elective', label: '전선' }
+  }
+  return { kind: 'elective', label: c || '기타' }
 }
 
-function classifyCourse(course: {
-  category?: string
-  role?: string
-  designCredits?: number
-}): { kind: CourseKind; categoryLabel: string } {
-  if ((course.designCredits ?? 0) > 0) {
-    return { kind: 'design', categoryLabel: '설계' }
-  }
-  if (course.category === 'GENERAL') {
-    return { kind: 'general', categoryLabel: '교양' }
-  }
-  if (course.role === 'REQUIRED' || course.role === 'BSM_REQUIRED') {
-    return { kind: 'required', categoryLabel: course.category === 'BSM' ? 'BSM' : '전필' }
-  }
-  if (course.category === 'BSM') {
-    return { kind: 'required', categoryLabel: 'BSM' }
-  }
-  return { kind: 'elective', categoryLabel: '전선' }
-}
-
-function toPlanned(
-  source: OfferedCourse | RoadmapCourse,
-  grade: Grade = 'A0',
-): PlannedCourse {
-  const code =
-    'abeekCourseCode' in source ? source.abeekCourseCode : (source as RoadmapCourse).abeekCourseCode
-  const designCredits = toNumber(source.designCredits)
-  const { kind, categoryLabel } = classifyCourse({
-    category: source.category,
-    role: source.role,
-    designCredits,
-  })
+function toCatalogItem(course: PlannableCourse): CatalogItem | null {
+  const code = course.courseCodes?.[0]
+  if (!code || !course.courseName) return null
   return {
-    id: `${code}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     code,
-    name: source.courseName,
-    credits: toNumber(source.credits) || 3,
-    designCredits,
-    kind: grade === 'P' || grade === 'NP' ? 'pass' : kind,
-    categoryLabel: grade === 'P' || grade === 'NP' ? 'P/NP' : categoryLabel,
-    grade,
+    name: course.courseName,
+    category: course.category || '',
+    credits: toNumber(course.credits?.[0]) || 3,
+    offeredTerms: course.offeredTerms ?? [],
+    targetGrades: course.targetGrades ?? [],
   }
 }
 
-function loadPlan(studentId: number): SemesterPlan[] | null {
-  try {
-    const raw = localStorage.getItem(`congraduation.sim.${studentId}`)
-    return raw ? (JSON.parse(raw) as SemesterPlan[]) : null
-  } catch {
-    return null
-  }
+function semesterLabel(sem: PlannedSemester) {
+  return `${sem.gradeYear}-${sem.semester}학기`
 }
 
-function savePlan(studentId: number, plans: SemesterPlan[]) {
-  localStorage.setItem(`congraduation.sim.${studentId}`, JSON.stringify(plans))
+function normalizeGrade(value?: string | null): Grade {
+  if (value && (GRADES as readonly string[]).includes(value)) return value as Grade
+  return 'A0'
 }
 
 export function SimulationPage() {
@@ -154,98 +102,52 @@ export function SimulationPage() {
   const { active } = useMajorTrack()
   const [progress, setProgress] = useState<GraduationProgressResponse | null>(null)
   const [evaluation, setEvaluation] = useState<AbeekEvaluationResponse | null>(null)
-  const [roadmapCourses, setRoadmapCourses] = useState<RoadmapCourse[]>([])
-  const [catalog, setCatalog] = useState<OfferedCourse[]>([])
+  const [planned, setPlanned] = useState<PlannedCoursesResponse | null>(null)
+  const [catalog, setCatalog] = useState<CatalogItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
 
-  const [plans, setPlans] = useState<SemesterPlan[]>([])
-  const [activeSemesterKey, setActiveSemesterKey] = useState<string>('')
+  const [activeSemesterId, setActiveSemesterId] = useState<number | null>(null)
   const [query, setQuery] = useState('')
   const [kindFilter, setKindFilter] = useState<string>('all')
-  const [dragId, setDragId] = useState<string | null>(null)
+  const [dragId, setDragId] = useState<number | null>(null)
+
+  const applyPlanned = useCallback((data: PlannedCoursesResponse) => {
+    setPlanned(data)
+    const semesters = data.semesters ?? []
+    setActiveSemesterId((prev) => {
+      if (prev != null && semesters.some((s) => s.plannedSemesterId === prev)) return prev
+      return semesters[0]?.plannedSemesterId ?? null
+    })
+  }, [])
+
+  const refreshAll = useCallback(async () => {
+    if (!student) return
+    const abeekId = student.studentNo || String(student.id)
+    let plannedData = await getPlannedCourses(student.id)
+    if (!plannedData.semesters?.length) {
+      plannedData = await addNextPlannedSemesters(student.id, 4)
+    }
+    const [prog, evalData] = await Promise.all([
+      getGraduationProgress(student.id),
+      getAbeekEvaluation(abeekId).catch(() => null),
+    ])
+    applyPlanned(plannedData)
+    setProgress(prog)
+    setEvaluation(evalData)
+  }, [student, applyPlanned])
 
   useEffect(() => {
     if (!student) return
     let cancelled = false
-
     ;(async () => {
       setLoading(true)
       setError(null)
       try {
-        const abeekId = student.studentNo || String(student.id)
-        const [prog, evalData, roadmap] = await Promise.all([
-          getGraduationProgress(student.id),
-          getAbeekEvaluation(abeekId).catch(() => null),
-          getAbeekFullRoadmapByStudent(abeekId).catch(() => null),
-        ])
-
-        let offered: OfferedCourse[] = []
-        try {
-          const now = new Date()
-          const termYear = now.getFullYear()
-          const semester = now.getMonth() + 1 >= 8 ? 2 : 1
-          const res = await getAbeekOfferedCoursesByStudent({
-            studentId: abeekId,
-            termYear,
-            semester,
-          })
-          offered = res.offeredCourses ?? []
-        } catch {
-          offered = []
-        }
-
+        await refreshAll()
         if (cancelled) return
-        setProgress(prog)
-        setEvaluation(evalData)
-        const flat = flattenRoadmapCourses(roadmap)
-        setRoadmapCourses(flat)
-
-        const fromRoadmap: OfferedCourse[] = flat
-          .filter((c) => c.completed !== true)
-          .map((c) => ({
-            abeekCourseCode: c.abeekCourseCode,
-            courseName: c.courseName,
-            category: c.category,
-            role: c.role,
-            credits: c.credits,
-            designCredits: c.designCredits,
-            recommendedTerm: c.recommendedTerm,
-          }))
-
-        const byCode = new Map<string, OfferedCourse>()
-        for (const c of [...offered, ...fromRoadmap]) {
-          if (!byCode.has(c.abeekCourseCode)) byCode.set(c.abeekCourseCode, c)
-        }
-        setCatalog([...byCode.values()])
-
-        const saved = loadPlan(student.id)
-        if (saved && saved.length > 0) {
-          setPlans(saved)
-          setActiveSemesterKey(saved[0].key)
-        } else {
-          const shells = nextSemesters(4, student.admissionYear).map((s) => ({
-            ...s,
-            courses: [] as PlannedCourse[],
-          }))
-          // seed with incomplete required courses into recommended terms if possible
-          const remaining = flat.filter((c) => c.completed !== true).slice(0, 12)
-          for (const course of remaining) {
-            const term = course.recommendedTerm // e.g. 3-1
-            let target = shells[0]
-            if (term) {
-              const match = shells.find((s) => s.label.startsWith(term))
-              if (match) target = match
-            }
-            const idx = shells.indexOf(target)
-            const bucket = shells[Math.min(Math.max(idx, 0), shells.length - 1)]
-            if (bucket.courses.length < 6) {
-              bucket.courses.push(toPlanned(course))
-            }
-          }
-          setPlans(shells)
-          setActiveSemesterKey(shells[0]?.key ?? '')
-        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : '시뮬레이션 데이터를 불러오지 못했습니다.')
@@ -254,19 +156,44 @@ export function SimulationPage() {
         if (!cancelled) setLoading(false)
       }
     })()
-
     return () => {
       cancelled = true
     }
-  }, [student])
+  }, [student, refreshAll])
 
   useEffect(() => {
-    if (!student || plans.length === 0) return
-    savePlan(student.id, plans)
-  }, [plans, student])
+    if (!student) return
+    let cancelled = false
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await getPlannedCourseCatalog({
+          keyword: query.trim() || undefined,
+          departmentName: student.major || undefined,
+        })
+        if (cancelled) return
+        const items = (res.courses ?? [])
+          .map(toCatalogItem)
+          .filter((c): c is CatalogItem => c != null)
+        setCatalog(items)
+      } catch {
+        if (!cancelled) setCatalog([])
+      }
+    }, query.trim() ? 250 : 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [student, query])
 
-  const plannedCourses = useMemo(() => plans.flatMap((p) => p.courses), [plans])
-  const plannedCodes = useMemo(() => new Set(plannedCourses.map((c) => c.code)), [plannedCourses])
+  const semesters = planned?.semesters ?? []
+  const plannedCourses = useMemo(
+    () => semesters.flatMap((s) => s.courses ?? []),
+    [semesters],
+  )
+  const plannedCodes = useMemo(
+    () => new Set(plannedCourses.map((c) => c.courseCode)),
+    [plannedCourses],
+  )
 
   const earnedTotal = toNumber(progress?.totalCredits?.earnedCredits)
   const requiredTotal = toNumber(progress?.totalCredits?.requiredCredits) || 130
@@ -277,28 +204,36 @@ export function SimulationPage() {
     toNumber(progress?.majorCredits?.requiredMajorCredits ?? evaluation?.major?.requiredCredits) ||
     45
 
-  const plannedCredits = plannedCourses.reduce((s, c) => s + c.credits, 0)
+  const plannedCredits =
+    toNumber(planned?.totalPlannedCredits) ||
+    plannedCourses.reduce((s, c) => s + toNumber(c.credit), 0)
   const plannedMajorCredits = plannedCourses
-    .filter((c) => c.kind === 'required' || c.kind === 'elective' || c.kind === 'design')
-    .reduce((s, c) => s + c.credits, 0)
+    .filter((c) => {
+      const { kind } = classifyByCategory(c.category, c.expectedGrade)
+      return kind === 'required' || kind === 'elective' || kind === 'design'
+    })
+    .reduce((s, c) => s + toNumber(c.credit), 0)
 
   const projectedTotal = earnedTotal + plannedCredits
   const projectedMajor = earnedMajor + plannedMajorCredits
-  const totalPct = requiredTotal > 0 ? Math.min(100, Math.round((projectedTotal / requiredTotal) * 100)) : 0
-  const majorPct = requiredMajor > 0 ? Math.min(100, Math.round((projectedMajor / requiredMajor) * 100)) : 0
+  const totalPct =
+    requiredTotal > 0 ? Math.min(100, Math.round((projectedTotal / requiredTotal) * 100)) : 0
+  const majorPct =
+    requiredMajor > 0 ? Math.min(100, Math.round((projectedMajor / requiredMajor) * 100)) : 0
   const completedPct =
     requiredTotal > 0 ? Math.min(100, Math.round((earnedTotal / requiredTotal) * 100)) : 0
 
-  const missingDesignMsgs = (evaluation?.messages ?? []).filter((m) => m.includes('미이수'))
   const canGraduate =
-    projectedTotal >= requiredTotal &&
-    projectedMajor >= requiredMajor &&
-    missingDesignMsgs.length === 0
+    progress?.graduationEligible === true ||
+    (projectedTotal >= requiredTotal && projectedMajor >= requiredMajor)
 
   const gradeDist = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const g of GRADES) counts[g] = 0
-    for (const c of plannedCourses) counts[c.grade] = (counts[c.grade] ?? 0) + 1
+    for (const c of plannedCourses) {
+      const g = normalizeGrade(c.expectedGrade)
+      counts[g] = (counts[g] ?? 0) + 1
+    }
     return GRADES.filter((g) => (counts[g] ?? 0) > 0).map((g) => ({
       grade: g,
       count: counts[g],
@@ -309,179 +244,135 @@ export function SimulationPage() {
 
   const missingItems = useMemo(() => {
     const items: string[] = []
+    for (const blocker of progress?.graduationBlockers ?? []) {
+      if (blocker) items.push(blocker)
+    }
     if (projectedMajor < requiredMajor) {
-      items.push(`전공 ${requiredMajor - projectedMajor}학점 부족`)
+      items.push(`전공 ${Math.max(0, requiredMajor - projectedMajor)}학점 부족`)
     }
     if (projectedTotal < requiredTotal) {
-      items.push(`전체 ${requiredTotal - projectedTotal}학점 부족`)
-    }
-    const designNeed = toNumber(evaluation?.design?.requiredCredits)
-    const designHave =
-      toNumber(evaluation?.design?.earnedCredits) +
-      plannedCourses.reduce((s, c) => s + c.designCredits, 0)
-    if (designNeed > 0 && designHave < designNeed) {
-      items.push(`설계 ${Math.round((designNeed - designHave) * 10) / 10}학점 부족`)
+      items.push(`전체 ${Math.max(0, requiredTotal - projectedTotal)}학점 부족`)
     }
     for (const msg of evaluation?.messages ?? []) {
       if (msg.includes('미이수')) items.push(msg.replace(/^[·•\s]+/, ''))
     }
-    const missingRequired = roadmapCourses.filter(
-      (c) =>
-        c.completed !== true &&
-        (c.role === 'REQUIRED' || c.role === 'BSM_REQUIRED') &&
-        !plannedCodes.has(c.abeekCourseCode),
-    )
-    if (missingRequired.length > 0) {
-      items.push(
-        `필수 ${missingRequired.length}과목 미이수 (예: ${missingRequired
-          .slice(0, 2)
-          .map((c) => c.courseName)
-          .join(', ')})`,
-      )
-    }
     return [...new Set(items)].slice(0, 6)
-  }, [
-    projectedMajor,
-    requiredMajor,
-    projectedTotal,
-    requiredTotal,
-    evaluation,
-    plannedCourses,
-    roadmapCourses,
-    plannedCodes,
-  ])
+  }, [progress?.graduationBlockers, projectedMajor, requiredMajor, projectedTotal, requiredTotal, evaluation])
 
   const recommendations = useMemo(() => {
     const tips: string[] = []
-    const empty = plans.find((p) => p.courses.length === 0)
-    if (empty) tips.push(`${empty.label}에 과목을 배정하세요.`)
-    const heavy = plans.find((p) => p.courses.reduce((s, c) => s + c.credits, 0) > 21)
-    if (heavy) tips.push(`${heavy.label} 학점이 21을 초과합니다. 분산을 권장합니다.`)
-    const designLeft = roadmapCourses.find(
-      (c) =>
-        c.completed !== true &&
-        toNumber(c.designCredits) > 0 &&
-        !plannedCodes.has(c.abeekCourseCode) &&
-        c.courseName.toLowerCase().includes('capstone'),
-    )
-    if (designLeft) tips.push(`${designLeft.courseName}을(를) 우선 배치하세요.`)
-    const os = roadmapCourses.find(
-      (c) =>
-        c.completed !== true &&
-        c.courseName.includes('운영체제') &&
-        !plannedCodes.has(c.abeekCourseCode),
-    )
-    if (os) tips.push(`선수 확인 후 ${os.courseName} 추가를 권장합니다.`)
-    if (plannedCourses.some((c) => c.grade === 'P')) {
-      tips.push('P/NP 과목은 전공 평점 계산에서 분리되는지 확인하세요.')
+    const empty = semesters.find((s) => (s.courses?.length ?? 0) === 0)
+    if (empty) tips.push(`${semesterLabel(empty)}에 과목을 배정하세요.`)
+    const heavy = semesters.find((s) => toNumber(s.totalCredits) > 21)
+    if (heavy) tips.push(`${semesterLabel(heavy)} 학점이 21을 초과합니다. 분산을 권장합니다.`)
+    if (plannedCourses.some((c) => c.retake)) {
+      tips.push('재수강 계획이 있습니다. 기존 성적 대체 여부를 확인하세요.')
     }
-    if (tips.length === 0) tips.push('현재 계획 균형이 양호합니다. 개설 여부를 한 번 더 확인하세요.')
+    if (planned?.lastCompletedSemester) {
+      tips.push(`마지막 이수 학기: ${planned.lastCompletedSemester} 이후부터 계획 중입니다.`)
+    }
+    if (tips.length === 0) tips.push('현재 계획 균형이 양호합니다. 개설 학기를 한 번 더 확인하세요.')
     return tips.slice(0, 4)
-  }, [plans, roadmapCourses, plannedCodes, plannedCourses])
+  }, [semesters, plannedCourses, planned?.lastCompletedSemester])
 
   const searchResults = useMemo(() => {
-    const q = query.trim().toLowerCase()
     return catalog
-      .filter((c) => !plannedCodes.has(c.abeekCourseCode))
+      .filter((c) => !plannedCodes.has(c.code))
       .filter((c) => {
         if (kindFilter === 'all') return true
-        const { kind } = classifyCourse(c)
-        return kind === kindFilter
+        return classifyByCategory(c.category).kind === kindFilter
       })
-      .filter((c) => {
-        if (!q) return true
-        return (
-          c.courseName.toLowerCase().includes(q) ||
-          c.abeekCourseCode.toLowerCase().includes(q)
-        )
-      })
-      .slice(0, 40)
-  }, [catalog, query, kindFilter, plannedCodes])
+      .slice(0, 50)
+  }, [catalog, kindFilter, plannedCodes])
 
-  const addCourse = (course: OfferedCourse, semesterKey = activeSemesterKey) => {
-    setPlans((prev) =>
-      prev.map((p) =>
-        p.key === semesterKey
-          ? {
-              ...p,
-              courses: p.courses.some((c) => c.code === course.abeekCourseCode)
-                ? p.courses
-                : [...p.courses, toPlanned(course)],
-            }
-          : p,
-      ),
-    )
+  const runAction = async (fn: () => Promise<void>) => {
+    if (!student) return
+    setSaving(true)
+    setActionError(null)
+    try {
+      await fn()
+      await refreshAll()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '요청에 실패했습니다.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const removeCourse = (semesterKey: string, courseId: string) => {
-    setPlans((prev) =>
-      prev.map((p) =>
-        p.key === semesterKey
-          ? { ...p, courses: p.courses.filter((c) => c.id !== courseId) }
-          : p,
-      ),
-    )
-  }
-
-  const updateGrade = (semesterKey: string, courseId: string, grade: Grade) => {
-    setPlans((prev) =>
-      prev.map((p) =>
-        p.key === semesterKey
-          ? {
-              ...p,
-              courses: p.courses.map((c) => {
-                if (c.id !== courseId) return c
-                if (grade === 'P' || grade === 'NP') {
-                  return { ...c, grade, kind: 'pass', categoryLabel: 'P/NP' }
-                }
-                const restored = classifyCourse({
-                  category:
-                    c.categoryLabel === '교양'
-                      ? 'GENERAL'
-                      : c.categoryLabel === 'BSM'
-                        ? 'BSM'
-                        : 'MAJOR',
-                  role: c.categoryLabel === '전필' || c.categoryLabel === 'BSM' ? 'REQUIRED' : 'ELECTIVE',
-                  designCredits: c.designCredits,
-                })
-                return {
-                  ...c,
-                  grade,
-                  kind: c.designCredits > 0 ? 'design' : restored.kind,
-                  categoryLabel: c.designCredits > 0 ? '설계' : restored.categoryLabel,
-                }
-              }),
-            }
-          : p,
-      ),
-    )
-  }
-
-  const moveCourse = (fromKey: string, toKey: string, courseId: string) => {
-    if (fromKey === toKey) return
-    setPlans((prev) => {
-      let moving: PlannedCourse | undefined
-      const without = prev.map((p) => {
-        if (p.key !== fromKey) return p
-        moving = p.courses.find((c) => c.id === courseId)
-        return { ...p, courses: p.courses.filter((c) => c.id !== courseId) }
+  const handleAddCourse = (course: CatalogItem) => {
+    if (!student || activeSemesterId == null) return
+    const target = semesters.find((s) => s.plannedSemesterId === activeSemesterId)
+    if (!target) return
+    void runAction(async () => {
+      await addPlannedCourse(student.id, {
+        plannedSemesterId: target.plannedSemesterId,
+        gradeYear: target.gradeYear,
+        semester: target.semester,
+        courseCode: course.code,
+        courseName: course.name,
+        category: course.category,
+        credit: String(course.credits),
+        expectedGrade: 'A0',
       })
-      if (!moving) return prev
-      return without.map((p) =>
-        p.key === toKey ? { ...p, courses: [...p.courses, moving!] } : p,
-      )
     })
   }
 
-  const resetPlan = () => {
+  const handleRemoveCourse = (courseId: number) => {
     if (!student) return
-    const shells = nextSemesters(4, student.admissionYear).map((s) => ({
-      ...s,
-      courses: [] as PlannedCourse[],
-    }))
-    setPlans(shells)
-    setActiveSemesterKey(shells[0]?.key ?? '')
-    localStorage.removeItem(`congraduation.sim.${student.id}`)
+    void runAction(async () => {
+      await deletePlannedCourse(student.id, courseId)
+    })
+  }
+
+  const handleUpdateGrade = (courseId: number, grade: Grade) => {
+    if (!student) return
+    void runAction(async () => {
+      await updatePlannedCourseExpectedGrade(student.id, courseId, grade as ExpectedGrade)
+    })
+  }
+
+  const handleAddSemester = () => {
+    if (!student) return
+    void runAction(async () => {
+      await addNextPlannedSemesters(student.id, 1)
+    })
+  }
+
+  const handleDeleteSemester = (plannedSemesterId: number) => {
+    if (!student) return
+    void runAction(async () => {
+      await deletePlannedSemester(student.id, plannedSemesterId)
+    })
+  }
+
+  const handleMoveCourse = (course: PlannedCourseItem, toSemesterId: number) => {
+    if (!student || course.plannedSemesterId === toSemesterId) return
+    const target = semesters.find((s) => s.plannedSemesterId === toSemesterId)
+    if (!target) return
+    void runAction(async () => {
+      await deletePlannedCourse(student.id, course.id)
+      await addPlannedCourse(student.id, {
+        plannedSemesterId: target.plannedSemesterId,
+        gradeYear: target.gradeYear,
+        semester: target.semester,
+        courseCode: course.courseCode,
+        courseName: course.courseName,
+        category: course.category,
+        credit: String(course.credit ?? ''),
+        expectedGrade: normalizeGrade(course.expectedGrade),
+      })
+    })
+  }
+
+  const handleReset = () => {
+    if (!student) return
+    void runAction(async () => {
+      const current = await getPlannedCourses(student.id)
+      for (const sem of current.semesters ?? []) {
+        await deletePlannedSemester(student.id, sem.plannedSemesterId)
+      }
+      await addNextPlannedSemesters(student.id, 4)
+    })
   }
 
   const displayName = student?.name || '학생'
@@ -527,6 +418,11 @@ export function SimulationPage() {
                   {active ? `${trackTypeLabel(active.trackType)} · ${majorLabel}` : majorLabel}
                 </span>
               )}
+              {planned?.lastCompletedSemester && (
+                <span className="rounded-full bg-panel px-3 py-1 text-xs font-semibold text-ink-muted">
+                  마지막 이수 {planned.lastCompletedSemester}
+                </span>
+              )}
               <span className="rounded-full bg-sejong px-3 py-1 text-xs font-semibold text-white">
                 졸업 시뮬레이션
               </span>
@@ -536,110 +432,161 @@ export function SimulationPage() {
             <MajorTrackSwitcher />
             <button
               type="button"
-              onClick={resetPlan}
-              className="rounded-full border border-[#e5e7eb] bg-white px-4 py-1.5 text-xs font-semibold text-ink hover:bg-panel"
+              onClick={handleAddSemester}
+              disabled={saving}
+              className="rounded-full border border-[#e5e7eb] bg-white px-4 py-1.5 text-xs font-semibold text-ink hover:bg-panel disabled:opacity-50"
+            >
+              학기 추가
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={saving}
+              className="rounded-full border border-[#e5e7eb] bg-white px-4 py-1.5 text-xs font-semibold text-ink hover:bg-panel disabled:opacity-50"
             >
               계획 초기화
             </button>
           </div>
         </div>
 
+        {actionError && (
+          <p className="mb-4 rounded-xl bg-sejong-light px-4 py-2 text-sm text-sejong">{actionError}</p>
+        )}
+        {saving && (
+          <p className="mb-3 text-xs font-semibold text-ink-muted">계획 저장 중...</p>
+        )}
+
         <div className="grid gap-5 xl:grid-cols-[1.15fr_1.05fr_0.85fr]">
-          {/* 남은 학기 로드맵 */}
           <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
             <h2 className="mb-4 text-base font-bold text-ink">남은 학기 로드맵</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {plans.map((plan) => {
-                const credits = plan.courses.reduce((s, c) => s + c.credits, 0)
-                const active = plan.key === activeSemesterKey
-                return (
-                  <article
-                    key={plan.key}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => {
-                      if (!dragId) return
-                      const from = plans.find((p) => p.courses.some((c) => c.id === dragId))
-                      if (from) moveCourse(from.key, plan.key, dragId)
-                      setDragId(null)
-                    }}
-                    className={`flex min-h-[260px] flex-col rounded-xl border p-3 transition ${
-                      active ? 'border-sejong bg-sejong-light/30' : 'border-[#eceff3] bg-panel/40'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setActiveSemesterKey(plan.key)}
-                      className="mb-2 flex w-full items-center justify-between text-left"
+            {semesters.length === 0 ? (
+              <p className="py-10 text-center text-sm text-ink-muted">
+                계획 학기가 없습니다. 학기 추가를 눌러 주세요.
+              </p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {semesters.map((plan) => {
+                  const courses = plan.courses ?? []
+                  const credits = toNumber(plan.totalCredits) ||
+                    courses.reduce((s, c) => s + toNumber(c.credit), 0)
+                  const activeCard = plan.plannedSemesterId === activeSemesterId
+                  return (
+                    <article
+                      key={plan.plannedSemesterId}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (dragId == null) return
+                        const moving = plannedCourses.find((c) => c.id === dragId)
+                        if (moving) handleMoveCourse(moving, plan.plannedSemesterId)
+                        setDragId(null)
+                      }}
+                      className={`flex min-h-[260px] flex-col rounded-xl border p-3 transition ${
+                        activeCard
+                          ? 'border-sejong bg-sejong-light/30'
+                          : 'border-[#eceff3] bg-panel/40'
+                      }`}
                     >
-                      <span className="text-sm font-bold text-ink">{plan.label}</span>
-                      <span className="text-xs font-semibold text-sejong">예상 {credits}학점</span>
-                    </button>
-                    <ul className="flex-1 space-y-2 overflow-y-auto">
-                      {plan.courses.map((course) => (
-                        <li
-                          key={course.id}
-                          draggable
-                          onDragStart={() => setDragId(course.id)}
-                          onDragEnd={() => setDragId(null)}
-                          className="rounded-lg border border-[#e8ebf0] bg-white px-2.5 py-2 shadow-sm"
+                      <div className="mb-2 flex w-full items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setActiveSemesterId(plan.plannedSemesterId)}
+                          className="text-left text-sm font-bold text-ink"
                         >
-                          <div className="flex items-start gap-2">
-                            <span className="mt-0.5 cursor-grab text-ink-faint" aria-hidden>
-                              ⋮⋮
-                            </span>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-[13px] font-semibold text-ink">{course.name}</p>
-                              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                                <span
-                                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${kindStyle[course.kind]}`}
-                                >
-                                  {course.categoryLabel}
+                          {semesterLabel(plan)}
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-sejong">예상 {credits}학점</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteSemester(plan.plannedSemesterId)}
+                            className="text-[10px] font-semibold text-ink-faint hover:text-sejong"
+                          >
+                            학기삭제
+                          </button>
+                        </div>
+                      </div>
+                      <ul className="flex-1 space-y-2 overflow-y-auto">
+                        {courses.map((course) => {
+                          const { kind, label } = classifyByCategory(
+                            course.category,
+                            course.expectedGrade,
+                          )
+                          return (
+                            <li
+                              key={course.id}
+                              draggable
+                              onDragStart={() => setDragId(course.id)}
+                              onDragEnd={() => setDragId(null)}
+                              className="rounded-lg border border-[#e8ebf0] bg-white px-2.5 py-2 shadow-sm"
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className="mt-0.5 cursor-grab text-ink-faint" aria-hidden>
+                                  ⋮⋮
                                 </span>
-                                <span className="text-[11px] text-ink-muted">{course.credits}학점</span>
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-[13px] font-semibold text-ink">
+                                    {course.courseName}
+                                  </p>
+                                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                    <span
+                                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${kindStyle[kind]}`}
+                                    >
+                                      {label}
+                                    </span>
+                                    <span className="text-[11px] text-ink-muted">
+                                      {toNumber(course.credit)}학점
+                                    </span>
+                                    {course.retake && (
+                                      <span className="rounded-full bg-panel px-2 py-0.5 text-[10px] font-semibold text-ink-muted">
+                                        재수강
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="mt-1.5 flex items-center gap-2">
+                                    <select
+                                      value={normalizeGrade(course.expectedGrade)}
+                                      onChange={(e) =>
+                                        handleUpdateGrade(course.id, e.target.value as Grade)
+                                      }
+                                      className="rounded-md border border-[#e5e7eb] bg-panel px-2 py-1 text-[11px] font-semibold outline-none"
+                                    >
+                                      {GRADES.map((g) => (
+                                        <option key={g} value={g}>
+                                          {g}
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveCourse(course.id)}
+                                      className="text-[11px] font-semibold text-ink-faint hover:text-sejong"
+                                    >
+                                      삭제
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="mt-1.5 flex items-center gap-2">
-                                <select
-                                  value={course.grade}
-                                  onChange={(e) =>
-                                    updateGrade(plan.key, course.id, e.target.value as Grade)
-                                  }
-                                  className="rounded-md border border-[#e5e7eb] bg-panel px-2 py-1 text-[11px] font-semibold outline-none"
-                                >
-                                  {GRADES.map((g) => (
-                                    <option key={g} value={g}>
-                                      {g}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button
-                                  type="button"
-                                  onClick={() => removeCourse(plan.key, course.id)}
-                                  className="text-[11px] font-semibold text-ink-faint hover:text-sejong"
-                                >
-                                  삭제
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                      {plan.courses.length === 0 && (
-                        <li className="py-8 text-center text-xs text-ink-faint">
-                          과목을 검색해 추가하세요
-                        </li>
-                      )}
-                    </ul>
-                    <button
-                      type="button"
-                      onClick={() => setActiveSemesterKey(plan.key)}
-                      className="mt-2 rounded-lg border border-dashed border-[#d5dae1] py-2 text-xs font-semibold text-ink-muted hover:border-sejong hover:text-sejong"
-                    >
-                      + 과목 추가
-                    </button>
-                  </article>
-                )
-              })}
-            </div>
+                            </li>
+                          )
+                        })}
+                        {courses.length === 0 && (
+                          <li className="py-8 text-center text-xs text-ink-faint">
+                            과목을 검색해 추가하세요
+                          </li>
+                        )}
+                      </ul>
+                      <button
+                        type="button"
+                        onClick={() => setActiveSemesterId(plan.plannedSemesterId)}
+                        className="mt-2 rounded-lg border border-dashed border-[#d5dae1] py-2 text-xs font-semibold text-ink-muted hover:border-sejong hover:text-sejong"
+                      >
+                        + 과목 추가
+                      </button>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
             <div className="mt-4 flex flex-wrap gap-2 border-t border-[#eee] pt-3">
               {(Object.keys(kindLabel) as CourseKind[]).map((k) => (
                 <span
@@ -652,7 +599,6 @@ export function SimulationPage() {
             </div>
           </section>
 
-          {/* 검색 + 결과 */}
           <div className="space-y-5">
             <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
               <h2 className="mb-3 text-base font-bold text-ink">시간표 기반 과목 검색</h2>
@@ -660,7 +606,7 @@ export function SimulationPage() {
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="과목명·코드 검색"
+                  placeholder="과목명 검색"
                   className="w-full rounded-xl border border-[#e5e7eb] bg-panel py-2.5 pl-10 pr-3 text-sm outline-none focus:ring-2 focus:ring-sejong/30"
                 />
                 <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint">
@@ -669,13 +615,13 @@ export function SimulationPage() {
               </div>
               <div className="mb-3 flex flex-wrap gap-2">
                 <select
-                  value={activeSemesterKey}
-                  onChange={(e) => setActiveSemesterKey(e.target.value)}
+                  value={activeSemesterId ?? ''}
+                  onChange={(e) => setActiveSemesterId(Number(e.target.value))}
                   className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-semibold"
                 >
-                  {plans.map((p) => (
-                    <option key={p.key} value={p.key}>
-                      {p.label}에 추가
+                  {semesters.map((p) => (
+                    <option key={p.plannedSemesterId} value={p.plannedSemesterId}>
+                      {semesterLabel(p)}에 추가
                     </option>
                   ))}
                 </select>
@@ -685,7 +631,7 @@ export function SimulationPage() {
                   className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-semibold"
                 >
                   <option value="all">전체 구분</option>
-                  <option value="required">전필/BSM</option>
+                  <option value="required">전필/기초</option>
                   <option value="elective">전선</option>
                   <option value="general">교양</option>
                   <option value="design">설계</option>
@@ -708,35 +654,36 @@ export function SimulationPage() {
                       <th className="px-3 py-2 font-semibold">과목</th>
                       <th className="px-2 py-2 font-semibold">구분</th>
                       <th className="px-2 py-2 font-semibold">학점</th>
-                      <th className="px-2 py-2 font-semibold">권장</th>
+                      <th className="px-2 py-2 font-semibold">개설</th>
                       <th className="px-2 py-2 font-semibold" />
                     </tr>
                   </thead>
                   <tbody>
                     {searchResults.map((course) => {
-                      const { categoryLabel, kind } = classifyCourse(course)
+                      const { label, kind } = classifyByCategory(course.category)
                       return (
-                        <tr key={course.abeekCourseCode} className="border-t border-[#f0f0f3]">
+                        <tr key={`${course.code}-${course.name}`} className="border-t border-[#f0f0f3]">
                           <td className="px-3 py-2">
-                            <p className="font-semibold text-ink">{course.courseName}</p>
-                            <p className="text-[10px] text-ink-faint">{course.abeekCourseCode}</p>
+                            <p className="font-semibold text-ink">{course.name}</p>
+                            <p className="text-[10px] text-ink-faint">{course.code}</p>
                           </td>
                           <td className="px-2 py-2">
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${kindStyle[kind]}`}
                             >
-                              {categoryLabel}
+                              {label}
                             </span>
                           </td>
-                          <td className="px-2 py-2 font-medium">{course.credits ?? '-'}</td>
+                          <td className="px-2 py-2 font-medium">{course.credits}</td>
                           <td className="px-2 py-2 text-ink-muted">
-                            {course.recommendedTerm ?? '-'}
+                            {course.offeredTerms[0] ?? '-'}
                           </td>
                           <td className="px-2 py-2 text-right">
                             <button
                               type="button"
-                              onClick={() => addCourse(course)}
-                              className="rounded-full bg-sejong px-2.5 py-1 text-[11px] font-bold text-white hover:bg-sejong-dark"
+                              onClick={() => handleAddCourse(course)}
+                              disabled={saving || activeSemesterId == null}
+                              className="rounded-full bg-sejong px-2.5 py-1 text-[11px] font-bold text-white hover:bg-sejong-dark disabled:opacity-50"
                             >
                               추가
                             </button>
@@ -799,9 +746,7 @@ export function SimulationPage() {
               </div>
               <div
                 className={`mt-4 rounded-xl px-4 py-3 text-center text-sm font-bold ${
-                  canGraduate
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-sejong-light text-sejong'
+                  canGraduate ? 'bg-emerald-50 text-emerald-700' : 'bg-sejong-light text-sejong'
                 }`}
               >
                 {canGraduate
@@ -811,7 +756,6 @@ export function SimulationPage() {
             </section>
           </div>
 
-          {/* 우측 패널 */}
           <div className="space-y-5">
             <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
               <h2 className="mb-4 text-base font-bold text-ink">예상 성적 분포</h2>

@@ -213,6 +213,9 @@ export type PlannedCourseItem = {
   credit?: string | number
   expectedGrade?: ExpectedGrade | string
   expectedGradePoint?: string | number
+  retake?: boolean
+  previousGrade?: string
+  previousGradePoint?: string | number
 }
 
 export type PlannedSemester = {
@@ -233,11 +236,28 @@ export type PlannedCoursesResponse = {
 
 export type AddPlannedCourseRequest = {
   plannedSemesterId: number
+  gradeYear?: number
+  semester?: number
   courseCode: string
   courseName: string
   category?: string
   credit?: string
   expectedGrade?: ExpectedGrade | string
+}
+
+export type PlannableCourse = {
+  courseCodes?: string[]
+  courseName: string
+  category?: string
+  departments?: string[]
+  targetGrades?: string[]
+  credits?: string[]
+  offeredTerms?: string[]
+}
+
+export type PlannableCourseCatalogResponse = {
+  count?: number
+  courses?: PlannableCourse[]
 }
 
 export type MajorTrackRequiredCourseProgress = {
