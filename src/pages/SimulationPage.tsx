@@ -133,6 +133,16 @@ function semesterLabel(sem: PlannedSemester) {
   return `${sem.gradeYear}-${sem.semester}학기`
 }
 
+/** "2026-1" / "2025-2" → "1학기" / "2학기" */
+function formatOfferedSemester(term?: string) {
+  if (!term) return '-'
+  const m = term.match(/(?:^|-)([12])(?:\s*$)/)
+  if (m) return `${m[1]}학기`
+  if (term.includes('1')) return '1학기'
+  if (term.includes('2')) return '2학기'
+  return term
+}
+
 function normalizeGrade(value?: string | null): Grade {
   if (value && (GRADES as readonly string[]).includes(value)) return value as Grade
   return 'A0'
@@ -412,20 +422,6 @@ export function SimulationPage() {
     })
   }
 
-  const handleAddSemester = () => {
-    if (!student) return
-    void runAction(async () => {
-      await addNextPlannedSemesters(student.id, 1)
-    })
-  }
-
-  const handleDeleteSemester = (plannedSemesterId: number) => {
-    if (!student) return
-    void runAction(async () => {
-      await deletePlannedSemester(student.id, plannedSemesterId)
-    })
-  }
-
   const handleMoveCourse = (course: PlannedCourseItem, toSemesterId: number) => {
     if (!student || course.plannedSemesterId === toSemesterId) return
     const target = semesters.find((s) => s.plannedSemesterId === toSemesterId)
@@ -513,14 +509,6 @@ export function SimulationPage() {
             <MajorTrackSwitcher />
             <button
               type="button"
-              onClick={handleAddSemester}
-              disabled={saving}
-              className="rounded-full border border-[#e5e7eb] bg-white px-4 py-1.5 text-xs font-semibold text-ink hover:bg-panel disabled:opacity-50"
-            >
-              학기 추가
-            </button>
-            <button
-              type="button"
               onClick={handleReset}
               disabled={saving}
               className="rounded-full border border-[#e5e7eb] bg-white px-4 py-1.5 text-xs font-semibold text-ink hover:bg-panel disabled:opacity-50"
@@ -542,7 +530,7 @@ export function SimulationPage() {
             <h2 className="mb-4 text-base font-bold text-ink">남은 학기 로드맵</h2>
             {semesters.length === 0 ? (
               <p className="py-10 text-center text-sm text-ink-muted">
-                계획 학기가 없습니다. 학기 추가를 눌러 주세요.
+                계획 학기가 없습니다. 계획 초기화로 학기를 생성해 주세요.
               </p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
@@ -554,6 +542,15 @@ export function SimulationPage() {
                   return (
                     <article
                       key={plan.plannedSemesterId}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setActiveSemesterId(plan.plannedSemesterId)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          setActiveSemesterId(plan.plannedSemesterId)
+                        }
+                      }}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => {
                         if (dragId == null) return
@@ -561,32 +558,20 @@ export function SimulationPage() {
                         if (moving) handleMoveCourse(moving, plan.plannedSemesterId)
                         setDragId(null)
                       }}
-                      className={`flex h-[320px] flex-col rounded-xl border p-3 transition ${
+                      className={`flex h-[320px] cursor-pointer flex-col rounded-xl border p-3 transition ${
                         activeCard
-                          ? 'border-sejong bg-sejong-light/30'
-                          : 'border-[#eceff3] bg-panel/40'
+                          ? 'border-sejong bg-sejong-light/30 ring-1 ring-sejong/30'
+                          : 'border-[#eceff3] bg-panel/40 hover:border-sejong/40'
                       }`}
                     >
                       <div className="mb-2 flex shrink-0 w-full items-center justify-between gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setActiveSemesterId(plan.plannedSemesterId)}
-                          className="text-left text-sm font-bold text-ink"
-                        >
-                          {semesterLabel(plan)}
-                        </button>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-sejong">예상 {credits}학점</span>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSemester(plan.plannedSemesterId)}
-                            className="text-[10px] font-semibold text-ink-faint hover:text-sejong"
-                          >
-                            학기삭제
-                          </button>
-                        </div>
+                        <p className="text-left text-sm font-bold text-ink">{semesterLabel(plan)}</p>
+                        <span className="text-xs font-semibold text-sejong">예상 {credits}학점</span>
                       </div>
-                      <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5">
+                      <ul
+                        className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         {courses.map((course) => {
                           const { kind, label } = classifyByCategory(
                             course.category,
@@ -749,21 +734,21 @@ export function SimulationPage() {
                           </td>
                           <td className="px-2 py-2">
                             <span
-                              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${kindStyle[kind]}`}
+                              className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ${kindStyle[kind]}`}
                             >
                               {label}
                             </span>
                           </td>
                           <td className="px-2 py-2 font-medium">{course.credits}</td>
-                          <td className="px-2 py-2 text-ink-muted">
-                            {course.offeredTerms[0] ?? '-'}
+                          <td className="px-2 py-2 whitespace-nowrap text-ink-muted">
+                            {formatOfferedSemester(course.offeredTerms[0])}
                           </td>
                           <td className="px-2 py-2 text-right">
                             <button
                               type="button"
                               onClick={() => handleAddCourse(course)}
                               disabled={saving || activeSemesterId == null}
-                              className="rounded-full bg-sejong px-2.5 py-1 text-[11px] font-bold text-white hover:bg-sejong-dark disabled:opacity-50"
+                              className="inline-flex shrink-0 whitespace-nowrap rounded-full bg-sejong px-3 py-1 text-[11px] font-bold text-white hover:bg-sejong-dark disabled:opacity-50"
                             >
                               추가
                             </button>
