@@ -23,6 +23,42 @@ import { toNumber } from '../utils/number'
 
 const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'] as const
 
+/** 행마다 auto 라벨 폭이 달라 학기 열이 어긋나지 않도록 고정 */
+const ROADMAP_GRID =
+  'grid grid-cols-[5.5rem_repeat(8,minmax(132px,1fr))] gap-2 items-start'
+
+/** 패닝: 왼쪽·위 공백으로 빠져나가지 않게 클램프 */
+function clampPan(
+  pan: { x: number; y: number },
+  zoom: number,
+  contentW: number,
+  contentH: number,
+  viewW: number,
+  viewH: number,
+) {
+  const scaledW = contentW * zoom
+  const scaledH = contentH * zoom
+
+  let minX = 0
+  let maxX = 0
+  let minY = 0
+  let maxY = 0
+
+  if (scaledW > viewW) {
+    minX = viewW - scaledW
+    maxX = 0
+  }
+  if (scaledH > viewH) {
+    minY = viewH - scaledH
+    maxY = 0
+  }
+
+  return {
+    x: Math.min(maxX, Math.max(minX, pan.x)),
+    y: Math.min(maxY, Math.max(minY, pan.y)),
+  }
+}
+
 type MapCategory = 'liberal' | 'bsm' | 'major-required' | 'major-elective'
 type ViewKind = 'general' | 'abeek'
 
@@ -49,16 +85,16 @@ type RowDef = {
 }
 
 const categoryStyle: Record<MapCategory, string> = {
-  liberal: 'bg-[#e8eaee] text-ink',
-  bsm: 'bg-[#4a5568] text-white',
-  'major-required': 'border-2 border-sejong bg-white text-sejong',
-  'major-elective': 'bg-sejong-pink text-ink',
+  liberal: 'border-transparent bg-[#e8eaee] text-ink',
+  bsm: 'border-transparent bg-[#4a5568] text-white',
+  'major-required': 'border-sejong bg-white text-sejong',
+  'major-elective': 'border-transparent bg-sejong-pink text-ink',
 }
 
 function courseBadgeClass(course: MapCourse, hasCompletionData: boolean): string {
-  // 이수한 과목은 카테고리와 무관하게 빨간색
+  // 이수한 과목은 카테고리와 무관하게 빨간색 (테두리는 정렬용으로 유지)
   if (course.completed) {
-    return 'bg-sejong text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]'
+    return 'border-transparent bg-sejong text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]'
   }
 
   if (course.category === 'major-required') {
@@ -504,6 +540,20 @@ export function CurriculumPage() {
     }
   }, [student?.id])
 
+  const clampCurrentPan = (next: { x: number; y: number }, zoomValue = zoomRef.current) => {
+    const viewport = viewportRef.current
+    const board = boardRef.current
+    if (!viewport || !board) return next
+    return clampPan(
+      next,
+      zoomValue,
+      board.offsetWidth,
+      board.offsetHeight,
+      viewport.clientWidth,
+      viewport.clientHeight,
+    )
+  }
+
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
     const target = e.target as HTMLElement
@@ -519,7 +569,7 @@ export function CurriculumPage() {
     if (!panning) return
     e.preventDefault()
     setPan((prev) => {
-      const next = { x: prev.x + e.movementX, y: prev.y + e.movementY }
+      const next = clampCurrentPan({ x: prev.x + e.movementX, y: prev.y + e.movementY })
       panRef.current = next
       return next
     })
@@ -813,10 +863,17 @@ export function CurriculumPage() {
 
       const worldX = (mx - panRef.current.x) / prevZoom
       const worldY = (my - panRef.current.y) / prevZoom
-      const nextPan = {
-        x: mx - worldX * nextZoom,
-        y: my - worldY * nextZoom,
-      }
+      const nextPan = clampPan(
+        {
+          x: mx - worldX * nextZoom,
+          y: my - worldY * nextZoom,
+        },
+        nextZoom,
+        boardRef.current?.offsetWidth || 0,
+        boardRef.current?.offsetHeight || 0,
+        viewport.clientWidth,
+        viewport.clientHeight,
+      )
       zoomRef.current = nextZoom
       panRef.current = nextPan
       setZoom(nextZoom)
@@ -826,6 +883,15 @@ export function CurriculumPage() {
     viewport.addEventListener('wheel', onWheel, { passive: false })
     return () => viewport.removeEventListener('wheel', onWheel)
   }, [loading, error, allCourses.length])
+
+  useEffect(() => {
+    if (loading || error || allCourses.length === 0) return
+    setPan((prev) => {
+      const next = clampCurrentPan(prev)
+      panRef.current = next
+      return next
+    })
+  }, [loading, error, allCourses.length, viewKind, zoom])
 
   const titleLabel =
     viewKind === 'abeek'
@@ -989,6 +1055,11 @@ export function CurriculumPage() {
                       const next = Math.max(0.45, zoomRef.current / 1.12)
                       zoomRef.current = next
                       setZoom(next)
+                      setPan((prev) => {
+                        const clamped = clampCurrentPan(prev, next)
+                        panRef.current = clamped
+                        return clamped
+                      })
                     }}
                     className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
                   >
@@ -1003,6 +1074,11 @@ export function CurriculumPage() {
                       const next = Math.min(2.5, zoomRef.current * 1.12)
                       zoomRef.current = next
                       setZoom(next)
+                      setPan((prev) => {
+                        const clamped = clampCurrentPan(prev, next)
+                        panRef.current = clamped
+                        return clamped
+                      })
                     }}
                     className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
                   >
@@ -1074,7 +1150,7 @@ export function CurriculumPage() {
                     ))}
                   </svg>
 
-                  <div className="relative z-10 mb-3 grid grid-cols-[auto_repeat(8,minmax(140px,1fr))] gap-2">
+                  <div className={`relative z-10 mb-3 ${ROADMAP_GRID}`}>
                     <div />
                     {SEMESTERS.map((s) => (
                       <div key={s} className="text-center text-sm font-bold text-ink">
@@ -1084,11 +1160,8 @@ export function CurriculumPage() {
                   </div>
 
                   {activeRowDefs.map((row) => (
-                    <div
-                      key={row.key}
-                      className="relative z-10 mb-4 grid grid-cols-[auto_repeat(8,minmax(140px,1fr))] items-start gap-2"
-                    >
-                      <div className="flex items-start justify-center pt-1">
+                    <div key={row.key} className={`relative z-10 mb-4 ${ROADMAP_GRID}`}>
+                      <div className="flex w-[5.5rem] items-start justify-center pt-1">
                         <span
                           className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-center text-[11px] font-bold text-ink ${row.border}`}
                         >
@@ -1108,7 +1181,7 @@ export function CurriculumPage() {
                         return (
                           <div
                             key={`${row.key}-${semester}`}
-                            className={`relative w-full space-y-1.5 rounded-xl p-1 ${
+                            className={`relative w-full min-w-0 space-y-1.5 rounded-xl p-1 ${
                               showPrereqBox
                                 ? 'h-fit border border-dashed border-sejong bg-sejong-light/40'
                                 : ''
@@ -1132,7 +1205,7 @@ export function CurriculumPage() {
                                     ? ' · 전공필수'
                                     : ''
                                 }`}
-                                className={`relative flex flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-center shadow-sm ${courseBadgeClass(
+                                className={`relative box-border flex w-full flex-col items-center gap-0.5 rounded-2xl border-2 px-2.5 py-1.5 text-center shadow-sm ${courseBadgeClass(
                                   course,
                                   hasCompletionData,
                                 )}`}
