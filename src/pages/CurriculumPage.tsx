@@ -25,9 +25,9 @@ const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'] as co
 
 /** 행마다 auto 라벨 폭이 달라 학기 열이 어긋나지 않도록 고정 */
 const ROADMAP_GRID =
-  'grid grid-cols-[5.5rem_repeat(8,minmax(132px,1fr))] gap-2 items-start'
+  'grid grid-cols-[5.5rem_repeat(8,minmax(140px,1fr))] gap-2 items-start'
 
-/** 패닝: 왼쪽·위 공백으로 빠져나가지 않게 클램프 */
+/** 패닝 클램프. edgePad만큼 오른쪽·아래가 잘리지 않게 여유를 둠 */
 function clampPan(
   pan: { x: number; y: number },
   zoom: number,
@@ -35,6 +35,7 @@ function clampPan(
   contentH: number,
   viewW: number,
   viewH: number,
+  edgePad = 28,
 ) {
   const scaledW = contentW * zoom
   const scaledH = contentH * zoom
@@ -44,18 +45,31 @@ function clampPan(
   let minY = 0
   let maxY = 0
 
-  if (scaledW > viewW) {
-    minX = viewW - scaledW
+  if (scaledW > viewW - edgePad) {
+    // 오른쪽이 viewport에 딱 붙지 않도록 edgePad 확보
+    minX = viewW - scaledW - edgePad
     maxX = 0
   }
-  if (scaledH > viewH) {
-    minY = viewH - scaledH
+  if (scaledH > viewH - edgePad) {
+    minY = viewH - scaledH - edgePad
     maxY = 0
   }
 
   return {
     x: Math.min(maxX, Math.max(minX, pan.x)),
     y: Math.min(maxY, Math.max(minY, pan.y)),
+  }
+}
+
+function getViewportInnerSize(viewport: HTMLElement) {
+  const style = window.getComputedStyle(viewport)
+  const padX =
+    (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0)
+  const padY =
+    (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0)
+  return {
+    width: Math.max(0, viewport.clientWidth - padX),
+    height: Math.max(0, viewport.clientHeight - padY),
   }
 }
 
@@ -206,6 +220,8 @@ function toTermKeyFromTaken(
   takenSemester: number | string | null | undefined,
   admissionYear?: number,
 ): string | null {
+  // 레거시 fallback 전용. 로드맵 배치는 standingTermKey / terms.termKey를 우선한다.
+  // takenYear - admissionYear + 1 은 휴학 시 4-1·초과학년으로 어긋남.
   const year = toNumber(takenYear)
   const semester = toNumber(takenSemester)
   if (!year || !semester) return null
@@ -216,6 +232,10 @@ function toTermKeyFromTaken(
   const sem = semester >= 2 ? 2 : 1
   const key = `${grade}-${sem}`
   return (SEMESTERS as readonly string[]).includes(key) ? key : null
+}
+
+function isValidTermKey(term: string | null | undefined): term is string {
+  return !!term && (SEMESTERS as readonly string[]).includes(term)
 }
 
 /** 이수했다면 실제 수강 학기, 아니면 권장(대상) 학기 */
@@ -231,6 +251,12 @@ function buildTakenTermMap(
     for (const raw of courses ?? []) {
       const code = String(raw.courseCode ?? '')
       if (!code || map.has(code)) continue
+      const standing = raw.standingTermKey as string | null | undefined
+      if (isValidTermKey(standing)) {
+        map.set(code, standing)
+        continue
+      }
+      // 졸업진행 API에 standing이 없을 때만 최후 fallback (달력). 로드맵 termKey가 나중에 덮어씀.
       const term = toTermKeyFromTaken(
         raw.takenYear as string | number | null | undefined,
         raw.takenSemester as string | number | null | undefined,
@@ -257,36 +283,35 @@ function buildTakenTermMap(
 
 function resolveDisplayTerm(
   recommendedTerm: string,
-  takenYear: number | string | null | undefined,
-  takenSemester: number | string | null | undefined,
   completed: boolean | undefined,
-  admissionYear?: number,
   takenTermByCode?: Map<string, string>,
   courseCode?: string,
+  standingTermKey?: string | null,
 ): string | null {
   const recommended = recommendedTerm.trim()
   if (completed) {
-    const fromFields = toTermKeyFromTaken(takenYear, takenSemester, admissionYear)
+    // API 기이수 순번 우선. takenYear-admissionYear 달력 재계산 금지.
+    if (isValidTermKey(standingTermKey)) return standingTermKey
+    // general 로드맵의 terms[].termKey / ABEEK recommendedTerm
+    if (isValidTermKey(recommended)) return recommended
     const fromMap = courseCode ? takenTermByCode?.get(courseCode) : undefined
-    if (fromFields || fromMap) return fromFields || fromMap || null
+    if (isValidTermKey(fromMap)) return fromMap
+    return null
   }
-  if (recommended && (SEMESTERS as readonly string[]).includes(recommended)) return recommended
+  if (isValidTermKey(recommended)) return recommended
   return null
 }
 
 function abeekToMapCourse(
   course: RoadmapCourse,
-  admissionYear?: number,
   takenTermByCode?: Map<string, string>,
 ): MapCourse | null {
   const semester = resolveDisplayTerm(
     course.recommendedTerm || '',
-    course.takenYear,
-    course.takenSemester,
     course.completed,
-    admissionYear,
     takenTermByCode,
     course.abeekCourseCode,
+    null,
   )
   if (!semester) return null
 
@@ -306,19 +331,16 @@ function abeekToMapCourse(
 function generalToMapCourse(
   course: StudentRoadmapCourse,
   termKey: string,
-  admissionYear?: number,
   takenTermByCode?: Map<string, string>,
 ): MapCourse | null {
   if (!course.courseCode) return null
 
   const semester = resolveDisplayTerm(
     termKey,
-    course.takenYear,
-    course.takenSemester,
     course.completed,
-    admissionYear,
     takenTermByCode,
     course.courseCode,
+    course.standingTermKey,
   )
   if (!semester) return null
 
@@ -344,7 +366,6 @@ function liberalCoursesFromProgress(
   takenTermByCode: Map<string, string>,
 ): MapCourse[] {
   if (!progress) return []
-  const admissionYear = progress.admissionYear
   const result: MapCourse[] = []
   const seen = new Set<string>()
 
@@ -356,12 +377,9 @@ function liberalCoursesFromProgress(
       const code = String(raw.courseCode ?? '')
       const name = String(raw.courseName ?? '')
       if (!code || !name || excludeCodes.has(code) || seen.has(code)) continue
+      const standing = raw.standingTermKey as string | null | undefined
       const term =
-        toTermKeyFromTaken(
-          raw.takenYear as string | number | null | undefined,
-          raw.takenSemester as string | number | null | undefined,
-          admissionYear,
-        ) || takenTermByCode.get(code)
+        (isValidTermKey(standing) ? standing : null) || takenTermByCode.get(code) || null
       if (!term) continue
       seen.add(code)
       result.push({
@@ -544,13 +562,14 @@ export function CurriculumPage() {
     const viewport = viewportRef.current
     const board = boardRef.current
     if (!viewport || !board) return next
+    const { width, height } = getViewportInnerSize(viewport)
     return clampPan(
       next,
       zoomValue,
-      board.offsetWidth,
-      board.offsetHeight,
-      viewport.clientWidth,
-      viewport.clientHeight,
+      board.scrollWidth,
+      board.scrollHeight,
+      width,
+      height,
     )
   }
 
@@ -719,33 +738,31 @@ export function CurriculumPage() {
   )
 
   const allCourses = useMemo(() => {
-    const admissionYear = graduation?.admissionYear ?? student?.admissionYear
     const takenTermByCode = buildTakenTermMap(graduation)
 
-    // 로드맵 이수 과목의 takenYear도 맵에 보강
-    for (const { course } of generalFlat) {
-      if (!course.completed || !course.courseCode || takenTermByCode.has(course.courseCode)) continue
-      const term = toTermKeyFromTaken(course.takenYear, course.takenSemester, admissionYear)
+    // 로드맵 API termKey / standingTermKey로 덮어씀 (달력 맵보다 우선)
+    for (const { course, termKey } of generalFlat) {
+      if (!course.completed || !course.courseCode) continue
+      const standing = course.standingTermKey
+      const term = isValidTermKey(standing) ? standing : isValidTermKey(termKey) ? termKey : null
       if (term) takenTermByCode.set(course.courseCode, term)
     }
     for (const course of abeekRawCourses) {
-      if (!course.completed || !course.abeekCourseCode || takenTermByCode.has(course.abeekCourseCode)) {
-        continue
+      if (!course.completed || !course.abeekCourseCode) continue
+      if (takenTermByCode.has(course.abeekCourseCode)) continue
+      if (isValidTermKey(course.recommendedTerm)) {
+        takenTermByCode.set(course.abeekCourseCode, course.recommendedTerm!)
       }
-      const term = toTermKeyFromTaken(course.takenYear, course.takenSemester, admissionYear)
-      if (term) takenTermByCode.set(course.abeekCourseCode, term)
     }
 
     if (viewKind === 'abeek') {
       return abeekRawCourses
-        .map((c) => abeekToMapCourse(c, admissionYear, takenTermByCode))
+        .map((c) => abeekToMapCourse(c, takenTermByCode))
         .filter((c): c is MapCourse => c != null)
     }
 
     const fromTimetable = generalFlat
-      .map(({ course, termKey }) =>
-        generalToMapCourse(course, termKey, admissionYear, takenTermByCode),
-      )
+      .map(({ course, termKey }) => generalToMapCourse(course, termKey, takenTermByCode))
       .filter((c): c is MapCourse => c != null)
 
     const byId = new Map(fromTimetable.map((c) => [c.id, c]))
@@ -756,7 +773,6 @@ export function CurriculumPage() {
     for (const course of liberalExtra) {
       const existing = byId.get(course.id)
       if (existing) {
-        // 시간표에서 전공으로 잘못 들어간 기이수 교양/기초 → 올바른 행으로 재분류
         if (existing.category.startsWith('major') && !course.category.startsWith('major')) {
           existing.category = course.category
           existing.completed = existing.completed || course.completed
@@ -767,7 +783,7 @@ export function CurriculumPage() {
       byId.set(course.id, course)
     }
     return [...byId.values()]
-  }, [viewKind, abeekRawCourses, generalFlat, graduation, student?.admissionYear])
+  }, [viewKind, abeekRawCourses, generalFlat, graduation])
 
   const activeRowDefs = viewKind === 'abeek' ? abeekRowDefs : generalRowDefs
 
@@ -863,16 +879,17 @@ export function CurriculumPage() {
 
       const worldX = (mx - panRef.current.x) / prevZoom
       const worldY = (my - panRef.current.y) / prevZoom
+      const { width, height } = getViewportInnerSize(viewport)
       const nextPan = clampPan(
         {
           x: mx - worldX * nextZoom,
           y: my - worldY * nextZoom,
         },
         nextZoom,
-        boardRef.current?.offsetWidth || 0,
-        boardRef.current?.offsetHeight || 0,
-        viewport.clientWidth,
-        viewport.clientHeight,
+        boardRef.current?.scrollWidth || 0,
+        boardRef.current?.scrollHeight || 0,
+        width,
+        height,
       )
       zoomRef.current = nextZoom
       panRef.current = nextPan
@@ -1101,13 +1118,13 @@ export function CurriculumPage() {
                 onPointerUp={endPan}
                 onPointerCancel={endPan}
                 onDragStart={(e) => e.preventDefault()}
-                className={`relative h-[min(70vh,720px)] touch-none select-none overflow-hidden p-5 ${
+                className={`relative h-[min(70vh,720px)] touch-none select-none overflow-hidden px-5 pb-6 pt-5 ${
                   panning ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
               >
                 <div
                   ref={boardRef}
-                  className="relative min-w-[1480px] origin-top-left will-change-transform"
+                  className="relative min-w-[1560px] origin-top-left pb-8 pr-8 will-change-transform"
                   style={{
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   }}
@@ -1181,7 +1198,7 @@ export function CurriculumPage() {
                         return (
                           <div
                             key={`${row.key}-${semester}`}
-                            className={`relative w-full min-w-0 space-y-1.5 rounded-xl p-1 ${
+                            className={`relative w-full min-w-0 overflow-visible space-y-1.5 rounded-xl p-1.5 ${
                               showPrereqBox
                                 ? 'h-fit border border-dashed border-sejong bg-sejong-light/40'
                                 : ''
@@ -1205,23 +1222,23 @@ export function CurriculumPage() {
                                     ? ' · 전공필수'
                                     : ''
                                 }`}
-                                className={`relative box-border flex w-full flex-col items-center gap-0.5 rounded-2xl border-2 px-2.5 py-1.5 text-center shadow-sm ${courseBadgeClass(
+                                className={`relative box-border flex w-full min-w-0 flex-col items-center gap-0.5 rounded-2xl border-2 px-2 py-1.5 pt-2.5 text-center shadow-sm ${courseBadgeClass(
                                   course,
                                   hasCompletionData,
                                 )}`}
                               >
                                 {course.category === 'major-required' && !course.completed && (
-                                  <span className="absolute -top-1.5 right-1 rounded-full bg-sejong px-1.5 py-[1px] text-[9px] font-bold leading-none text-white">
+                                  <span className="absolute right-1 top-1 rounded-full bg-sejong px-1.5 py-[1px] text-[9px] font-bold leading-none text-white">
                                     필수
                                   </span>
                                 )}
                                 {course.completed && (
-                                  <span className="absolute -top-1.5 right-1 rounded-full bg-white px-1.5 py-[1px] text-[9px] font-bold leading-none text-sejong">
+                                  <span className="absolute right-1 top-1 rounded-full bg-white px-1.5 py-[1px] text-[9px] font-bold leading-none text-sejong">
                                     이수
                                   </span>
                                 )}
                                 <p
-                                  className={`w-full font-semibold leading-snug ${
+                                  className={`w-full min-w-0 break-keep font-semibold leading-snug ${
                                     course.name.length >= 14 ? 'text-[10px]' : 'text-[10.5px]'
                                   }`}
                                 >

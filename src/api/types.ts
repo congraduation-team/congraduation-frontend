@@ -233,7 +233,12 @@ export type PlannedSemester = {
 
 export type PlannedCoursesResponse = {
   studentId?: number
+  /** 기이수 정규학기 순번 기준 마지막 학기(1-1~4-2). 달력 상대학년 아님 */
   lastCompletedSemester?: string
+  lastCompletedTakenYear?: string | null
+  lastCompletedTakenSemester?: string | null
+  standingGradeYear?: number | null
+  overStanding?: boolean
   totalPlannedCredits?: string | number
   semesters?: PlannedSemester[]
 }
@@ -484,8 +489,11 @@ export type StudentRoadmapCourse = {
   abeekBucket?: string
   credits?: number
   completed?: boolean
+  /** 실제 수강 연도(원본). 학년 계산에 쓰지 말 것 */
   takenYear?: string | null
   takenSemester?: string | null
+  /** 기이수 정규학기 순번 칸(1-1~4-2). takenYear-admissionYear 달력 계산 금지 */
+  standingTermKey?: string | null
   grade?: string | null
   sectionCount?: number
 }
