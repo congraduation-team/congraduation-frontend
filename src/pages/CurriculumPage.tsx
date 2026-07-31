@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react'
 import {
   getAbeekFullRoadmap,
   getAbeekFullRoadmapByStudent,
@@ -23,11 +23,24 @@ import { toNumber } from '../utils/number'
 
 const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'] as const
 
-/** 행마다 auto 라벨 폭이 달라 학기 열이 어긋나지 않도록 고정 */
-const ROADMAP_GRID =
-  'grid grid-cols-[5.5rem_repeat(8,minmax(140px,1fr))] gap-2 items-start'
+const LABEL_COL_PX = 88
+const SEM_COL_PX = 172
+const GRID_GAP_PX = 8
+const BOARD_PAD_X = 60
+const BOARD_PAD_Y = 68
+/** 라벨 + 갭 + 학기 8열 */
+const BOARD_GRID_WIDTH_PX =
+  LABEL_COL_PX + GRID_GAP_PX + SEMESTERS.length * (SEM_COL_PX + GRID_GAP_PX) - GRID_GAP_PX
 
-/** 패닝 클램프. edgePad만큼 오른쪽·아래가 잘리지 않게 여유를 둠 */
+const ROADMAP_GRID_STYLE: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: `${LABEL_COL_PX}px repeat(8, ${SEM_COL_PX}px)`,
+  gap: GRID_GAP_PX,
+  alignItems: 'start',
+  width: BOARD_GRID_WIDTH_PX,
+}
+
+/** 패닝 클램프 — 오른쪽·아래 카드가 잘리지 않도록 여유 확보 */
 function clampPan(
   pan: { x: number; y: number },
   zoom: number,
@@ -35,25 +48,14 @@ function clampPan(
   contentH: number,
   viewW: number,
   viewH: number,
-  edgePad = 28,
+  edgePad = 40,
 ) {
   const scaledW = contentW * zoom
   const scaledH = contentH * zoom
-
-  let minX = 0
-  let maxX = 0
-  let minY = 0
-  let maxY = 0
-
-  if (scaledW > viewW - edgePad) {
-    // 오른쪽이 viewport에 딱 붙지 않도록 edgePad 확보
-    minX = viewW - scaledW - edgePad
-    maxX = 0
-  }
-  if (scaledH > viewH - edgePad) {
-    minY = viewH - scaledH - edgePad
-    maxY = 0
-  }
+  const maxX = 0
+  const maxY = 0
+  const minX = Math.min(0, viewW - scaledW - edgePad)
+  const minY = Math.min(0, viewH - scaledH - edgePad)
 
   return {
     x: Math.min(maxX, Math.max(minX, pan.x)),
@@ -61,15 +63,10 @@ function clampPan(
   }
 }
 
-function getViewportInnerSize(viewport: HTMLElement) {
-  const style = window.getComputedStyle(viewport)
-  const padX =
-    (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0)
-  const padY =
-    (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0)
+function measureBoardSize(board: HTMLElement) {
   return {
-    width: Math.max(0, viewport.clientWidth - padX),
-    height: Math.max(0, viewport.clientHeight - padY),
+    width: Math.max(board.scrollWidth, board.offsetWidth, BOARD_GRID_WIDTH_PX + BOARD_PAD_X),
+    height: Math.max(board.scrollHeight, board.offsetHeight, BOARD_PAD_Y + 200),
   }
 }
 
@@ -474,7 +471,7 @@ function CourseNameText({ name }: { name: string }) {
     )
     .filter(Boolean)
   return (
-    <span className="break-keep [word-break:keep-all] [overflow-wrap:normal]">
+    <span className="[overflow-wrap:anywhere] [word-break:keep-all]">
       {parts.map((part, index) => (
         <Fragment key={`${part}-${index}`}>
           {index > 0 ? <wbr /> : null}
@@ -562,14 +559,14 @@ export function CurriculumPage() {
     const viewport = viewportRef.current
     const board = boardRef.current
     if (!viewport || !board) return next
-    const { width, height } = getViewportInnerSize(viewport)
+    const size = measureBoardSize(board)
     return clampPan(
       next,
       zoomValue,
-      board.scrollWidth,
-      board.scrollHeight,
-      width,
-      height,
+      size.width,
+      size.height,
+      viewport.clientWidth,
+      viewport.clientHeight,
     )
   }
 
@@ -879,17 +876,17 @@ export function CurriculumPage() {
 
       const worldX = (mx - panRef.current.x) / prevZoom
       const worldY = (my - panRef.current.y) / prevZoom
-      const { width, height } = getViewportInnerSize(viewport)
+      const size = boardRef.current ? measureBoardSize(boardRef.current) : { width: 0, height: 0 }
       const nextPan = clampPan(
         {
           x: mx - worldX * nextZoom,
           y: my - worldY * nextZoom,
         },
         nextZoom,
-        boardRef.current?.scrollWidth || 0,
-        boardRef.current?.scrollHeight || 0,
-        width,
-        height,
+        size.width,
+        size.height,
+        viewport.clientWidth,
+        viewport.clientHeight,
       )
       zoomRef.current = nextZoom
       panRef.current = nextPan
@@ -903,12 +900,24 @@ export function CurriculumPage() {
 
   useEffect(() => {
     if (loading || error || allCourses.length === 0) return
-    setPan((prev) => {
-      const next = clampCurrentPan(prev)
-      panRef.current = next
-      return next
-    })
-  }, [loading, error, allCourses.length, viewKind, zoom])
+    const viewport = viewportRef.current
+    const board = boardRef.current
+    if (!viewport || !board) return
+
+    const reclamp = () => {
+      setPan((prev) => {
+        const next = clampCurrentPan(prev)
+        panRef.current = next
+        return next
+      })
+    }
+
+    reclamp()
+    const ro = new ResizeObserver(reclamp)
+    ro.observe(viewport)
+    ro.observe(board)
+    return () => ro.disconnect()
+  }, [loading, error, allCourses.length, viewKind, zoom, courses.length])
 
   const titleLabel =
     viewKind === 'abeek'
@@ -1118,14 +1127,16 @@ export function CurriculumPage() {
                 onPointerUp={endPan}
                 onPointerCancel={endPan}
                 onDragStart={(e) => e.preventDefault()}
-                className={`relative h-[min(70vh,720px)] touch-none select-none overflow-hidden px-5 pb-6 pt-5 ${
+                className={`relative h-[min(72vh,760px)] touch-none select-none overflow-hidden bg-white ${
                   panning ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
               >
                 <div
                   ref={boardRef}
-                  className="relative min-w-[1560px] origin-top-left pb-8 pr-8 will-change-transform"
+                  className="relative box-border origin-top-left will-change-transform"
                   style={{
+                    width: BOARD_GRID_WIDTH_PX + 64,
+                    padding: '20px 40px 48px 20px',
                     transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
                   }}
                 >
@@ -1167,7 +1178,7 @@ export function CurriculumPage() {
                     ))}
                   </svg>
 
-                  <div className={`relative z-10 mb-3 ${ROADMAP_GRID}`}>
+                  <div className="relative z-10 mb-3" style={ROADMAP_GRID_STYLE}>
                     <div />
                     {SEMESTERS.map((s) => (
                       <div key={s} className="text-center text-sm font-bold text-ink">
@@ -1177,8 +1188,11 @@ export function CurriculumPage() {
                   </div>
 
                   {activeRowDefs.map((row) => (
-                    <div key={row.key} className={`relative z-10 mb-4 ${ROADMAP_GRID}`}>
-                      <div className="flex w-[5.5rem] items-start justify-center pt-1">
+                    <div key={row.key} className="relative z-10 mb-4" style={ROADMAP_GRID_STYLE}>
+                      <div
+                        className="flex items-start justify-center pt-1"
+                        style={{ width: LABEL_COL_PX }}
+                      >
                         <span
                           className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-center text-[11px] font-bold text-ink ${row.border}`}
                         >
@@ -1238,7 +1252,7 @@ export function CurriculumPage() {
                                   </span>
                                 )}
                                 <p
-                                  className={`w-full min-w-0 break-keep font-semibold leading-snug ${
+                                  className={`w-full min-w-0 font-semibold leading-snug [overflow-wrap:anywhere] ${
                                     course.name.length >= 14 ? 'text-[10px]' : 'text-[10.5px]'
                                   }`}
                                 >
