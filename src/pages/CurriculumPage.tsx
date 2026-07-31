@@ -722,7 +722,7 @@ export function CurriculumPage() {
                     ))}
                   </svg>
 
-                  <div className="relative z-10 mb-3 grid grid-cols-[72px_repeat(8,1fr)] gap-2">
+                  <div className="relative z-10 mb-3 grid grid-cols-[auto_repeat(8,minmax(0,1fr))] gap-2">
                     <div />
                     {SEMESTERS.map((s) => (
                       <div key={s} className="text-center text-sm font-bold text-ink">
@@ -734,12 +734,11 @@ export function CurriculumPage() {
                   {rowDefs.map((row) => (
                     <div
                       key={row.key}
-                      className="relative z-10 mb-5 grid grid-cols-[72px_repeat(8,1fr)] gap-2"
+                      className="relative z-10 mb-4 grid grid-cols-[auto_repeat(8,minmax(0,1fr))] items-start gap-2"
                     >
-                      <div className="flex items-center justify-center">
+                      <div className="flex items-start justify-center pt-1">
                         <span
-                          className={`rounded-full border px-2 py-8 text-center text-[11px] font-bold text-ink ${row.border}`}
-                          style={{ writingMode: 'vertical-rl' }}
+                          className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-center text-[11px] font-bold text-ink ${row.border}`}
                         >
                           {row.label}
                         </span>
@@ -751,18 +750,19 @@ export function CurriculumPage() {
                             (row.categories as readonly MapCategory[]).includes(c.category),
                         )
                         const isFirstMajor = row.key === 'major' && semester === '1-1'
+                        const showPrereqBox = isFirstMajor && cellCourses.length > 0
 
                         return (
                           <div
                             key={`${row.key}-${semester}`}
-                            className={`relative min-h-[130px] space-y-2.5 rounded-xl p-1.5 ${
-                              isFirstMajor
-                                ? 'border border-dashed border-sejong bg-sejong-light/40'
+                            className={`relative w-full space-y-1.5 rounded-xl p-1 ${
+                              showPrereqBox
+                                ? 'h-fit border border-dashed border-sejong bg-sejong-light/40'
                                 : ''
                             }`}
                           >
-                            {isFirstMajor && (
-                              <p className="mb-1 text-center text-[10px] font-semibold text-sejong">
+                            {showPrereqBox && (
+                              <p className="text-center text-[10px] font-semibold leading-tight text-sejong">
                                 모든 전공의 선수 과목
                               </p>
                             )}
@@ -772,7 +772,7 @@ export function CurriculumPage() {
                                 ref={(el) => {
                                   nodeRefs.current[course.id] = el
                                 }}
-                                className={`rounded-full px-2.5 py-2 text-center text-[11px] font-semibold leading-tight shadow-sm ${
+                                className={`flex flex-wrap items-center justify-center gap-x-1 rounded-full px-2.5 py-1.5 text-center text-[11px] font-semibold leading-snug shadow-sm ${
                                   categoryStyle[course.category]
                                 } ${
                                   hasCompletionData && !course.completed && mode === 'all'
@@ -780,12 +780,12 @@ export function CurriculumPage() {
                                     : ''
                                 }`}
                               >
-                                <div>{course.name}</div>
-                                <div className="mt-0.5 text-[10px] font-medium opacity-80">
+                                <span>{course.name}</span>
+                                <span className="text-[10px] font-medium opacity-80">
                                   {course.hours}
-                                </div>
+                                </span>
                                 {course.name.toLowerCase().includes('capstone') && (
-                                  <span className="mt-1 inline-flex size-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-sejong">
+                                  <span className="inline-flex size-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-sejong">
                                     !
                                   </span>
                                 )}
