@@ -161,29 +161,74 @@ function toTermKeyFromTaken(
 }
 
 /** 이수했다면 실제 수강 학기, 아니면 권장(대상) 학기 */
+/** CompletedCourseDto 등 takenYear/takenSemester가 있는 목록에서 학수번호→학기 맵 생성 */
+function buildTakenTermMap(
+  progress: GraduationProgressResponse | null | undefined,
+): Map<string, string> {
+  const map = new Map<string, string>()
+  if (!progress) return map
+  const admissionYear = progress.admissionYear
+
+  const ingest = (courses?: Array<Record<string, unknown>>) => {
+    for (const raw of courses ?? []) {
+      const code = String(raw.courseCode ?? '')
+      if (!code || map.has(code)) continue
+      const term = toTermKeyFromTaken(
+        raw.takenYear as string | number | null | undefined,
+        raw.takenSemester as string | number | null | undefined,
+        admissionYear,
+      )
+      if (term) map.set(code, term)
+    }
+  }
+
+  ingest(progress.commonLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined)
+  ingest(progress.electiveLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined)
+  ingest(
+    progress.academicFoundationCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+  )
+  ingest(
+    progress.majorFoundationCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+  )
+  ingest(
+    progress.balancedLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+  )
+
+  return map
+}
+
 function resolveDisplayTerm(
   recommendedTerm: string,
   takenYear: number | string | null | undefined,
   takenSemester: number | string | null | undefined,
   completed: boolean | undefined,
   admissionYear?: number,
+  takenTermByCode?: Map<string, string>,
+  courseCode?: string,
 ): string | null {
   const recommended = recommendedTerm.trim()
   if (completed) {
-    const taken = toTermKeyFromTaken(takenYear, takenSemester, admissionYear)
-    if (taken) return taken
+    const fromFields = toTermKeyFromTaken(takenYear, takenSemester, admissionYear)
+    const fromMap = courseCode ? takenTermByCode?.get(courseCode) : undefined
+    if (fromFields || fromMap) return fromFields || fromMap || null
   }
   if (recommended && (SEMESTERS as readonly string[]).includes(recommended)) return recommended
   return null
 }
 
-function abeekToMapCourse(course: RoadmapCourse, admissionYear?: number): MapCourse | null {
+function abeekToMapCourse(
+  course: RoadmapCourse,
+  admissionYear?: number,
+  takenTermByCode?: Map<string, string>,
+): MapCourse | null {
   const semester = resolveDisplayTerm(
     course.recommendedTerm || '',
     course.takenYear,
     course.takenSemester,
     course.completed,
     admissionYear,
+    takenTermByCode,
+    course.abeekCourseCode,
   )
   if (!semester) return null
 
@@ -204,6 +249,7 @@ function generalToMapCourse(
   course: StudentRoadmapCourse,
   termKey: string,
   admissionYear?: number,
+  takenTermByCode?: Map<string, string>,
 ): MapCourse | null {
   if (!course.courseCode) return null
 
@@ -213,6 +259,8 @@ function generalToMapCourse(
     course.takenSemester,
     course.completed,
     admissionYear,
+    takenTermByCode,
+    course.courseCode,
   )
   if (!semester) return null
 
@@ -229,11 +277,13 @@ function generalToMapCourse(
 /**
  * 졸업진행 기이수:
  * - 기초필수: 공통교양/기초필수 등
- * - 교양: 전공도 기초필수도 아닌 이수 과목
+ * - 교양: 전공·기초필수 아닌 이수 과목
+ * - 수강 학기(takenYear/Semester)가 없으면 배치하지 않음 (가짜 2-1 방지)
  */
 function liberalCoursesFromProgress(
   progress: GraduationProgressResponse | null | undefined,
   excludeCodes: Set<string>,
+  takenTermByCode: Map<string, string>,
 ): MapCourse[] {
   if (!progress) return []
   const admissionYear = progress.admissionYear
@@ -243,7 +293,6 @@ function liberalCoursesFromProgress(
   const pushCompleted = (
     courses: Array<Record<string, unknown>> | undefined,
     category: MapCategory,
-    fallbackTerm: string,
   ) => {
     for (const raw of courses ?? []) {
       const code = String(raw.courseCode ?? '')
@@ -254,7 +303,8 @@ function liberalCoursesFromProgress(
           raw.takenYear as string | number | null | undefined,
           raw.takenSemester as string | number | null | undefined,
           admissionYear,
-        ) || fallbackTerm
+        ) || takenTermByCode.get(code)
+      if (!term) continue
       seen.add(code)
       result.push({
         id: code,
@@ -267,38 +317,37 @@ function liberalCoursesFromProgress(
     }
   }
 
-  // 기초필수
+  // 기초필수 — CompletedCourseDto(takenYear 포함)
   pushCompleted(
     progress.commonLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
     'bsm',
-    '1-1',
   )
   pushCompleted(
     progress.academicFoundationCredits?.completedCourses as
       | Array<Record<string, unknown>>
       | undefined,
     'bsm',
-    '1-1',
   )
 
-  // 교양(선택·균형 등 — 전공/기초필수 제외)
+  // 교양 — CompletedCourseDto
   pushCompleted(
     progress.electiveLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
     'liberal',
-    '1-2',
   )
-  for (const area of progress.balancedLiberalAreaProgresses ?? []) {
-    pushCompleted(area.courses as unknown as Array<Record<string, unknown>>, 'liberal', '2-1')
-  }
+  pushCompleted(
+    progress.balancedLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+    'liberal',
+  )
 
+  // categorySummaries / 균형영역은 CategoryCourse라 학기 없음 → 맵에 있을 때만
   for (const summary of progress.categorySummaries ?? []) {
     const label = summary.category || ''
     if (label.includes('전공')) continue
-    if (isFoundationRequiredLabel(label)) {
-      pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, 'bsm', '1-1')
-      continue
-    }
-    pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, 'liberal', '2-1')
+    const category: MapCategory = isFoundationRequiredLabel(label) ? 'bsm' : 'liberal'
+    pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, category)
+  }
+  for (const area of progress.balancedLiberalAreaProgresses ?? []) {
+    pushCompleted(area.courses as unknown as Array<Record<string, unknown>>, 'liberal')
   }
 
   return result
@@ -597,22 +646,38 @@ export function CurriculumPage() {
 
   const allCourses = useMemo(() => {
     const admissionYear = graduation?.admissionYear ?? student?.admissionYear
+    const takenTermByCode = buildTakenTermMap(graduation)
+
+    // 로드맵 이수 과목의 takenYear도 맵에 보강
+    for (const { course } of generalFlat) {
+      if (!course.completed || !course.courseCode || takenTermByCode.has(course.courseCode)) continue
+      const term = toTermKeyFromTaken(course.takenYear, course.takenSemester, admissionYear)
+      if (term) takenTermByCode.set(course.courseCode, term)
+    }
+    for (const course of abeekRawCourses) {
+      if (!course.completed || !course.abeekCourseCode || takenTermByCode.has(course.abeekCourseCode)) {
+        continue
+      }
+      const term = toTermKeyFromTaken(course.takenYear, course.takenSemester, admissionYear)
+      if (term) takenTermByCode.set(course.abeekCourseCode, term)
+    }
 
     if (viewKind === 'abeek') {
       return abeekRawCourses
-        .map((c) => abeekToMapCourse(c, admissionYear))
+        .map((c) => abeekToMapCourse(c, admissionYear, takenTermByCode))
         .filter((c): c is MapCourse => c != null)
     }
 
     const fromTimetable = generalFlat
-      .map(({ course, termKey }) => generalToMapCourse(course, termKey, admissionYear))
+      .map(({ course, termKey }) =>
+        generalToMapCourse(course, termKey, admissionYear, takenTermByCode),
+      )
       .filter((c): c is MapCourse => c != null)
 
-    // 전공 시간표에 이미 있는 학수번호는 교양/기초필수 쪽으로 중복 추가하지 않음
     const majorCodes = new Set(
       fromTimetable.filter((c) => c.category.startsWith('major')).map((c) => c.id),
     )
-    const liberalExtra = liberalCoursesFromProgress(graduation, majorCodes)
+    const liberalExtra = liberalCoursesFromProgress(graduation, majorCodes, takenTermByCode)
     const existing = new Set(fromTimetable.map((c) => c.id))
     const merged = [...fromTimetable]
     for (const course of liberalExtra) {
