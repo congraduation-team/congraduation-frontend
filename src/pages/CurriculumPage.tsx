@@ -196,16 +196,11 @@ function semesterOrder(term: string) {
 }
 
 /**
- * 일반 로드맵 표시 학기
- * - API termKey = 이수 순번(학년학기 칸)
- * - takenYear 캘린더 환산은 중복·오배치 제거용
- * - 휴학 등으로 캘린더(4-1) ≠ 이수순번(2-1)이면 API termKey 유지
+ * 일반 로드맵 표시 학기 — API termKey / standingTermKey만 사용.
+ * takenYear−admissionYear 캘린더 환산으로 다시 넣지 않음 (휴학 시 4-1 몰림 방지).
+ * 동일 과목이 여러 칸에 중복되면 가장 이른 이수순번을 씀.
  */
-function pickGeneralDisplayTerm(
-  termKeys: string[],
-  course: StudentRoadmapCourse,
-  admissionYear?: number,
-): string | null {
+function pickGeneralDisplayTerm(termKeys: string[]): string | null {
   const valid = [
     ...new Set(
       termKeys
@@ -213,29 +208,9 @@ function pickGeneralDisplayTerm(
         .filter((k) => (SEMESTERS as readonly string[]).includes(k)),
     ),
   ]
-
-  if (course.completed === true) {
-    const calc = toTermKeyFromTaken(course.takenYear, course.takenSemester, admissionYear)
-    if (calc && valid.includes(calc)) return calc
-
-    if (valid.length === 1) {
-      const api = valid[0]
-      if (!calc) return api
-      // 실제 수강이 API 칸보다 이르면(예: 1-2인데 2-1에도 중복) → 캘린더
-      if (semesterOrder(calc) < semesterOrder(api)) return calc
-      // 캘린더가 더 늦으면(휴학 후 복학) → API 이수순번 유지
-      return api
-    }
-
-    if (valid.length > 1) {
-      if (calc) return calc
-      return valid.slice().sort((a, b) => semesterOrder(a) - semesterOrder(b))[0]
-    }
-
-    return calc
-  }
-
-  return valid[0] ?? null
+  if (valid.length === 0) return null
+  if (valid.length === 1) return valid[0]
+  return valid.slice().sort((a, b) => semesterOrder(a) - semesterOrder(b))[0]
 }
 
 /** CompletedCourseDto 등 takenYear/takenSemester가 있는 목록에서 학수번호→학기 맵 생성 */
@@ -284,12 +259,13 @@ function resolveDisplayTerm(
   courseCode?: string,
 ): string | null {
   const recommended = recommendedTerm.trim()
+  // 권장/API 학기 칸을 우선 — 캘린더 환산으로 옮기지 않음
+  if (recommended && (SEMESTERS as readonly string[]).includes(recommended)) return recommended
   if (completed) {
     const fromFields = toTermKeyFromTaken(takenYear, takenSemester, admissionYear)
     const fromMap = courseCode ? takenTermByCode?.get(courseCode) : undefined
     if (fromFields || fromMap) return fromFields || fromMap || null
   }
-  if (recommended && (SEMESTERS as readonly string[]).includes(recommended)) return recommended
   return null
 }
 
@@ -325,11 +301,10 @@ function abeekToMapCourse(
 function generalToMapCourse(
   course: StudentRoadmapCourse,
   termKey: string,
-  admissionYear?: number,
 ): MapCourse | null {
   if (!course.courseCode) return null
 
-  const semester = pickGeneralDisplayTerm([termKey], course, admissionYear)
+  const semester = pickGeneralDisplayTerm([termKey])
   if (!semester) return null
 
   return {
@@ -429,7 +404,7 @@ function flattenStudentRoadmapCourses(
   const seen = new Set<string>()
 
   for (const term of roadmap.terms ?? []) {
-    const termKey = term.termKey || ''
+    const termKey = (term.standingTermKey || term.termKey || '').trim()
     const fromCourses = term.courses ?? []
     const fromCategories = Object.values(term.categories ?? {}).flat()
     // courses와 categories 모두 병합 (한쪽만 쓰면 GENERAL/BSM이 빠질 수 있음)
@@ -760,11 +735,7 @@ export function CurriculumPage() {
       const completedInst = instances.find((i) => i.course.completed === true)
       if (completedInst) {
         const termKeys = instances.map((i) => i.termKey)
-        const semester = pickGeneralDisplayTerm(
-          termKeys,
-          completedInst.course,
-          admissionYear,
-        )
+        const semester = pickGeneralDisplayTerm(termKeys)
         if (!semester) continue
         fromTimetable.push({
           id: completedInst.course.courseCode,
@@ -778,7 +749,7 @@ export function CurriculumPage() {
       }
 
       for (const { course, termKey } of instances) {
-        const mapped = generalToMapCourse(course, termKey, admissionYear)
+        const mapped = generalToMapCourse(course, termKey)
         if (mapped) fromTimetable.push(mapped)
       }
     }

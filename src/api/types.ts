@@ -233,7 +233,14 @@ export type PlannedSemester = {
 
 export type PlannedCoursesResponse = {
   studentId?: number
+  /** 기이수 순번 (예: 4-1). 초과학년 판단에 캘린더 연도 쓰지 말 것 */
   lastCompletedSemester?: string
+  /** 실제 수강 연도 (예: 2026) */
+  lastCompletedTakenYear?: number | string | null
+  /** 실제 수강 학기 (예: 1) */
+  lastCompletedTakenSemester?: number | string | null
+  /** true일 때만 초과학년 표시. 순번 4학년 이하면 false */
+  overStanding?: boolean
   totalPlannedCredits?: string | number
   semesters?: PlannedSemester[]
 }
@@ -499,6 +506,8 @@ export type StudentRoadmapCourse = {
 
 export type StudentRoadmapTerm = {
   termKey: string
+  /** 이수 순번 학기 키 (있으면 termKey보다 우선) */
+  standingTermKey?: string
   gradeYear?: number
   semester?: number
   termIndex?: number

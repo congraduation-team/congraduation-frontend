@@ -167,19 +167,49 @@ function formatGradeTerm(gradeYear: number, semester: number, admissionYear?: nu
   return `${gradeYear}년차 ${semester}학기`
 }
 
-function formatLastCompletedLabel(value?: string, admissionYear?: number) {
-  const parsed = parseTermKey(value)
-  if (!parsed) return value || null
-  const label = formatGradeTerm(parsed.gradeYear, parsed.semester, admissionYear)
-  if (parsed.gradeYear > 4) return `${label} · 초과학년`
+/** overStanding이 true일 때만 초과학년. 순번 문자열로 추론하지 않음 */
+function resolveOverStanding(planned?: PlannedCoursesResponse | null): boolean {
+  return planned?.overStanding === true
+}
+
+/**
+ * 마지막 이수 표시
+ * - lastCompletedTakenYear/Semester → 실제 수강 (예: 2026-1학기)
+ * - lastCompletedSemester → 기이수 순번 폴백 (예: 4-1)
+ * - 초과학년은 overStanding일 때만 붙임
+ */
+function formatLastCompletedLabel(
+  planned?: PlannedCoursesResponse | null,
+  admissionYear?: number,
+): string | null {
+  if (!planned) return null
+
+  const takenYear = toNumber(planned.lastCompletedTakenYear)
+  const takenSem = toNumber(planned.lastCompletedTakenSemester)
+  let label: string | null = null
+
+  if (takenYear > 0 && (takenSem === 1 || takenSem === 2)) {
+    label = `${takenYear}-${takenSem}학기`
+  } else {
+    const standing = planned.lastCompletedSemester
+    const parsed = parseTermKey(standing)
+    if (parsed) {
+      label = formatGradeTerm(parsed.gradeYear, parsed.semester, admissionYear)
+    } else if (standing) {
+      label = standing
+    }
+  }
+
+  if (!label) return null
+  if (resolveOverStanding(planned)) return `${label} · 초과학년`
   return label
 }
 
+/** 계획 학기 한도: 8학년 2학기까지 (그 이후면 다음 학기 생성 불가) */
 function isPastMaxPlannableTerm(lastCompleted?: string) {
   const parsed = parseTermKey(lastCompleted)
   if (!parsed) return false
-  // API 한도: 4-2. 마지막 이수가 4-2 이상이면 다음 학기 생성 불가
-  return parsed.gradeYear > 4 || (parsed.gradeYear === 4 && parsed.semester >= 2)
+  return parsed.gradeYear > 8 || (parsed.gradeYear === 8 && parsed.semester >= 2)
 }
 
 function normalizeGrade(value?: string | null): Grade {
@@ -188,14 +218,14 @@ function normalizeGrade(value?: string | null): Grade {
 }
 
 /**
- * 계획 학기가 없으면 4-2까지 가능한 만큼만 순차 생성.
- * API는 4학년 2학기 이후 추가를 거부하므로 count 일괄 요청은 피한다.
+ * 계획 학기가 없으면 가능한 만큼 순차 생성 (최대 8학년 2학기).
+ * count 일괄 요청은 API 한도에 걸릴 수 있어 1개씩 추가한다.
  */
 async function ensurePlannedSemesters(studentId: number): Promise<PlannedCoursesResponse> {
   let planned = await getPlannedCourses(studentId)
   if (planned.semesters?.length) return planned
 
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 16; i++) {
     try {
       planned = await addNextPlannedSemesters(studentId, 1)
     } catch {
@@ -414,7 +444,7 @@ export function SimulationPage() {
     if (plannedCourses.some((c) => c.retake)) {
       tips.push('재수강 계획이 있습니다. 기존 성적 대체 여부를 확인하세요.')
     }
-    const lastLabel = formatLastCompletedLabel(planned?.lastCompletedSemester, admit)
+    const lastLabel = formatLastCompletedLabel(planned, admit)
     if (lastLabel) {
       tips.push(`마지막 이수 학기: ${lastLabel} 이후부터 계획 중입니다.`)
     }
@@ -423,7 +453,7 @@ export function SimulationPage() {
   }, [
     semesters,
     plannedCourses,
-    planned?.lastCompletedSemester,
+    planned,
     student?.admissionYear,
     progress?.admissionYear,
   ])
@@ -521,10 +551,7 @@ export function SimulationPage() {
   const displayName = student?.name || '학생'
   const majorLabel = active?.label || student?.major || ''
   const admissionYear = student?.admissionYear ?? progress?.admissionYear
-  const lastCompletedLabel = formatLastCompletedLabel(
-    planned?.lastCompletedSemester,
-    admissionYear,
-  )
+  const lastCompletedLabel = formatLastCompletedLabel(planned, admissionYear)
   const pastPlannable = isPastMaxPlannableTerm(planned?.lastCompletedSemester)
 
   if (loading) {
@@ -603,19 +630,12 @@ export function SimulationPage() {
             {semesters.length === 0 ? (
               <div className="space-y-2 py-10 text-center text-sm leading-relaxed text-ink-muted">
                 {pastPlannable ? (
-                  <>
-                    <p>
-                      서버가 계획 학기를{' '}
-                      <span className="font-semibold text-ink">4학년 2학기까지</span>만 허용하는데,
-                      마지막 이수가 그 이후(
-                      {lastCompletedLabel || planned?.lastCompletedSemester})로 잡혀 다음 학기를 만들 수
-                      없습니다.
-                    </p>
-                    <p className="text-xs text-ink-faint">
-                      입학년도 기준으로 재학 연차가 5학년 이상으로 계산된 상태입니다. 초과학년
-                      학기 계획(예: 2026-2)은 백엔드에서 4-2 제한을 해제해야 추가됩니다.
-                    </p>
-                  </>
+                  <p>
+                    계획 가능한 학기 한도(
+                    <span className="font-semibold text-ink">8학년 2학기</span>
+                    )에 도달했습니다. 마지막 이수:{' '}
+                    {lastCompletedLabel || planned?.lastCompletedSemester || '-'}
+                  </p>
                 ) : (
                   <p>추가할 수 있는 남은 학기가 없습니다.</p>
                 )}
