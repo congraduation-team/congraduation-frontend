@@ -190,7 +190,54 @@ function toTermKeyFromTaken(
   return (SEMESTERS as readonly string[]).includes(key) ? key : null
 }
 
-/** 이수했다면 실제 수강 학기, 아니면 권장(대상) 학기 */
+function semesterOrder(term: string) {
+  const idx = (SEMESTERS as readonly string[]).indexOf(term)
+  return idx >= 0 ? idx : 999
+}
+
+/**
+ * 일반 로드맵 표시 학기
+ * - API termKey = 이수 순번(학년학기 칸)
+ * - takenYear 캘린더 환산은 중복·오배치 제거용
+ * - 휴학 등으로 캘린더(4-1) ≠ 이수순번(2-1)이면 API termKey 유지
+ */
+function pickGeneralDisplayTerm(
+  termKeys: string[],
+  course: StudentRoadmapCourse,
+  admissionYear?: number,
+): string | null {
+  const valid = [
+    ...new Set(
+      termKeys
+        .map((k) => k.trim())
+        .filter((k) => (SEMESTERS as readonly string[]).includes(k)),
+    ),
+  ]
+
+  if (course.completed === true) {
+    const calc = toTermKeyFromTaken(course.takenYear, course.takenSemester, admissionYear)
+    if (calc && valid.includes(calc)) return calc
+
+    if (valid.length === 1) {
+      const api = valid[0]
+      if (!calc) return api
+      // 실제 수강이 API 칸보다 이르면(예: 1-2인데 2-1에도 중복) → 캘린더
+      if (semesterOrder(calc) < semesterOrder(api)) return calc
+      // 캘린더가 더 늦으면(휴학 후 복학) → API 이수순번 유지
+      return api
+    }
+
+    if (valid.length > 1) {
+      if (calc) return calc
+      return valid.slice().sort((a, b) => semesterOrder(a) - semesterOrder(b))[0]
+    }
+
+    return calc
+  }
+
+  return valid[0] ?? null
+}
+
 /** CompletedCourseDto 등 takenYear/takenSemester가 있는 목록에서 학수번호→학기 맵 생성 */
 function buildTakenTermMap(
   progress: GraduationProgressResponse | null | undefined,
@@ -279,19 +326,10 @@ function generalToMapCourse(
   course: StudentRoadmapCourse,
   termKey: string,
   admissionYear?: number,
-  takenTermByCode?: Map<string, string>,
 ): MapCourse | null {
   if (!course.courseCode) return null
 
-  const semester = resolveDisplayTerm(
-    termKey,
-    course.takenYear,
-    course.takenSemester,
-    course.completed,
-    admissionYear,
-    takenTermByCode,
-    course.courseCode,
-  )
+  const semester = pickGeneralDisplayTerm([termKey], course, admissionYear)
   if (!semester) return null
 
   return {
@@ -692,12 +730,7 @@ export function CurriculumPage() {
     const admissionYear = graduation?.admissionYear ?? student?.admissionYear
     const takenTermByCode = buildTakenTermMap(graduation)
 
-    // 로드맵 이수 과목의 takenYear도 맵에 보강
-    for (const { course } of generalFlat) {
-      if (!course.completed || !course.courseCode || takenTermByCode.has(course.courseCode)) continue
-      const term = toTermKeyFromTaken(course.takenYear, course.takenSemester, admissionYear)
-      if (term) takenTermByCode.set(course.courseCode, term)
-    }
+    // ABEEK 뷰용: 이수 과목 takenYear 보강
     for (const course of abeekRawCourses) {
       if (!course.completed || !course.abeekCourseCode || takenTermByCode.has(course.abeekCourseCode)) {
         continue
@@ -712,11 +745,43 @@ export function CurriculumPage() {
         .filter((c): c is MapCourse => c != null)
     }
 
-    const fromTimetable = generalFlat
-      .map(({ course, termKey }) =>
-        generalToMapCourse(course, termKey, admissionYear, takenTermByCode),
-      )
-      .filter((c): c is MapCourse => c != null)
+    // 학수번호별 API 칸 모아서 이수순번/중복 정리
+    const grouped = new Map<string, Array<{ course: StudentRoadmapCourse; termKey: string }>>()
+    for (const item of generalFlat) {
+      const code = item.course.courseCode
+      if (!code) continue
+      const list = grouped.get(code) ?? []
+      list.push(item)
+      grouped.set(code, list)
+    }
+
+    const fromTimetable: MapCourse[] = []
+    for (const [, instances] of grouped) {
+      const completedInst = instances.find((i) => i.course.completed === true)
+      if (completedInst) {
+        const termKeys = instances.map((i) => i.termKey)
+        const semester = pickGeneralDisplayTerm(
+          termKeys,
+          completedInst.course,
+          admissionYear,
+        )
+        if (!semester) continue
+        fromTimetable.push({
+          id: completedInst.course.courseCode,
+          name: completedInst.course.courseName,
+          hours: `${completedInst.course.credits ?? 0}학점`,
+          category: mapGeneralCategory(completedInst.course),
+          semester,
+          completed: true,
+        })
+        continue
+      }
+
+      for (const { course, termKey } of instances) {
+        const mapped = generalToMapCourse(course, termKey, admissionYear)
+        if (mapped) fromTimetable.push(mapped)
+      }
+    }
 
     const byId = new Map(fromTimetable.map((c) => [c.id, c]))
     const majorCodes = new Set(
@@ -730,7 +795,7 @@ export function CurriculumPage() {
         if (existing.category.startsWith('major') && !course.category.startsWith('major')) {
           existing.category = course.category
           existing.completed = existing.completed || course.completed
-          if (course.semester) existing.semester = course.semester
+          // 이수 학기는 시간표 termKey 우선 (휴학 순번 유지)
         }
         continue
       }
