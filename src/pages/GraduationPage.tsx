@@ -163,6 +163,48 @@ export function GraduationPage() {
     }
   }, [progress])
 
+  /** 2022학번(입학 2022)부터 균형교양(균필) 요건 적용 */
+  const showBalancedLiberal = (progress?.admissionYear ?? student?.admissionYear ?? 0) >= 2022
+
+  const balancedLiberal = useMemo(() => {
+    const fromCredits = progress?.balancedLiberalCredits
+    const fromSummary = progress?.categorySummaries?.find(
+      (c) =>
+        c.category.includes('균형교양') ||
+        c.category.includes('균필') ||
+        c.category === '균필',
+    )
+    const areas = progress?.balancedLiberalAreaProgresses ?? []
+    const completedFromAreas = areas.flatMap((a) => a.courses ?? [])
+    const unsatisfiedAreas = areas
+      .filter((a) => a.satisfied !== true)
+      .map((a) => ({
+        name: a.area,
+        credits: toNumber(a.earnedCredits),
+        code: a.area,
+      }))
+    const fallbackRemaining = toUiCourses(
+      fromCredits?.remainingCourses ??
+        fromCredits?.missingCourses ??
+        fromSummary?.remainingCourses ??
+        fromSummary?.missingCourses ??
+        [],
+    )
+
+    return {
+      earned: toNumber(fromCredits?.earnedCredits ?? fromSummary?.earnedCredits),
+      required: toNumber(fromCredits?.requiredCredits ?? fromSummary?.requiredCredits),
+      percent: toPercent(fromCredits?.progressPercent ?? fromSummary?.progressPercent),
+      courses: toUiCourses(
+        fromCredits?.completedCourses ?? fromSummary?.courses ?? completedFromAreas,
+      ),
+      remaining: unsatisfiedAreas.length > 0 ? unsatisfiedAreas : fallbackRemaining,
+      requiredAreas: progress?.balancedLiberalRequiredAreaCount ?? 0,
+      completedAreas: progress?.balancedLiberalCompletedAreaCount ?? 0,
+      areas,
+    }
+  }, [progress])
+
   const displayName = student?.name || '학생'
   const totalEarned = toNumber(progress?.totalCredits?.earnedCredits)
   const totalRequired = toNumber(progress?.totalCredits?.requiredCredits)
@@ -441,6 +483,39 @@ export function GraduationPage() {
               })
             }
           />
+          {showBalancedLiberal && (
+            <DetailCreditCard
+              title={`${displayName}님 균필(균형교양) 현황`}
+              remainingTitle="미충족 영역"
+              percent={balancedLiberal.percent}
+              earned={balancedLiberal.earned}
+              required={balancedLiberal.required}
+              completed={balancedLiberal.courses}
+              remaining={balancedLiberal.remaining}
+              areaHint={
+                balancedLiberal.requiredAreas > 0
+                  ? `영역 ${balancedLiberal.completedAreas}/${balancedLiberal.requiredAreas} 충족`
+                  : undefined
+              }
+              onOpenCompleted={() =>
+                setListModal({
+                  title: '균필(균형교양) 이수 과목',
+                  subtitle: `${balancedLiberal.earned}학점 이수`,
+                  courses: balancedLiberal.courses,
+                })
+              }
+              onOpenRemaining={() =>
+                setListModal({
+                  title: '균필 미충족 영역',
+                  subtitle:
+                    balancedLiberal.requiredAreas > 0
+                      ? `${balancedLiberal.completedAreas}/${balancedLiberal.requiredAreas}개 영역`
+                      : `${balancedLiberal.remaining.length}개`,
+                  courses: balancedLiberal.remaining,
+                })
+              }
+            />
+          )}
           <DetailCreditCard
             title={`${displayName}님 교양 선택 현황`}
             remainingTitle="남은 선택 과목"
@@ -546,6 +621,7 @@ function DetailCreditCard({
   required = 0,
   completed,
   remaining = [],
+  areaHint,
   onOpenCompleted,
   onOpenRemaining,
   earnedOnly = false,
@@ -558,6 +634,7 @@ function DetailCreditCard({
   required?: number
   completed: ReturnType<typeof toUiCourses>
   remaining?: ReturnType<typeof toUiCourses>
+  areaHint?: string
   onOpenCompleted: () => void
   onOpenRemaining: () => void
   earnedOnly?: boolean
@@ -566,6 +643,7 @@ function DetailCreditCard({
   return (
     <article className="flex h-full flex-col rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
       <h3 className="mb-1.5 text-base font-bold leading-snug text-ink">{title}</h3>
+      {areaHint && <p className="mb-2 text-xs font-semibold text-ink-muted">{areaHint}</p>}
       {!earnedOnly && (
         <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-3" />
       )}
@@ -622,7 +700,7 @@ function DetailCreditCard({
                 courses={remaining}
                 previewCount={4}
                 showMoreLink
-                emptyText="남은 과목이 없습니다."
+                emptyText="남은 항목이 없습니다."
                 onMoreClick={onOpenRemaining}
               />
             )}

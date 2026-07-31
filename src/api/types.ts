@@ -313,6 +313,8 @@ export type AbeekEvaluationResponse = {
   bsm?: AbeekCategoryProgress
   major?: AbeekCategoryProgress
   design?: AbeekCategoryProgress
+  /** 2022학번 이후 인증선택 (적용 시에만) */
+  certElective?: AbeekCategoryProgress
   designSequenceSatisfied?: boolean
   designDetail?: AbeekDesignEvaluationResult
   entranceRequiredCourses?: AbeekRequiredCourseStatus[]

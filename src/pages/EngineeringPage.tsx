@@ -5,10 +5,12 @@ import {
   getAbeekEvaluation,
   getAbeekFullRoadmap,
   getAbeekFullRoadmapByStudent,
+  getGraduationProgress,
 } from '../api/endpoints'
 import type {
   AbeekEvaluationResponse,
   FullRoadmapResponse,
+  GraduationProgressResponse,
   RoadmapCourse,
 } from '../api/types'
 import { flattenRoadmapCourses } from '../api/types'
@@ -75,6 +77,7 @@ export function EngineeringPage() {
   const { student } = useAuth()
   const { active } = useMajorTrack()
   const [evaluation, setEvaluation] = useState<AbeekEvaluationResponse | null>(null)
+  const [graduation, setGraduation] = useState<GraduationProgressResponse | null>(null)
   const [roadmap, setRoadmap] = useState<FullRoadmapResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -99,9 +102,13 @@ export function EngineeringPage() {
           student.tracks?.[0]?.departmentCode ||
           'CSE'
 
-        const data = await getAbeekEvaluation(abeekId)
+        const [data, grad] = await Promise.all([
+          getAbeekEvaluation(abeekId),
+          getGraduationProgress(student.id).catch(() => null),
+        ])
         if (cancelled) return
         setEvaluation(data)
+        setGraduation(grad)
 
         const year =
           data.graduationAbeekYear ||
@@ -226,6 +233,46 @@ export function EngineeringPage() {
     evaluation?.certElectiveApplicable ??
     ((evaluation?.entranceYear ?? student?.admissionYear ?? 9999) >= 2022)
 
+  /** 2022학번부터 균형교양(균필) — graduation-progress API */
+  const showBalancedLiberal =
+    (graduation?.admissionYear ??
+      evaluation?.entranceYear ??
+      student?.admissionYear ??
+      0) >= 2022
+
+  const balancedLiberal = useMemo(() => {
+    const fromCredits = graduation?.balancedLiberalCredits
+    const areas = graduation?.balancedLiberalAreaProgresses ?? []
+    const completed = (
+      fromCredits?.completedCourses ?? areas.flatMap((a) => a.courses ?? [])
+    ).map((c) => {
+      const row = c as { courseCode: string; courseName: string; credit?: string; credits?: number }
+      return toCourse({
+        courseCode: row.courseCode,
+        courseName: row.courseName,
+        credits: row.credits ?? row.credit,
+      })
+    })
+    const unsatisfiedAreas = areas
+      .filter((a) => a.satisfied !== true)
+      .map((a) =>
+        toCourse({
+          courseCode: a.area,
+          courseName: a.area,
+          credits: a.earnedCredits,
+        }),
+      )
+    return {
+      earned: toNumber(fromCredits?.earnedCredits),
+      required: toNumber(fromCredits?.requiredCredits),
+      percent: toPercent(fromCredits?.progressPercent),
+      completed,
+      remaining: unsatisfiedAreas,
+      requiredAreas: graduation?.balancedLiberalRequiredAreaCount ?? 0,
+      completedAreas: graduation?.balancedLiberalCompletedAreaCount ?? 0,
+    }
+  }, [graduation])
+
   const incompleteRequiredCourses = useMemo(
     () => (evaluation?.entranceRequiredCourses ?? []).filter((c) => c.completed === false),
     [evaluation?.entranceRequiredCourses],
@@ -300,7 +347,11 @@ export function EngineeringPage() {
         <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           <h3 className="mb-3 text-base font-bold text-ink">인증 요약</h3>
 
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div
+            className={`grid grid-cols-2 gap-3 ${
+              showBalancedLiberal ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
+            }`}
+          >
             <SummaryMiniGauge
               label="전문교양"
               percent={generalPct}
@@ -325,6 +376,14 @@ export function EngineeringPage() {
               earned={toNumber(designEarned)}
               required={designRequired}
             />
+            {showBalancedLiberal && (
+              <SummaryMiniGauge
+                label="균필"
+                percent={balancedLiberal.percent}
+                earned={balancedLiberal.earned}
+                required={balancedLiberal.required}
+              />
+            )}
           </div>
 
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -517,6 +576,54 @@ export function EngineeringPage() {
             />
           </article>
         </div>
+
+        {showBalancedLiberal && (
+          <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-bold text-ink">
+                  균필(균형교양){' '}
+                  <span className="text-sejong">
+                    {balancedLiberal.earned}/{balancedLiberal.required || '-'}
+                  </span>
+                  학점
+                </h3>
+                {balancedLiberal.requiredAreas > 0 && (
+                  <p className="mt-0.5 text-xs text-ink-muted">
+                    영역 {balancedLiberal.completedAreas}/{balancedLiberal.requiredAreas} 충족
+                  </p>
+                )}
+              </div>
+              {balancedLiberal.remaining.length > 0 && (
+                <RemainingButton
+                  onClick={() =>
+                    setListModal({
+                      title: '균필 미충족 영역',
+                      subtitle:
+                        balancedLiberal.requiredAreas > 0
+                          ? `${balancedLiberal.completedAreas}/${balancedLiberal.requiredAreas}개 영역`
+                          : `${balancedLiberal.remaining.length}개`,
+                      courses: balancedLiberal.remaining,
+                    })
+                  }
+                />
+              )}
+            </div>
+            <AbeekCategoryBlock
+              percent={balancedLiberal.percent}
+              courses={balancedLiberal.completed}
+              totalValue={balancedLiberal.earned}
+              legend="총 학점"
+              onMore={() =>
+                setListModal({
+                  title: '균필(균형교양) 이수 과목',
+                  subtitle: `${balancedLiberal.earned}학점 · ${balancedLiberal.completed.length}과목`,
+                  courses: balancedLiberal.completed,
+                })
+              }
+            />
+          </article>
+        )}
 
         <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
