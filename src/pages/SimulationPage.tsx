@@ -173,10 +173,43 @@ function resolveOverStanding(planned?: PlannedCoursesResponse | null): boolean {
 }
 
 /**
+ * 계획/필터에 쓸 이수 순번.
+ * - 정상: lastCompletedSemester (예: 4-1)
+ * - 서버가 캘린더 환산(6-1)을 넣은 경우: overStanding이 아니면 4학년으로 클램프
+ * - 4-2로 과대 표기됐 실제 수강이 1학기면 4-1로 보정 (4-2 계획 가능)
+ */
+function resolveEffectiveLastStanding(
+  planned?: PlannedCoursesResponse | null,
+): string | null {
+  const raw = planned?.lastCompletedSemester?.trim() || null
+  const parsed = parseTermKey(raw)
+  if (!parsed) return raw
+
+  const over = resolveOverStanding(planned)
+  const takenSem = toNumber(planned?.lastCompletedTakenSemester)
+
+  if (!over && parsed.gradeYear > 4) {
+    const sem = parsed.semester >= 2 ? 2 : 1
+    // 초과학년이 아닌데 5학년 이상으로 오면 이수 순번 오표기 → 4학년으로 클램프
+    return `4-${sem}`
+  }
+
+  if (
+    !over &&
+    parsed.gradeYear === 4 &&
+    parsed.semester === 2 &&
+    takenSem === 1
+  ) {
+    return '4-1'
+  }
+
+  return `${parsed.gradeYear}-${parsed.semester}`
+}
+
+/**
  * 마지막 이수 표시
- * - lastCompletedTakenYear/Semester → 실제 수강 (예: 2026-1학기)
- * - lastCompletedSemester → 기이수 순번 폴백 (예: 4-1)
- * - 초과학년은 overStanding일 때만 붙임
+ * - 순번(lastCompletedSemester) 우선: 4-1학기
+ * - 실제 수강 연도가 있으면 병기: 4-1학기 (2026-1)
  */
 function formatLastCompletedLabel(
   planned?: PlannedCoursesResponse | null,
@@ -184,20 +217,21 @@ function formatLastCompletedLabel(
 ): string | null {
   if (!planned) return null
 
+  const standingKey = resolveEffectiveLastStanding(planned)
+  const standingParsed = parseTermKey(standingKey)
   const takenYear = toNumber(planned.lastCompletedTakenYear)
   const takenSem = toNumber(planned.lastCompletedTakenSemester)
+
   let label: string | null = null
+  if (standingParsed) {
+    label = formatGradeTerm(standingParsed.gradeYear, standingParsed.semester, admissionYear)
+  } else if (standingKey) {
+    label = standingKey
+  }
 
   if (takenYear > 0 && (takenSem === 1 || takenSem === 2)) {
-    label = `${takenYear}-${takenSem}학기`
-  } else {
-    const standing = planned.lastCompletedSemester
-    const parsed = parseTermKey(standing)
-    if (parsed) {
-      label = formatGradeTerm(parsed.gradeYear, parsed.semester, admissionYear)
-    } else if (standing) {
-      label = standing
-    }
+    const takenLabel = `${takenYear}-${takenSem}`
+    label = label ? `${label} (${takenLabel})` : `${takenLabel}학기`
   }
 
   if (!label) return null
@@ -206,7 +240,7 @@ function formatLastCompletedLabel(
 }
 
 /** 계획 학기 한도: 8학년 2학기까지 (그 이후면 다음 학기 생성 불가) */
-function isPastMaxPlannableTerm(lastCompleted?: string) {
+function isPastMaxPlannableTerm(lastCompleted?: string | null) {
   const parsed = parseTermKey(lastCompleted)
   if (!parsed) return false
   return parsed.gradeYear > 8 || (parsed.gradeYear === 8 && parsed.semester >= 2)
@@ -231,15 +265,14 @@ function normalizeGrade(value?: string | null): Grade {
 }
 
 /**
- * 마지막 이수 다음 학기가 계획에 있도록 보장.
- * 예: lastCompleted=4-1 → 4-2가 생길 때까지 next 호출.
- * (이미 학기가 있어도 미래 학기가 없으면 계속 추가)
+ * 마지막 이수(순번) 다음 학기가 계획에 있도록 보장.
+ * 예: effective last=4-1 → 4-2가 보일 때까지 next 호출.
  */
 async function ensurePlannedSemesters(studentId: number): Promise<PlannedCoursesResponse> {
   let planned = await getPlannedCourses(studentId)
 
   for (let i = 0; i < 16; i++) {
-    const lastKey = planned.lastCompletedSemester
+    const lastKey = resolveEffectiveLastStanding(planned)
     if (isPastMaxPlannableTerm(lastKey)) return planned
 
     const semesters = planned.semesters ?? []
@@ -252,6 +285,7 @@ async function ensurePlannedSemesters(studentId: number): Promise<PlannedCourses
     try {
       planned = await addNextPlannedSemesters(studentId, 1)
     } catch {
+      // 서버가 캘린더 순번으로 next를 막아도, 이미 4학년 계획 학기가 있으면 그걸 씀
       break
     }
 
@@ -390,8 +424,8 @@ export function SimulationPage() {
 
   const semesters = useMemo(() => {
     const all = planned?.semesters ?? []
-    const lastKey = planned?.lastCompletedSemester
-    // 마지막 이수 이후 학기만 계획 대상으로 표시 (4-1 이수 후 4-2만 등)
+    const lastKey = resolveEffectiveLastStanding(planned)
+    // 마지막 이수 순번 이후 학기만 표시 (캘린더 6-1 오표기로 4-2가 숨겨지지 않게)
     return all.filter((s) => isSemesterAfterLast(s.gradeYear, s.semester, lastKey))
   }, [planned])
   const plannedCourses = useMemo(
@@ -585,7 +619,8 @@ export function SimulationPage() {
   const majorLabel = active?.label || student?.major || ''
   const admissionYear = student?.admissionYear ?? progress?.admissionYear
   const lastCompletedLabel = formatLastCompletedLabel(planned, admissionYear)
-  const pastPlannable = isPastMaxPlannableTerm(planned?.lastCompletedSemester)
+  const effectiveLastStanding = resolveEffectiveLastStanding(planned)
+  const pastPlannable = isPastMaxPlannableTerm(effectiveLastStanding)
 
   if (loading) {
     return (
@@ -672,9 +707,12 @@ export function SimulationPage() {
                 ) : (
                   <>
                     <p>
-                      마지막 이수(
-                      {lastCompletedLabel || planned?.lastCompletedSemester || '-'})
+                      마지막 이수 순번(
+                      {effectiveLastStanding || lastCompletedLabel || '-'})
                       다음 학기 계획이 없습니다.
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      4-1까지 이수했다면 4-2 학기를 추가할 수 있어야 합니다.
                     </p>
                     <button
                       type="button"
@@ -687,7 +725,7 @@ export function SimulationPage() {
                       }}
                       className="rounded-full bg-sejong px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
                     >
-                      다음 학기 추가
+                      다음 학기(4-2 등) 추가
                     </button>
                   </>
                 )}
