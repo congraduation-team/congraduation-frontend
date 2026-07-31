@@ -38,7 +38,7 @@ export function CourseMiniList({
   return (
     <div className={`min-w-0 ${className}`}>
       {title && (
-        <div className="mb-2.5 flex items-start justify-between gap-2">
+        <div className="mb-2.5 flex items-start justify-between gap-3 pr-0.5">
           <button
             type="button"
             onClick={openAll}
@@ -52,24 +52,26 @@ export function CourseMiniList({
             <button
               type="button"
               onClick={openAll}
-              className="mt-0.5 shrink-0 text-xs font-medium text-ink-muted hover:text-sejong"
+              className="mt-0.5 shrink-0 whitespace-nowrap text-xs font-medium text-ink-muted hover:text-sejong"
             >
               더보기
             </button>
           )}
         </div>
       )}
-      <ul className="space-y-2.5">
+      <ul className="space-y-2.5 pr-0.5">
         {visible.map((course) => (
           <li
             key={`${course.code}-${course.name}`}
-            className="flex items-center justify-between gap-2 text-sm"
+            className="flex items-start justify-between gap-3 text-sm"
           >
-            <span className="min-w-0 truncate text-ink">{course.name}</span>
+            <span className="min-w-0 flex-1 break-keep leading-snug text-ink">{course.name}</span>
             {showSemester && course.semester ? (
               <span className="shrink-0 font-semibold text-sejong">{course.semester}학기</span>
             ) : (
-              <span className="w-6 shrink-0 text-right font-medium text-ink">{course.credits}</span>
+              <span className="w-7 shrink-0 pt-px text-right font-medium text-ink">
+                {course.credits}
+              </span>
             )}
           </li>
         ))}
@@ -87,9 +89,9 @@ export function CourseMiniList({
         </button>
       )}
       {totalValue !== undefined && (
-        <p className="mt-3 flex items-center justify-between border-t border-[#eee] pt-2.5 text-sm font-bold">
+        <p className="mt-3 flex items-center justify-between gap-3 border-t border-[#eee] pt-2.5 pr-0.5 text-sm font-bold">
           <span className="text-ink">{totalLabel}</span>
-          <span className="text-sejong">{totalValue}</span>
+          <span className="shrink-0 text-sejong">{totalValue}</span>
         </p>
       )}
     </div>

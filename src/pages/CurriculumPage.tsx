@@ -27,37 +27,9 @@ const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'] as co
 const ROADMAP_GRID =
   'grid grid-cols-[5.5rem_repeat(8,minmax(132px,1fr))] gap-2 items-start'
 
-/** 패닝: 왼쪽·위 공백으로 빠져나가지 않게 클램프 */
-function clampPan(
-  pan: { x: number; y: number },
-  zoom: number,
-  contentW: number,
-  contentH: number,
-  viewW: number,
-  viewH: number,
-) {
-  const scaledW = contentW * zoom
-  const scaledH = contentH * zoom
-
-  let minX = 0
-  let maxX = 0
-  let minY = 0
-  let maxY = 0
-
-  if (scaledW > viewW) {
-    minX = viewW - scaledW
-    maxX = 0
-  }
-  if (scaledH > viewH) {
-    minY = viewH - scaledH
-    maxY = 0
-  }
-
-  return {
-    x: Math.min(maxX, Math.max(minX, pan.x)),
-    y: Math.min(maxY, Math.max(minY, pan.y)),
-  }
-}
+/** 뷰포트 끝에서 항상 보이는 여백 (브라우저 줌과 무관) */
+const VIEW_MARGIN = 56
+const BOARD_MIN_WIDTH = 1480
 
 type MapCategory = 'liberal' | 'bsm' | 'major-required' | 'major-elective'
 type ViewKind = 'general' | 'abeek'
@@ -486,15 +458,14 @@ export function CurriculumPage() {
   const [filter, setFilter] = useState<string | null>(null)
   const [paths, setPaths] = useState<Array<{ d: string; type: MapEdge['type']; key: string }>>([])
   const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
   const [panning, setPanning] = useState(false)
+  const [boardSize, setBoardSize] = useState({ w: BOARD_MIN_WIDTH, h: 600 })
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const panRef = useRef(pan)
   const zoomRef = useRef(zoom)
-  panRef.current = pan
+  const dragRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
   zoomRef.current = zoom
 
   const abeekTarget = generalRoadmap?.abeekTarget === true
@@ -505,7 +476,12 @@ export function CurriculumPage() {
 
   const resetView = () => {
     setZoom(1)
-    setPan({ x: 0, y: 0 })
+    zoomRef.current = 1
+    const viewport = viewportRef.current
+    if (viewport) {
+      viewport.scrollLeft = 0
+      viewport.scrollTop = 0
+    }
   }
 
   useEffect(() => {
@@ -540,39 +516,33 @@ export function CurriculumPage() {
     }
   }, [student?.id])
 
-  const clampCurrentPan = (next: { x: number; y: number }, zoomValue = zoomRef.current) => {
-    const viewport = viewportRef.current
-    const board = boardRef.current
-    if (!viewport || !board) return next
-    return clampPan(
-      next,
-      zoomValue,
-      board.offsetWidth,
-      board.offsetHeight,
-      viewport.clientWidth,
-      viewport.clientHeight,
-    )
-  }
-
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
     const target = e.target as HTMLElement
     if (target.closest('button, a, select, input')) return
 
+    const viewport = viewportRef.current
+    if (!viewport) return
+
     e.preventDefault()
     window.getSelection()?.removeAllRanges()
     e.currentTarget.setPointerCapture(e.pointerId)
+    dragRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: viewport.scrollLeft,
+      scrollTop: viewport.scrollTop,
+    }
     setPanning(true)
   }
 
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
     if (!panning) return
+    const viewport = viewportRef.current
+    if (!viewport) return
     e.preventDefault()
-    setPan((prev) => {
-      const next = clampCurrentPan({ x: prev.x + e.movementX, y: prev.y + e.movementY })
-      panRef.current = next
-      return next
-    })
+    viewport.scrollLeft = dragRef.current.scrollLeft - (e.clientX - dragRef.current.x)
+    viewport.scrollTop = dragRef.current.scrollTop - (e.clientY - dragRef.current.y)
   }
 
   const endPan = (e: PointerEvent<HTMLDivElement>) => {
@@ -847,6 +817,22 @@ export function CurriculumPage() {
     }
   }, [visibleEdges, courses, mode, filter, viewKind, departmentName])
 
+  useLayoutEffect(() => {
+    const board = boardRef.current
+    if (!board || loading || error || allCourses.length === 0) return
+
+    const update = () => {
+      setBoardSize({
+        w: Math.max(board.scrollWidth, board.offsetWidth, BOARD_MIN_WIDTH),
+        h: Math.max(board.scrollHeight, board.offsetHeight, 420),
+      })
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(board)
+    return () => observer.disconnect()
+  }, [loading, error, allCourses.length, courses, mode, filter, viewKind, departmentName])
+
   useEffect(() => {
     const viewport = viewportRef.current
     if (!viewport || loading || error || allCourses.length === 0) return
@@ -861,37 +847,21 @@ export function CurriculumPage() {
       const nextZoom = Math.min(2.5, Math.max(0.45, prevZoom * factor))
       if (nextZoom === prevZoom) return
 
-      const worldX = (mx - panRef.current.x) / prevZoom
-      const worldY = (my - panRef.current.y) / prevZoom
-      const nextPan = clampPan(
-        {
-          x: mx - worldX * nextZoom,
-          y: my - worldY * nextZoom,
-        },
-        nextZoom,
-        boardRef.current?.offsetWidth || 0,
-        boardRef.current?.offsetHeight || 0,
-        viewport.clientWidth,
-        viewport.clientHeight,
-      )
+      const contentX = (viewport.scrollLeft + mx - VIEW_MARGIN) / prevZoom
+      const contentY = (viewport.scrollTop + my - VIEW_MARGIN) / prevZoom
+
       zoomRef.current = nextZoom
-      panRef.current = nextPan
       setZoom(nextZoom)
-      setPan(nextPan)
+
+      requestAnimationFrame(() => {
+        viewport.scrollLeft = contentX * nextZoom + VIEW_MARGIN - mx
+        viewport.scrollTop = contentY * nextZoom + VIEW_MARGIN - my
+      })
     }
 
     viewport.addEventListener('wheel', onWheel, { passive: false })
     return () => viewport.removeEventListener('wheel', onWheel)
   }, [loading, error, allCourses.length])
-
-  useEffect(() => {
-    if (loading || error || allCourses.length === 0) return
-    setPan((prev) => {
-      const next = clampCurrentPan(prev)
-      panRef.current = next
-      return next
-    })
-  }, [loading, error, allCourses.length, viewKind, zoom])
 
   const titleLabel =
     viewKind === 'abeek'
@@ -1030,7 +1000,7 @@ export function CurriculumPage() {
                 <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
               </svg>
             </div>
-            <p className="pb-0.5 text-xs text-ink-muted">휠: 확대/축소 · 드래그: 이동</p>
+            <p className="pb-0.5 text-xs text-ink-muted">휠: 확대/축소 · 드래그·스크롤: 이동</p>
           </div>
         </div>
         )}
@@ -1055,11 +1025,6 @@ export function CurriculumPage() {
                       const next = Math.max(0.45, zoomRef.current / 1.12)
                       zoomRef.current = next
                       setZoom(next)
-                      setPan((prev) => {
-                        const clamped = clampCurrentPan(prev, next)
-                        panRef.current = clamped
-                        return clamped
-                      })
                     }}
                     className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
                   >
@@ -1074,11 +1039,6 @@ export function CurriculumPage() {
                       const next = Math.min(2.5, zoomRef.current * 1.12)
                       zoomRef.current = next
                       setZoom(next)
-                      setPan((prev) => {
-                        const clamped = clampCurrentPan(prev, next)
-                        panRef.current = clamped
-                        return clamped
-                      })
                     }}
                     className="rounded-lg border border-[#e5e7eb] px-2.5 py-1 text-sm font-semibold text-ink hover:bg-surface"
                   >
@@ -1101,17 +1061,30 @@ export function CurriculumPage() {
                 onPointerUp={endPan}
                 onPointerCancel={endPan}
                 onDragStart={(e) => e.preventDefault()}
-                className={`relative h-[min(70vh,720px)] touch-none select-none overflow-hidden p-5 ${
+                className={`relative h-[min(72vh,760px)] touch-none select-none overflow-auto ${
                   panning ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
               >
                 <div
-                  ref={boardRef}
-                  className="relative min-w-[1480px] origin-top-left will-change-transform"
                   style={{
-                    transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                    boxSizing: 'border-box',
+                    width: boardSize.w * zoom + VIEW_MARGIN * 2,
+                    height: boardSize.h * zoom + VIEW_MARGIN * 2,
+                    padding: VIEW_MARGIN,
                   }}
                 >
+                  <div
+                    ref={boardRef}
+                    className="relative origin-top-left will-change-transform"
+                    style={{
+                      width: boardSize.w,
+                      minWidth: BOARD_MIN_WIDTH,
+                      transform: `scale(${zoom})`,
+                      transformOrigin: '0 0',
+                      paddingRight: 24,
+                      paddingBottom: 32,
+                    }}
+                  >
                   <svg className="pointer-events-none absolute inset-0 z-0 h-full w-full overflow-visible">
                     <defs>
                       <marker
@@ -1248,6 +1221,7 @@ export function CurriculumPage() {
                       })}
                     </div>
                   ))}
+                  </div>
                 </div>
               </div>
             </>
