@@ -129,17 +129,38 @@ function isFoundationRequiredLabel(label: string) {
   )
 }
 
+/** 일반 로드맵: 공학인증 bucket + 시간표 이수구분 */
 function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
+  // 공학인증 대상 학과: API가 채운 GENERAL/BSM/MAJOR 우선
+  if (course.abeekBucket === 'GENERAL') return 'liberal'
+  if (course.abeekBucket === 'BSM') return 'bsm'
+
   const label = course.category || ''
+
+  if (isFoundationRequiredLabel(label)) return 'bsm'
+
+  // 「전공기초」라도 abeekBucket이 MAJOR면 전공 (C프로그래밍 등)
+  // BSM bucket은 위에서 이미 기초필수로 처리됨
 
   if (label.includes('전공')) {
     if (label.includes('선택')) return 'major-elective'
     return 'major-required'
   }
 
-  if (isFoundationRequiredLabel(label)) return 'bsm'
+  if (
+    label.includes('교양') ||
+    label.includes('균형') ||
+    label.includes('일반선택') ||
+    label.includes('통과')
+  ) {
+    return 'liberal'
+  }
 
-  // 전공·기초필수가 아닌 과목 → 교양
+  // MAJOR bucket 이거나 이수구분 불명 → 전공선택으로
+  if (course.abeekBucket === 'MAJOR') {
+    return label.includes('필수') ? 'major-required' : 'major-elective'
+  }
+
   return 'liberal'
 }
 
@@ -364,9 +385,11 @@ function flattenStudentRoadmapCourses(
     const termKey = term.termKey || ''
     const fromCourses = term.courses ?? []
     const fromCategories = Object.values(term.categories ?? {}).flat()
-    const merged = fromCourses.length > 0 ? fromCourses : fromCategories
+    // courses와 categories 모두 병합 (한쪽만 쓰면 GENERAL/BSM이 빠질 수 있음)
+    const merged = [...fromCourses, ...fromCategories]
 
     for (const course of merged) {
+      if (!course?.courseCode) continue
       const key = `${termKey}:${course.courseCode}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -674,18 +697,25 @@ export function CurriculumPage() {
       )
       .filter((c): c is MapCourse => c != null)
 
+    const byId = new Map(fromTimetable.map((c) => [c.id, c]))
     const majorCodes = new Set(
-      fromTimetable.filter((c) => c.category.startsWith('major')).map((c) => c.id),
+      [...byId.values()].filter((c) => c.category.startsWith('major')).map((c) => c.id),
     )
     const liberalExtra = liberalCoursesFromProgress(graduation, majorCodes, takenTermByCode)
-    const existing = new Set(fromTimetable.map((c) => c.id))
-    const merged = [...fromTimetable]
     for (const course of liberalExtra) {
-      if (existing.has(course.id)) continue
-      existing.add(course.id)
-      merged.push(course)
+      const existing = byId.get(course.id)
+      if (existing) {
+        // 시간표에서 전공으로 잘못 들어간 기이수 교양/기초 → 올바른 행으로 재분류
+        if (existing.category.startsWith('major') && !course.category.startsWith('major')) {
+          existing.category = course.category
+          existing.completed = existing.completed || course.completed
+          if (course.semester) existing.semester = course.semester
+        }
+        continue
+      }
+      byId.set(course.id, course)
     }
-    return merged
+    return [...byId.values()]
   }, [viewKind, abeekRawCourses, generalFlat, graduation, student?.admissionYear])
 
   const activeRowDefs = viewKind === 'abeek' ? abeekRowDefs : generalRowDefs
@@ -870,7 +900,7 @@ export function CurriculumPage() {
         <p className="mt-3 text-sm text-ink-muted">
           {viewKind === 'abeek'
             ? '공학인증(ABEEK) 이수체계도입니다. 전문교양·BSM·전공을 표시합니다.'
-            : '강의 시간표 기준 학과 로드맵입니다. 기초필수·교양은 기이수 기준으로 표시하며, 이수한 과목은 실제 수강 학기에 배치됩니다.'}
+            : '강의 시간표 기준 학과 로드맵입니다. 기초필수(BSM)는 시간표에서, 교양은 기이수 성적 기준으로 표시합니다. 전문교양 전체 커리큘럼은 공학인증 보기에서 확인하세요.'}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#e5e5ea] py-3.5">

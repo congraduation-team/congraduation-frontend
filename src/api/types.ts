@@ -107,7 +107,11 @@ export type CreditProgress = {
   satisfied?: boolean
   progressPercent?: string | number
   completedCourseCount?: number
-  completedCourses?: CategoryCourse[]
+  completedCourses?: Array<CategoryCourse & {
+    credits?: number
+    takenYear?: number | string | null
+    takenSemester?: number | string | null
+  }>
   remainingCourses?: CategoryCourse[]
   missingCourses?: CategoryCourse[]
 }
