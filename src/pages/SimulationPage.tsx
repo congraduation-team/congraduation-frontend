@@ -173,10 +173,20 @@ function resolveOverStanding(planned?: PlannedCoursesResponse | null): boolean {
 }
 
 /**
+ * 서버 lastCompletedSemester가 달력 상대학년(5학년+)으로 온 경우.
+ * 구 API는 overStanding/taken 필드 없이 6-1 같은 값을 내려 next 생성을 막는다.
+ */
+function isCalendarMislabelledStanding(planned?: PlannedCoursesResponse | null): boolean {
+  if (!planned || resolveOverStanding(planned)) return false
+  const parsed = parseTermKey(planned.lastCompletedSemester)
+  return !!parsed && parsed.gradeYear > 4
+}
+
+/**
  * 계획/필터에 쓸 이수 순번.
  * - 정상: lastCompletedSemester (예: 4-1)
- * - 서버가 캘린더 환산(6-1)을 넣은 경우: overStanding이 아니면 4학년으로 클램프
- * - 4-2로 과대 표기됐 실제 수강이 1학기면 4-1로 보정 (4-2 계획 가능)
+ * - 서버가 캘린더 환산(6-1)을 넣은 경우: overStanding이 아니면 표시용으로만 4학년 클램프
+ *   (실제 next 생성은 서버가 막으면 FE에서 만들 수 없음)
  */
 function resolveEffectiveLastStanding(
   planned?: PlannedCoursesResponse | null,
@@ -185,22 +195,9 @@ function resolveEffectiveLastStanding(
   const parsed = parseTermKey(raw)
   if (!parsed) return raw
 
-  const over = resolveOverStanding(planned)
-  const takenSem = toNumber(planned?.lastCompletedTakenSemester)
-
-  if (!over && parsed.gradeYear > 4) {
+  if (isCalendarMislabelledStanding(planned)) {
     const sem = parsed.semester >= 2 ? 2 : 1
-    // 초과학년이 아닌데 5학년 이상으로 오면 이수 순번 오표기 → 4학년으로 클램프
     return `4-${sem}`
-  }
-
-  if (
-    !over &&
-    parsed.gradeYear === 4 &&
-    parsed.semester === 2 &&
-    takenSem === 1
-  ) {
-    return '4-1'
   }
 
   return `${parsed.gradeYear}-${parsed.semester}`
@@ -247,16 +244,15 @@ function isPastMaxPlannableTerm(lastCompleted?: string | null) {
 }
 
 function isSemesterAfterLast(
-  gradeYear: number,
-  semester: number,
+  gradeYear: number | string | null | undefined,
+  semester: number | string | null | undefined,
   lastCompleted?: string | null,
 ) {
   const last = parseTermKey(lastCompleted)
   if (!last) return true
-  return (
-    gradeYear > last.gradeYear ||
-    (gradeYear === last.gradeYear && semester > last.semester)
-  )
+  const gy = toNumber(gradeYear)
+  const sem = toNumber(semester)
+  return gy > last.gradeYear || (gy === last.gradeYear && sem > last.semester)
 }
 
 function normalizeGrade(value?: string | null): Grade {
@@ -266,10 +262,14 @@ function normalizeGrade(value?: string | null): Grade {
 
 /**
  * 마지막 이수(순번) 다음 학기가 계획에 있도록 보장.
- * 예: effective last=4-1 → 4-2가 보일 때까지 next 호출.
+ * 예: last=4-1 → 4-2가 보일 때까지 next 호출.
+ * 구 API가 lastCompleted=6-1처럼 달력 학년을 주면 next가 4-2 한도에 걸려 실패하므로 호출을 생략한다.
  */
 async function ensurePlannedSemesters(studentId: number): Promise<PlannedCoursesResponse> {
   let planned = await getPlannedCourses(studentId)
+
+  // 달력 오표기(6-1 등)면 서버 next도 같은 기준으로 거절 → 무의미한 재시도 방지
+  if (isCalendarMislabelledStanding(planned)) return planned
 
   for (let i = 0; i < 16; i++) {
     const lastKey = resolveEffectiveLastStanding(planned)
@@ -285,7 +285,6 @@ async function ensurePlannedSemesters(studentId: number): Promise<PlannedCourses
     try {
       planned = await addNextPlannedSemesters(studentId, 1)
     } catch {
-      // 서버가 캘린더 순번으로 next를 막아도, 이미 4학년 계획 학기가 있으면 그걸 씀
       break
     }
 
@@ -620,7 +619,15 @@ export function SimulationPage() {
   const admissionYear = student?.admissionYear ?? progress?.admissionYear
   const lastCompletedLabel = formatLastCompletedLabel(planned, admissionYear)
   const effectiveLastStanding = resolveEffectiveLastStanding(planned)
+  const rawLastStanding = planned?.lastCompletedSemester?.trim() || null
+  const calendarMislabelled = isCalendarMislabelledStanding(planned)
   const pastPlannable = isPastMaxPlannableTerm(effectiveLastStanding)
+  const effectiveParsed = parseTermKey(effectiveLastStanding)
+  const lastStandingAtCap =
+    !calendarMislabelled &&
+    !!effectiveParsed &&
+    effectiveParsed.gradeYear === 4 &&
+    effectiveParsed.semester >= 2
 
   if (loading) {
     return (
@@ -697,12 +704,26 @@ export function SimulationPage() {
             <h2 className="mb-4 text-base font-bold text-ink">남은 학기 로드맵</h2>
             {semesters.length === 0 ? (
               <div className="space-y-3 py-10 text-center text-sm leading-relaxed text-ink-muted">
-                {pastPlannable ? (
+                {calendarMislabelled ? (
+                  <>
+                    <p>
+                      서버가 마지막 이수를 순번이 아니라 달력 학년(
+                      <span className="font-semibold text-ink">{rawLastStanding}</span>
+                      )으로 보고 있어 다음 학기(4-2)를 만들 수 없습니다.
+                    </p>
+                    <p className="text-xs text-ink-faint">
+                      백엔드 `PlannedCourseService`의 기이수 순번(
+                      TranscriptStandingMapper) 배포가 필요합니다. FE만으로는 4-2
+                      학기 카드를 생성할 수 없습니다.
+                    </p>
+                  </>
+                ) : pastPlannable || lastStandingAtCap ? (
                   <p>
-                    계획 가능한 학기 한도(
-                    <span className="font-semibold text-ink">8학년 2학기</span>
-                    )에 도달했습니다. 마지막 이수:{' '}
-                    {lastCompletedLabel || planned?.lastCompletedSemester || '-'}
+                    이수 순번이{' '}
+                    <span className="font-semibold text-ink">
+                      {effectiveLastStanding || lastCompletedLabel || '-'}
+                    </span>
+                    까지 완료되어 추가할 정규 계획 학기가 없습니다.
                   </p>
                 ) : (
                   <>
@@ -710,9 +731,6 @@ export function SimulationPage() {
                       마지막 이수 순번(
                       {effectiveLastStanding || lastCompletedLabel || '-'})
                       다음 학기 계획이 없습니다.
-                    </p>
-                    <p className="text-xs text-ink-faint">
-                      4-1까지 이수했다면 4-2 학기를 추가할 수 있어야 합니다.
                     </p>
                     <button
                       type="button"
@@ -725,7 +743,7 @@ export function SimulationPage() {
                       }}
                       className="rounded-full bg-sejong px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
                     >
-                      다음 학기(4-2 등) 추가
+                      다음 학기 추가
                     </button>
                   </>
                 )}

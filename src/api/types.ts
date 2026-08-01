@@ -237,8 +237,10 @@ export type PlannedCoursesResponse = {
   lastCompletedSemester?: string
   /** 실제 수강 연도 (예: 2026) */
   lastCompletedTakenYear?: number | string | null
-  /** 실제 수강 학기 (예: 1) */
+  /** 실제 수강 학기 (예: 1학기) */
   lastCompletedTakenSemester?: number | string | null
+  /** 기이수 순번 기준 학년(1~4). 신규 API */
+  standingGradeYear?: number | null
   /** true일 때만 초과학년 표시. 순번 4학년 이하면 false */
   overStanding?: boolean
   totalPlannedCredits?: string | number
