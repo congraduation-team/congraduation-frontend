@@ -801,9 +801,14 @@ function DetailCreditCard({
               stroke={11}
               label={formatPercentLabel(percent)}
             />
-            <div className="space-y-0.5 text-center text-xs text-ink-muted">
-              <p>필요 학점 {required || '-'}학점</p>
-              <p>이수 학점 {earned}학점</p>
+            <div className="space-y-1 text-center text-xs leading-snug">
+              <p>
+                <span className="font-medium text-ink-muted">이수 학점 </span>
+                <span className="font-bold text-sejong">{earned}학점</span>
+              </p>
+              <p className="text-ink-faint">
+                필요 학점 {required || '-'}학점
+              </p>
             </div>
           </div>
 
