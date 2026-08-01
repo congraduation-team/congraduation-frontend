@@ -186,6 +186,19 @@ export function GraduationPage() {
     )
     const areas = progress?.balancedLiberalAreaProgresses ?? []
     const completedFromAreas = areas.flatMap((a) => a.courses ?? [])
+    // BE missingBalancedLiberalAreas: 정책상 가능한 영역 중 미충족 (0학점 영역 포함)
+    const missingAreaNames = progress?.missingBalancedLiberalAreas ?? []
+    const missingFromApi = missingAreaNames
+      .map((name) => name?.trim())
+      .filter((name): name is string => !!name)
+      .map((name) => {
+        const hit = areas.find((a) => a.area === name)
+        return {
+          name,
+          credits: toNumber(hit?.earnedCredits),
+          code: name,
+        }
+      })
     const unsatisfiedAreas = areas
       .filter((a) => a.satisfied !== true)
       .map((a) => ({
@@ -208,7 +221,12 @@ export function GraduationPage() {
       courses: toUiCourses(
         fromCredits?.completedCourses ?? fromSummary?.courses ?? completedFromAreas,
       ),
-      remaining: unsatisfiedAreas.length > 0 ? unsatisfiedAreas : fallbackRemaining,
+      remaining:
+        missingFromApi.length > 0
+          ? missingFromApi
+          : unsatisfiedAreas.length > 0
+            ? unsatisfiedAreas
+            : fallbackRemaining,
       requiredAreas: progress?.balancedLiberalRequiredAreaCount ?? 0,
       completedAreas: progress?.balancedLiberalCompletedAreaCount ?? 0,
       areas,

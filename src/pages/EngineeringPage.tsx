@@ -261,6 +261,18 @@ export function EngineeringPage() {
         credits: row.credits ?? row.credit,
       })
     })
+    // BE missingBalancedLiberalAreas 우선 (0학점·미이수 영역 포함)
+    const missingFromApi = (graduation?.missingBalancedLiberalAreas ?? [])
+      .map((name) => name?.trim())
+      .filter((name): name is string => !!name)
+      .map((name) => {
+        const hit = areas.find((a) => a.area === name)
+        return toCourse({
+          courseCode: name,
+          courseName: name,
+          credits: hit?.earnedCredits,
+        })
+      })
     const unsatisfiedAreas = areas
       .filter((a) => a.satisfied !== true)
       .map((a) =>
@@ -275,7 +287,7 @@ export function EngineeringPage() {
       required: toNumber(fromCredits?.requiredCredits),
       percent: toPercent(fromCredits?.progressPercent),
       completed,
-      remaining: unsatisfiedAreas,
+      remaining: missingFromApi.length > 0 ? missingFromApi : unsatisfiedAreas,
       requiredAreas: graduation?.balancedLiberalRequiredAreaCount ?? 0,
       completedAreas: graduation?.balancedLiberalCompletedAreaCount ?? 0,
     }
