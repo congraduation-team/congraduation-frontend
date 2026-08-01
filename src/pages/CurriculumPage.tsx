@@ -56,38 +56,55 @@ type RowDef = {
   border: string
 }
 
+const MAJOR_COMPLETED_CLASS =
+  'border-transparent bg-[#c8012e] text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]'
+const MAJOR_INCOMPLETE_CLASS = 'border-[#c8012e] bg-white text-[#c8012e]'
+
 const categoryStyle: Record<MapCategory, string> = {
   // 교양: 쿨 그레이블루 / 기초필수: 슬레이트 / 전공: 세종 레드 통일
   liberal: 'border-transparent bg-[#dbe4f0] text-[#334155]',
   bsm: 'border-transparent bg-[#334155] text-white',
-  'major-required': 'border-sejong bg-white text-sejong',
-  'major-elective': 'border-sejong bg-white text-sejong',
+  'major-required': MAJOR_INCOMPLETE_CLASS,
+  'major-elective': MAJOR_INCOMPLETE_CLASS,
 }
 
-/** 이수 과목도 카테고리별 색 유지 (교양·기초필수 구분, 전공은 빨강 통일) */
+/** 이수 과목: 교양·기초필수는 구분, 전공(필수·선택)은 동일 빨강 */
 const completedCategoryStyle: Record<MapCategory, string> = {
   liberal: 'border-transparent bg-[#64748b] text-white shadow-[0_0_0_1px_rgba(100,116,139,0.35)]',
   bsm: 'border-transparent bg-[#0f766e] text-white shadow-[0_0_0_1px_rgba(15,118,110,0.35)]',
-  'major-required': 'border-transparent bg-sejong text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]',
-  'major-elective': 'border-transparent bg-sejong text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]',
+  'major-required': MAJOR_COMPLETED_CLASS,
+  'major-elective': MAJOR_COMPLETED_CLASS,
 }
 
-function courseBadgeClass(course: MapCourse, hasCompletionData: boolean): string {
-  if (course.completed) {
-    return completedCategoryStyle[course.category]
+function isMajorCategory(category: MapCategory) {
+  return category === 'major-required' || category === 'major-elective'
+}
+
+function courseBadgeClass(
+  course: MapCourse,
+  hasCompletionData: boolean,
+  rowKey?: string,
+): string {
+  // 전공 행에 그려지는 과목은 카테고리와 무관하게 동일 빨강 (선택/필수 톤 차이 제거)
+  const treatAsMajor = rowKey === 'major' || isMajorCategory(course.category)
+
+  if (treatAsMajor) {
+    if (course.completed) return MAJOR_COMPLETED_CLASS
+    return `${MAJOR_INCOMPLETE_CLASS} ${hasCompletionData ? 'opacity-70' : ''}`
   }
 
-  if (course.category === 'major-required' || course.category === 'major-elective') {
-    return `${categoryStyle[course.category]} ${hasCompletionData ? 'opacity-70' : ''}`
+  if (course.completed) {
+    return completedCategoryStyle[course.category]
   }
 
   return categoryStyle[course.category]
 }
 
-function completedChipClass(category: MapCategory): string {
+function completedChipClass(category: MapCategory, rowKey?: string): string {
+  if (rowKey === 'major' || isMajorCategory(category)) return 'bg-white text-[#c8012e]'
   if (category === 'liberal') return 'bg-white text-[#64748b]'
   if (category === 'bsm') return 'bg-white text-[#0f766e]'
-  return 'bg-white text-sejong'
+  return 'bg-white text-[#c8012e]'
 }
 
 /** 일반(시간표) 로드맵: 교양 → 기초필수 → 전공 */
@@ -1498,16 +1515,17 @@ export function CurriculumPage() {
                                 className={`relative box-border flex w-full flex-col items-center gap-0.5 rounded-2xl border-2 px-2.5 py-1.5 text-center shadow-sm ${courseBadgeClass(
                                   course,
                                   hasCompletionData,
+                                  row.key,
                                 )}`}
                               >
                                 {course.category === 'major-required' && !course.completed && (
-                                  <span className="absolute -top-1.5 right-1 rounded-full bg-sejong px-1.5 py-[1px] text-[9px] font-bold leading-none text-white">
+                                  <span className="absolute -top-1.5 right-1 rounded-full bg-[#c8012e] px-1.5 py-[1px] text-[9px] font-bold leading-none text-white">
                                     필수
                                   </span>
                                 )}
                                 {course.completed && (
                                   <span
-                                    className={`absolute -top-1.5 right-1 rounded-full px-1.5 py-[1px] text-[9px] font-bold leading-none ${completedChipClass(course.category)}`}
+                                    className={`absolute -top-1.5 right-1 rounded-full px-1.5 py-[1px] text-[9px] font-bold leading-none ${completedChipClass(course.category, row.key)}`}
                                   >
                                     이수
                                   </span>
