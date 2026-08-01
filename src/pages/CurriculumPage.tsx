@@ -57,16 +57,25 @@ type RowDef = {
 }
 
 const categoryStyle: Record<MapCategory, string> = {
-  liberal: 'border-transparent bg-[#e8eaee] text-ink',
-  bsm: 'border-transparent bg-[#4a5568] text-white',
+  // 교양: 쿨 그레이블루 / 기초필수: 슬레이트 / 전공: 세종 레드·핑크
+  liberal: 'border-transparent bg-[#dbe4f0] text-[#334155]',
+  bsm: 'border-transparent bg-[#334155] text-white',
   'major-required': 'border-sejong bg-white text-sejong',
   'major-elective': 'border-transparent bg-sejong-pink text-ink',
 }
 
+/** 이수 과목도 카테고리별 색 유지 (전부 빨강이면 구분 불가) */
+const completedCategoryStyle: Record<MapCategory, string> = {
+  liberal: 'border-transparent bg-[#64748b] text-white shadow-[0_0_0_1px_rgba(100,116,139,0.35)]',
+  bsm: 'border-transparent bg-[#0f766e] text-white shadow-[0_0_0_1px_rgba(15,118,110,0.35)]',
+  'major-required': 'border-transparent bg-sejong text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]',
+  'major-elective':
+    'border-transparent bg-[#c45c6a] text-white shadow-[0_0_0_1px_rgba(196,92,106,0.3)]',
+}
+
 function courseBadgeClass(course: MapCourse, hasCompletionData: boolean): string {
-  // 이수한 과목은 카테고리와 무관하게 빨간색 (테두리는 정렬용으로 유지)
   if (course.completed) {
-    return 'border-transparent bg-sejong text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]'
+    return completedCategoryStyle[course.category]
   }
 
   if (course.category === 'major-required') {
@@ -77,20 +86,26 @@ function courseBadgeClass(course: MapCourse, hasCompletionData: boolean): string
     return `${categoryStyle['major-elective']} ${hasCompletionData ? 'opacity-55' : ''}`
   }
 
-  // 교양·기초필수(BSM): 카테고리 고유 색 유지 (미이수 opacity로 회색빛 나지 않게)
   return categoryStyle[course.category]
 }
 
-/** 일반(시간표) 로드맵: 교양 / 기초필수 / 전공 */
+function completedChipClass(category: MapCategory): string {
+  if (category === 'liberal') return 'bg-white text-[#64748b]'
+  if (category === 'bsm') return 'bg-white text-[#0f766e]'
+  if (category === 'major-elective') return 'bg-white text-[#c45c6a]'
+  return 'bg-white text-sejong'
+}
+
+/** 일반(시간표) 로드맵: 전공 → 기초필수 → 교양 */
 const generalRowDefs: RowDef[] = [
-  { key: 'liberal', label: '교양', categories: ['liberal'], border: 'border-[#c5c9d0]' },
-  { key: 'foundation', label: '기초필수', categories: ['bsm'], border: 'border-[#4a5568]' },
   {
     key: 'major',
     label: '전공',
     categories: ['major-required', 'major-elective'],
     border: 'border-sejong',
   },
+  { key: 'foundation', label: '기초필수', categories: ['bsm'], border: 'border-[#334155]' },
+  { key: 'liberal', label: '교양', categories: ['liberal'], border: 'border-[#94a3b8]' },
 ]
 
 /** 공학인증 로드맵: 전문교양 / BSM / 전공 */
@@ -1200,70 +1215,121 @@ export function CurriculumPage() {
         <p className="mt-3 text-sm text-ink-muted">
           {viewKind === 'abeek'
             ? '공학인증(ABEEK) 이수체계도입니다. 전문교양·BSM·전공을 표시합니다.'
-            : '강의 시간표 기준 학과 로드맵입니다. 이수한 과목은 빨간색으로 표시됩니다.'}
+            : '강의 시간표 기준 학과 로드맵입니다. 전공 → 기초필수 → 교양 순이며, 이수는 카테고리별 색으로 표시됩니다.'}
         </p>
 
-        {viewKind === 'abeek' && (
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#e5e5ea] py-3.5">
           <span className="shrink-0 text-sm font-medium text-ink">체계표 안내</span>
           <div className="flex flex-wrap items-center gap-2">
-            <LegendPill
-              active={filter === 'liberal'}
-              onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-              className="bg-[#e8eaee] text-ink"
-              label="전문교양"
-            />
-            <LegendPill
-              active={filter === 'bsm'}
-              onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-              className="bg-[#4a5568] text-white"
-              label="BSM(기초수학, 과학)"
-            />
-            <LegendPill
-              active={filter === 'major-required'}
-              onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
-              className="border-2 border-sejong bg-white text-sejong"
-              label="전공필수"
-            />
-            <LegendPill
-              active={filter === 'major-elective'}
-              onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
-              className="bg-sejong-pink text-ink"
-              label="전공선택"
-            />
-            {hasCompletionData && (
+            {viewKind === 'abeek' ? (
+              <>
+                <LegendPill
+                  active={filter === 'liberal'}
+                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
+                  className="bg-[#dbe4f0] text-[#334155]"
+                  label="전문교양"
+                />
+                <LegendPill
+                  active={filter === 'bsm'}
+                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
+                  className="bg-[#334155] text-white"
+                  label="BSM(기초수학, 과학)"
+                />
+              </>
+            ) : (
+              <>
+                <LegendPill
+                  active={filter === 'major-required'}
+                  onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
+                  className="border-2 border-sejong bg-white text-sejong"
+                  label="전공필수"
+                />
+                <LegendPill
+                  active={filter === 'major-elective'}
+                  onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
+                  className="bg-sejong-pink text-ink"
+                  label="전공선택"
+                />
+                <LegendPill
+                  active={filter === 'bsm'}
+                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
+                  className="bg-[#334155] text-white"
+                  label="기초필수"
+                />
+                <LegendPill
+                  active={filter === 'liberal'}
+                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
+                  className="bg-[#dbe4f0] text-[#334155]"
+                  label="교양"
+                />
+              </>
+            )}
+            {viewKind === 'abeek' && (
+              <>
+                <LegendPill
+                  active={filter === 'major-required'}
+                  onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
+                  className="border-2 border-sejong bg-white text-sejong"
+                  label="전공필수"
+                />
+                <LegendPill
+                  active={filter === 'major-elective'}
+                  onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
+                  className="bg-sejong-pink text-ink"
+                  label="전공선택"
+                />
+              </>
+            )}
+            {hasCompletionData && viewKind === 'general' && (
+              <>
+                <span className="rounded-full bg-[#c45c6a] px-3.5 py-1.5 text-xs font-semibold text-white">
+                  이수·전공
+                </span>
+                <span className="rounded-full bg-[#0f766e] px-3.5 py-1.5 text-xs font-semibold text-white">
+                  이수·기초필수
+                </span>
+                <span className="rounded-full bg-[#64748b] px-3.5 py-1.5 text-xs font-semibold text-white">
+                  이수·교양
+                </span>
+              </>
+            )}
+            {hasCompletionData && viewKind === 'abeek' && (
               <span className="rounded-full bg-sejong px-3.5 py-1.5 text-xs font-semibold text-white">
                 이수 과목
               </span>
             )}
           </div>
-          <div className="ml-auto flex flex-wrap items-end gap-4">
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-xs text-ink">필수 선수과목</span>
-              <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
-                <line x1="0" y1="6" x2="46" y2="6" stroke="#222" strokeWidth="1.8" />
-                <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
-              </svg>
+          {viewKind === 'abeek' && (
+            <div className="ml-auto flex flex-wrap items-end gap-4">
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-xs text-ink">필수 선수과목</span>
+                <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
+                  <line x1="0" y1="6" x2="46" y2="6" stroke="#222" strokeWidth="1.8" />
+                  <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
+                </svg>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-xs text-ink">선택 선수과목</span>
+                <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
+                  <line
+                    x1="0"
+                    y1="6"
+                    x2="46"
+                    y2="6"
+                    stroke="#222"
+                    strokeWidth="1.8"
+                    strokeDasharray="4 3"
+                  />
+                  <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
+                </svg>
+              </div>
+              <p className="pb-0.5 text-xs text-ink-muted">휠: 확대/축소 · 드래그·스크롤: 이동</p>
             </div>
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-xs text-ink">선택 선수과목</span>
-              <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
-                <line
-                  x1="0"
-                  y1="6"
-                  x2="46"
-                  y2="6"
-                  stroke="#222"
-                  strokeWidth="1.8"
-                  strokeDasharray="4 3"
-                />
-                <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
-              </svg>
-            </div>
-            <p className="pb-0.5 text-xs text-ink-muted">휠: 확대/축소 · 드래그·스크롤: 이동</p>
-          </div>
+          )}
+          {viewKind === 'general' && (
+            <p className="ml-auto pb-0.5 text-xs text-ink-muted">휠: 확대/축소 · 드래그·스크롤: 이동</p>
+          )}
         </div>
-        )}
 
         <div className="mt-6 overflow-hidden rounded-2xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           {loading ? (
@@ -1449,7 +1515,9 @@ export function CurriculumPage() {
                                   </span>
                                 )}
                                 {course.completed && (
-                                  <span className="absolute -top-1.5 right-1 rounded-full bg-white px-1.5 py-[1px] text-[9px] font-bold leading-none text-sejong">
+                                  <span
+                                    className={`absolute -top-1.5 right-1 rounded-full px-1.5 py-[1px] text-[9px] font-bold leading-none ${completedChipClass(course.category)}`}
+                                  >
                                     이수
                                   </span>
                                 )}
