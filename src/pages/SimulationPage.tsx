@@ -534,9 +534,9 @@ export function SimulationPage() {
     }
     const lastLabel = formatLastCompletedLabel(planned, admit)
     if (lastLabel) {
-      tips.push(`마지막 이수 학기: ${lastLabel} 이후부터 계획 중입니다.`)
+      tips.push(`마지막 이수 학기: ${lastLabel}\n이후부터 계획 중입니다.`)
     }
-    if (tips.length === 0) tips.push('현재 계획 균형이 양호합니다. 개설 학기를 한 번 더 확인하세요.')
+    if (tips.length === 0) tips.push('현재 계획 균형이 양호합니다.\n개설 학기를 한 번 더 확인하세요.')
     return tips.slice(0, 4)
   }, [
     semesters,
@@ -1097,7 +1097,7 @@ export function SimulationPage() {
                 {recommendations.map((tip) => (
                   <li
                     key={tip}
-                    className="rounded-lg border border-[#eee] bg-panel/60 px-3 py-2 text-xs leading-relaxed text-ink"
+                    className="rounded-lg border border-[#eee] bg-panel/60 px-3 py-2 text-xs leading-relaxed text-ink break-keep whitespace-pre-line"
                   >
                     {tip}
                   </li>
