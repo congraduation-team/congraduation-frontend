@@ -1,4 +1,5 @@
 import { englishRequirements } from '../../data/mockData'
+import { CertDetailText } from '../../utils/certDetail'
 import { Modal } from './Modal'
 
 type Props = {
@@ -26,9 +27,10 @@ export function EnglishCertModal({
       {satisfied ? (
         <div className="rounded-xl bg-sejong/5 px-5 py-6 text-center">
           <p className="text-base font-bold text-sejong">영어졸업인증을 이수했습니다.</p>
-          {(detail || primaryRequirement) && (
-            <p className="mt-2 text-sm text-ink-muted">{detail || primaryRequirement}</p>
-          )}
+          <CertDetailText
+            detail={detail || primaryRequirement}
+            className="mt-2 text-sm leading-relaxed text-ink-muted"
+          />
         </div>
       ) : (
         <>

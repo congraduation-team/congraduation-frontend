@@ -1,4 +1,5 @@
 import { Modal } from './Modal'
+import { CertDetailText } from '../../utils/certDetail'
 
 type Props = {
   open: boolean
@@ -27,7 +28,7 @@ export function SWCodingCertModal({
       {satisfied ? (
         <div className="rounded-xl bg-sejong/5 px-5 py-6 text-center">
           <p className="text-base font-bold text-sejong">SW코딩졸업인증을 이수했습니다.</p>
-          {detail && <p className="mt-2 text-sm text-ink-muted">{detail}</p>}
+          <CertDetailText detail={detail} className="mt-2 text-sm leading-relaxed text-ink-muted" />
         </div>
       ) : (
         <>

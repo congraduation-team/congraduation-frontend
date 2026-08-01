@@ -13,6 +13,7 @@ import { useMajorTrack } from '../context/MajorTrackContext'
 import { classicReading } from '../data/mockData'
 import { trackTypeLabel } from '../utils/majorTrack'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
+import { CertDetailText } from '../utils/certDetail'
 
 function toUiCourses(courses?: CategoryCourse[] | Array<Record<string, unknown>>) {
   return (courses ?? []).map((c) => {
@@ -431,9 +432,7 @@ export function GraduationPage() {
               {englishSatisfied ? (
                 <div className="rounded-lg border border-sejong/20 bg-sejong/5 px-3 py-3 text-center">
                   <p className="text-sm font-bold text-sejong">영어졸업인증 이수 완료</p>
-                  {englishCert?.detail && (
-                    <p className="mt-1 text-[11px] leading-snug text-ink-muted">{englishCert.detail}</p>
-                  )}
+                  <CertDetailText detail={englishCert?.detail} />
                 </div>
               ) : (
                 <>
@@ -478,10 +477,8 @@ export function GraduationPage() {
               <p className="mb-1.5 text-xs font-bold text-ink">SW코딩졸업인증</p>
               {swSatisfied ? (
                 <div className="rounded-lg border border-sejong/20 bg-sejong/5 px-3 py-3 text-center">
-                  <p className="text-sm font-bold text-sejong">SW코딩졸업인증 이수 완료</p>
-                  {swCert?.detail && (
-                    <p className="mt-1 text-[11px] leading-snug text-ink-muted">{swCert.detail}</p>
-                  )}
+                  <p className="text-sm font-bold leading-snug text-sejong">SW코딩졸업인증 이수 완료</p>
+                  <CertDetailText detail={swCert?.detail} />
                 </div>
               ) : (
                 <>
