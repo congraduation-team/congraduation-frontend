@@ -58,17 +58,18 @@ type RowDef = {
 
 const MAJOR_COMPLETED_CLASS =
   'border-transparent bg-[#c8012e] text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]'
-const MAJOR_INCOMPLETE_CLASS = 'border-[#c8012e] bg-white text-[#c8012e]'
+const MAJOR_REQUIRED_INCOMPLETE_CLASS = 'border-sejong bg-white text-sejong'
+const MAJOR_ELECTIVE_INCOMPLETE_CLASS = 'border-transparent bg-sejong-pink text-ink'
 
 const categoryStyle: Record<MapCategory, string> = {
-  // 교양: 쿨 그레이블루 / 기초필수: 슬레이트 / 전공: 세종 레드 통일
+  // 교양·기초필수 구분 / 미이수 전공: 필수=흰, 선택=연한 핑크
   liberal: 'border-transparent bg-[#dbe4f0] text-[#334155]',
   bsm: 'border-transparent bg-[#334155] text-white',
-  'major-required': MAJOR_INCOMPLETE_CLASS,
-  'major-elective': MAJOR_INCOMPLETE_CLASS,
+  'major-required': MAJOR_REQUIRED_INCOMPLETE_CLASS,
+  'major-elective': MAJOR_ELECTIVE_INCOMPLETE_CLASS,
 }
 
-/** 이수 과목: 교양·기초필수는 구분, 전공(필수·선택)은 동일 빨강 */
+/** 이수 과목: 교양·기초필수는 구분, 전공은 빨강 */
 const completedCategoryStyle: Record<MapCategory, string> = {
   liberal: 'border-transparent bg-[#64748b] text-white shadow-[0_0_0_1px_rgba(100,116,139,0.35)]',
   bsm: 'border-transparent bg-[#0f766e] text-white shadow-[0_0_0_1px_rgba(15,118,110,0.35)]',
@@ -85,12 +86,16 @@ function courseBadgeClass(
   hasCompletionData: boolean,
   rowKey?: string,
 ): string {
-  // 전공 행에 그려지는 과목은 카테고리와 무관하게 동일 빨강 (선택/필수 톤 차이 제거)
   const treatAsMajor = rowKey === 'major' || isMajorCategory(course.category)
 
   if (treatAsMajor) {
     if (course.completed) return MAJOR_COMPLETED_CLASS
-    return `${MAJOR_INCOMPLETE_CLASS} ${hasCompletionData ? 'opacity-70' : ''}`
+    // 미이수: 필수=흰+빨간 테두리, 선택=연한 핑크 (이전과 동일)
+    const base =
+      course.category === 'major-required'
+        ? MAJOR_REQUIRED_INCOMPLETE_CLASS
+        : MAJOR_ELECTIVE_INCOMPLETE_CLASS
+    return `${base} ${hasCompletionData ? 'opacity-70' : ''}`
   }
 
   if (course.completed) {
@@ -1265,10 +1270,16 @@ export function CurriculumPage() {
                   label="기초필수"
                 />
                 <LegendPill
-                  active={filter === 'major'}
-                  onClick={() => setFilter(filter === 'major' ? null : 'major')}
+                  active={filter === 'major-required'}
+                  onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
                   className="border-2 border-sejong bg-white text-sejong"
-                  label="전공"
+                  label="전공필수"
+                />
+                <LegendPill
+                  active={filter === 'major-elective'}
+                  onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
+                  className="bg-sejong-pink text-ink"
+                  label="전공선택"
                 />
               </>
             )}

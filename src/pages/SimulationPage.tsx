@@ -261,9 +261,9 @@ function normalizeGrade(value?: string | null): Grade {
 }
 
 /**
- * 마지막 이수(순번) 다음 학기가 계획에 있도록 보장.
- * 예: last=4-1 → 4-2가 보일 때까지 next 호출.
- * 구 API가 lastCompleted=6-1처럼 달력 학년을 주면 next가 4-2 한도에 걸려 실패하므로 호출을 생략한다.
+ * 마지막 이수 다음~4-2가 계획에 있도록 보장.
+ * BE(#74)가 한 번에 채워 주면 1회 next로 충분하고,
+ * 구버전이면 4-2까지 순차 추가한다.
  */
 async function ensurePlannedSemesters(studentId: number): Promise<PlannedCoursesResponse> {
   let planned = await getPlannedCourses(studentId)
@@ -276,10 +276,7 @@ async function ensurePlannedSemesters(studentId: number): Promise<PlannedCourses
     if (isPastMaxPlannableTerm(lastKey)) return planned
 
     const semesters = planned.semesters ?? []
-    const hasFuture = semesters.some((s) =>
-      isSemesterAfterLast(s.gradeYear, s.semester, lastKey),
-    )
-    if (hasFuture) return planned
+    if (hasPlansThroughCap(semesters, lastKey, 4, 2)) return planned
 
     const beforeIds = new Set(semesters.map((s) => s.plannedSemesterId))
     try {
@@ -294,6 +291,31 @@ async function ensurePlannedSemesters(studentId: number): Promise<PlannedCourses
   }
 
   return getPlannedCourses(studentId)
+}
+
+/** last 다음 학기부터 gradeYear-semester(기본 4-2)까지 모두 있는지 */
+function hasPlansThroughCap(
+  semesters: Array<{ gradeYear?: number | string | null; semester?: number | string | null }>,
+  lastKey: string | null,
+  capGrade = 4,
+  capSem = 2,
+) {
+  const last = parseTermKey(lastKey)
+  if (!last) return semesters.length > 0
+
+  const lastStep = (last.gradeYear - 1) * 2 + last.semester
+  const capStep = (capGrade - 1) * 2 + capSem
+  if (lastStep >= capStep) return true
+
+  for (let step = lastStep + 1; step <= capStep; step++) {
+    const gy = Math.floor((step - 1) / 2) + 1
+    const sem = ((step - 1) % 2) + 1
+    const found = semesters.some(
+      (s) => toNumber(s.gradeYear) === gy && toNumber(s.semester) === sem,
+    )
+    if (!found) return false
+  }
+  return true
 }
 
 export function SimulationPage() {
