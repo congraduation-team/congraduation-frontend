@@ -1,4 +1,5 @@
 import type { Course } from '../../data/mockData'
+import { displayCourseCode } from '../../utils/courseCode'
 import { Modal } from './Modal'
 
 export type CourseListGroup = {
@@ -14,6 +15,17 @@ type CourseListModalProps = {
   courses?: Course[]
   /** 영역별 추천 과목 등 그룹 목록 (있으면 courses 대신 사용) */
   groups?: CourseListGroup[]
+}
+
+function CourseRow({ course }: { course: Course }) {
+  const code = displayCourseCode(course.code)
+  return (
+    <li className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
+      <span className="truncate text-[15px] font-medium text-ink">{course.name}</span>
+      <span className="w-14 text-right text-[15px] font-semibold text-ink">{course.credits}학점</span>
+      <span className="w-20 text-right text-sm text-ink-faint">{code || '—'}</span>
+    </li>
+  )
 }
 
 export function CourseListModal({
@@ -39,18 +51,10 @@ export function CourseListModal({
                 ) : (
                   <ul className="space-y-3">
                     {group.courses.map((course) => (
-                      <li
+                      <CourseRow
                         key={`${group.title}-${course.code}-${course.name}`}
-                        className="grid grid-cols-[1fr_auto_auto] items-center gap-4"
-                      >
-                        <span className="truncate text-[15px] font-medium text-ink">
-                          {course.name}
-                        </span>
-                        <span className="w-14 text-right text-[15px] font-semibold text-ink">
-                          {course.credits}학점
-                        </span>
-                        <span className="w-20 text-right text-sm text-ink-faint">{course.code}</span>
-                      </li>
+                        course={course}
+                      />
                     ))}
                   </ul>
                 )}
@@ -62,16 +66,7 @@ export function CourseListModal({
         ) : (
           <ul className="space-y-3.5">
             {courses.map((course) => (
-              <li
-                key={`${course.code}-${course.name}`}
-                className="grid grid-cols-[1fr_auto_auto] items-center gap-4"
-              >
-                <span className="truncate text-[15px] font-medium text-ink">{course.name}</span>
-                <span className="w-14 text-right text-[15px] font-semibold text-ink">
-                  {course.credits}학점
-                </span>
-                <span className="w-20 text-right text-sm text-ink-faint">{course.code}</span>
-              </li>
+              <CourseRow key={`${course.code}-${course.name}`} course={course} />
             ))}
           </ul>
         )}

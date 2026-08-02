@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getGraduationProgress } from '../api/endpoints'
+import { getGraduationProgress, getPlannedCourseCatalog, getStudentRoadmapByStudent } from '../api/endpoints'
 import type { CategoryCourse, GraduationProgressResponse } from '../api/types'
 import { ChartLegend } from '../components/charts/ChartLegend'
 import { DonutChart } from '../components/charts/DonutChart'
@@ -14,14 +14,29 @@ import { classicReading } from '../data/mockData'
 import { trackTypeLabel } from '../utils/majorTrack'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 import { CertDetailText } from '../utils/certDetail'
+import {
+  isAcademicCourseCode,
+  lookupAcademicCodeByName,
+  normalizeCourseNameKey,
+} from '../utils/courseCode'
 
-function toUiCourses(courses?: CategoryCourse[] | Array<Record<string, unknown>>) {
+function toUiCourses(
+  courses?: CategoryCourse[] | Array<Record<string, unknown>>,
+  codeByName?: Map<string, string>,
+) {
   return (courses ?? []).map((c) => {
     const row = c as Record<string, unknown>
+    const name = String(row.courseName ?? row.name ?? '')
+    let code = String(row.courseCode ?? row.code ?? '')
+    if (!isAcademicCourseCode(code) && codeByName && name) {
+      code = lookupAcademicCodeByName(name, codeByName) || ''
+    } else if (!isAcademicCourseCode(code)) {
+      code = ''
+    }
     const base: { name: string; credits: number; code: string; semester?: string } = {
-      name: String(row.courseName ?? row.name ?? ''),
+      name,
       credits: toNumber((row.credit ?? row.credits) as string | number | undefined),
-      code: String(row.courseCode ?? row.code ?? ''),
+      code,
     }
     if (row.recommendedTerm != null && String(row.recommendedTerm) !== '') {
       base.semester = String(row.recommendedTerm)
@@ -45,6 +60,14 @@ export function GraduationPage() {
     courses: ReturnType<typeof toUiCourses>
     groups?: Array<{ title: string; courses: ReturnType<typeof toUiCourses> }>
   } | null>(null)
+  /** 과목명 → 학수번호 (MAJ_* 대체용) */
+  const [codeByName, setCodeByName] = useState<Map<string, string>>(() => new Map())
+
+  const mapCourses = useCallback(
+    (courses?: CategoryCourse[] | Array<Record<string, unknown>>) =>
+      toUiCourses(courses, codeByName),
+    [codeByName],
+  )
 
   useEffect(() => {
     if (!student) return
@@ -72,6 +95,47 @@ export function GraduationPage() {
       cancelled = true
     }
   }, [student, setMajorTracksProgress])
+
+  useEffect(() => {
+    if (!student) return
+    let cancelled = false
+    ;(async () => {
+      const map = new Map<string, string>()
+      const ingest = (name?: string | null, code?: string | null) => {
+        if (!name || !isAcademicCourseCode(code)) return
+        const key = normalizeCourseNameKey(name)
+        if (key && !map.has(key)) map.set(key, code!.trim())
+      }
+      try {
+        const [catalog, roadmap] = await Promise.all([
+          getPlannedCourseCatalog({
+            departmentName: student.major || active?.label || undefined,
+          }).catch(() => null),
+          getStudentRoadmapByStudent(student.id).catch(() => null),
+        ])
+        for (const course of catalog?.courses ?? []) {
+          ingest(course.courseName, course.courseCodes?.[0])
+        }
+        for (const term of roadmap?.terms ?? []) {
+          for (const course of term.courses ?? []) {
+            ingest(course.courseName, course.courseCode)
+          }
+          for (const list of Object.values(term.categories ?? {})) {
+            if (!Array.isArray(list)) continue
+            for (const course of list) {
+              ingest(course.courseName, course.courseCode)
+            }
+          }
+        }
+      } catch {
+        /* 학수번호 보조 조회 실패는 무시 */
+      }
+      if (!cancelled) setCodeByName(map)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [student, active?.label])
 
   const activeTrack = useMemo(() => {
     const tracks = progress?.majorTracks ?? []
@@ -233,6 +297,7 @@ export function GraduationPage() {
         fromSummary?.remainingCourses ??
         fromSummary?.missingCourses ??
         [],
+      codeByName,
     )
 
     // 모달용: 영역별 추천 과목
@@ -240,7 +305,7 @@ export function GraduationPage() {
       .filter((d) => d.area?.trim())
       .map((d) => ({
         title: d.area,
-        courses: toUiCourses(d.candidateCourses ?? []),
+        courses: toUiCourses(d.candidateCourses ?? [], codeByName),
       }))
 
     return {
@@ -249,6 +314,7 @@ export function GraduationPage() {
       percent: toPercent(fromCredits?.progressPercent ?? fromSummary?.progressPercent),
       courses: toUiCourses(
         fromCredits?.completedCourses ?? fromSummary?.courses ?? completedFromAreas,
+        codeByName,
       ),
       remaining:
         remainingAreas.length > 0
@@ -261,7 +327,7 @@ export function GraduationPage() {
       completedAreas: progress?.balancedLiberalCompletedAreaCount ?? 0,
       areas,
     }
-  }, [progress])
+  }, [progress, codeByName])
 
   const displayName = student?.name || '학생'
   const totalEarned = toNumber(progress?.totalCredits?.earnedCredits)
@@ -386,22 +452,22 @@ export function GraduationPage() {
             현재 {totalEarned}/{totalRequired || '-'}학점 이수 완료!
           </h3>
 
-          <div className="grid grid-cols-[1fr_1fr_auto] items-center justify-items-center gap-4">
-            <SummaryGauge title="전체 학점" percent={totalPct} size={136} stroke={15} />
-            <SummaryGauge title="전공 학점" percent={majorPct} size={136} stroke={15} />
-            <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-4">
+            <SummaryGauge title="전체 학점" percent={totalPct} size={158} stroke={17} />
+            <SummaryGauge title="전공 학점" percent={majorPct} size={158} stroke={17} />
+            <div className="flex flex-col items-center gap-3 pl-1">
               <SummaryGauge
                 title="전공 필수"
                 percent={majorReqPct}
-                size={78}
-                stroke={10}
+                size={84}
+                stroke={11}
                 compact
               />
               <SummaryGauge
                 title="전공 선택"
                 percent={majorElecPct}
-                size={78}
-                stroke={10}
+                size={84}
+                stroke={11}
                 compact
               />
             </div>
@@ -560,20 +626,20 @@ export function GraduationPage() {
             percent={majorReqPct}
             earned={majorRequiredLabel}
             required={majorRequiredNeed}
-            completed={toUiCourses(majorRequired.courses)}
-            remaining={toUiCourses(majorRequired.remaining)}
+            completed={mapCourses(majorRequired.courses)}
+            remaining={mapCourses(majorRequired.remaining)}
             onOpenCompleted={() =>
               setListModal({
                 title: `${majorTitle} 필수 이수 과목`,
                 subtitle: `${majorRequiredLabel}학점 이수 완료`,
-                courses: toUiCourses(majorRequired.courses),
+                courses: mapCourses(majorRequired.courses),
               })
             }
             onOpenRemaining={() =>
               setListModal({
                 title: `${majorTitle} 남은 필수 과목`,
                 subtitle: `${majorRequired.remaining.length}과목`,
-                courses: toUiCourses(majorRequired.remaining),
+                courses: mapCourses(majorRequired.remaining),
               })
             }
           />
@@ -583,20 +649,20 @@ export function GraduationPage() {
             percent={majorElecPct}
             earned={majorElectiveEarned}
             required={majorElectiveNeed}
-            completed={toUiCourses(majorElective.courses)}
-            remaining={toUiCourses(majorElective.remaining)}
+            completed={mapCourses(majorElective.courses)}
+            remaining={mapCourses(majorElective.remaining)}
             onOpenCompleted={() =>
               setListModal({
                 title: `${majorTitle} 선택 이수 과목`,
                 subtitle: `${majorElectiveEarned}학점 이수 완료`,
-                courses: toUiCourses(majorElective.courses),
+                courses: mapCourses(majorElective.courses),
               })
             }
             onOpenRemaining={() =>
               setListModal({
                 title: `${majorTitle} 남은 선택 과목`,
                 subtitle: `${majorElective.remaining.length}과목`,
-                courses: toUiCourses(majorElective.remaining),
+                courses: mapCourses(majorElective.remaining),
               })
             }
           />
@@ -606,20 +672,20 @@ export function GraduationPage() {
             percent={liberalRequired.percent}
             earned={liberalRequired.earned}
             required={liberalRequired.required}
-            completed={toUiCourses(liberalRequired.courses)}
-            remaining={toUiCourses(liberalRequired.remaining)}
+            completed={mapCourses(liberalRequired.courses)}
+            remaining={mapCourses(liberalRequired.remaining)}
             onOpenCompleted={() =>
               setListModal({
                 title: '교양 필수 이수 과목',
                 subtitle: `${liberalRequired.earned}학점 이수 완료`,
-                courses: toUiCourses(liberalRequired.courses),
+                courses: mapCourses(liberalRequired.courses),
               })
             }
             onOpenRemaining={() =>
               setListModal({
                 title: '남은 교양 필수 과목',
                 subtitle: `${liberalRequired.remaining.length}과목`,
-                courses: toUiCourses(liberalRequired.remaining),
+                courses: mapCourses(liberalRequired.remaining),
               })
             }
           />
@@ -667,20 +733,20 @@ export function GraduationPage() {
             title={`${displayName}님 교양 선택 현황`}
             remainingTitle="남은 선택 과목"
             earned={liberalElective.earned}
-            completed={toUiCourses(liberalElective.courses)}
-            remaining={toUiCourses(liberalElective.remaining)}
+            completed={mapCourses(liberalElective.courses)}
+            remaining={mapCourses(liberalElective.remaining)}
             onOpenCompleted={() =>
               setListModal({
                 title: '교양 선택 이수 과목',
                 subtitle: `취득 ${liberalElective.earned}학점`,
-                courses: toUiCourses(liberalElective.courses),
+                courses: mapCourses(liberalElective.courses),
               })
             }
             onOpenRemaining={() =>
               setListModal({
                 title: '남은 교양 선택 과목',
                 subtitle: `${liberalElective.remaining.length}과목`,
-                courses: toUiCourses(liberalElective.remaining),
+                courses: mapCourses(liberalElective.remaining),
               })
             }
             earnedOnly
@@ -734,7 +800,7 @@ function SummaryGauge({
   compact?: boolean
 }) {
   return (
-    <div className="flex w-full flex-col items-center" style={{ maxWidth: size + 24 }}>
+    <div className="flex flex-col items-center" style={{ width: size + 8 }}>
       <p
         className={`mb-1 w-full text-center font-bold text-ink ${
           compact ? 'text-xs' : 'text-sm'
