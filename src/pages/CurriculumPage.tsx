@@ -558,18 +558,6 @@ function flattenStudentRoadmapCourses(
   return list
 }
 
-function buildAbeekEdges(courses: RoadmapCourse[]): MapEdge[] {
-  const ids = new Set(courses.map((c) => c.abeekCourseCode))
-  const edges: MapEdge[] = []
-  for (const course of courses) {
-    for (const pre of course.prerequisiteCourseCodes ?? []) {
-      if (!ids.has(pre) || !ids.has(course.abeekCourseCode)) continue
-      edges.push({ from: pre, to: course.abeekCourseCode, type: 'required' })
-    }
-  }
-  return edges
-}
-
 /** 긴 과목명: 괄호·영한 경계·구분자 앞에서만 줄바꿈 */
 function CourseNameText({ name }: { name: string }) {
   const parts = name
@@ -902,8 +890,8 @@ export function CurriculumPage() {
   const generalFlat = useMemo(() => flattenStudentRoadmapCourses(generalRoadmap), [generalRoadmap])
 
   const edges = useMemo(
-    () => (viewKind === 'abeek' ? buildAbeekEdges(abeekRawCourses) : []),
-    [viewKind, abeekRawCourses],
+    () => [] as MapEdge[],
+    [],
   )
 
   const allCourses = useMemo(() => {
@@ -1385,28 +1373,6 @@ export function CurriculumPage() {
           </div>
           {viewKind === 'abeek' && (
             <div className="ml-auto flex flex-wrap items-end gap-4">
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-xs text-ink">필수 선수과목</span>
-                <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
-                  <line x1="0" y1="6" x2="46" y2="6" stroke="#222" strokeWidth="1.8" />
-                  <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
-                </svg>
-              </div>
-              <div className="flex flex-col items-center gap-1">
-                <span className="text-xs text-ink">선택 선수과목</span>
-                <svg width="56" height="12" viewBox="0 0 56 12" aria-hidden>
-                  <line
-                    x1="0"
-                    y1="6"
-                    x2="46"
-                    y2="6"
-                    stroke="#222"
-                    strokeWidth="1.8"
-                    strokeDasharray="4 3"
-                  />
-                  <polygon points="46,1.5 56,6 46,10.5" fill="#222" />
-                </svg>
-              </div>
               <p className="pb-0.5 text-xs text-ink-muted">휠: 확대/축소 · 드래그·스크롤: 이동</p>
             </div>
           )}
