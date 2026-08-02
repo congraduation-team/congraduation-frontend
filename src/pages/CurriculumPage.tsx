@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import {
+  getAbeekEvaluation,
   getAbeekFullRoadmap,
   getAbeekFullRoadmapByStudent,
   getGraduationProgress,
@@ -8,6 +9,7 @@ import {
   getStudentRoadmapByStudent,
 } from '../api/endpoints'
 import type {
+  AbeekEvaluationResponse,
   FullRoadmapResponse,
   GraduationProgressResponse,
   RoadmapCourse,
@@ -20,6 +22,14 @@ import { MajorTrackSwitcher } from '../components/modals/MajorTrackSwitcher'
 import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
 import { toNumber } from '../utils/number'
+
+function normalizeAlertKey(value?: string | null) {
+  return (value || '').replace(/\s+/g, '').toUpperCase()
+}
+
+function isFailGrade(grade?: string | null) {
+  return String(grade || '').trim().toUpperCase() === 'F'
+}
 
 const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'] as const
 
@@ -41,6 +51,9 @@ type MapCourse = {
   category: MapCategory
   semester: string
   completed: boolean
+  /** 설계학점 불인정 또는 F — 느낌표 표시 */
+  showAlert?: boolean
+  alertReason?: string
 }
 
 type MapEdge = {
@@ -626,6 +639,7 @@ export function CurriculumPage() {
   const [generalRoadmap, setGeneralRoadmap] = useState<StudentRoadmapResponse | null>(null)
   const [abeekRoadmap, setAbeekRoadmap] = useState<FullRoadmapResponse | null>(null)
   const [graduation, setGraduation] = useState<GraduationProgressResponse | null>(null)
+  const [abeekEvaluation, setAbeekEvaluation] = useState<AbeekEvaluationResponse | null>(null)
   const [generalLoading, setGeneralLoading] = useState(true)
   const [abeekLoading, setAbeekLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -675,21 +689,32 @@ export function CurriculumPage() {
   useEffect(() => {
     if (!student?.id) {
       setGraduation(null)
+      setAbeekEvaluation(null)
       return
     }
     let cancelled = false
     ;(async () => {
+      const abeekId = student.studentNo || String(student.id)
       try {
-        const data = await getGraduationProgress(student.id)
-        if (!cancelled) setGraduation(data)
+        const [grad, abeek] = await Promise.all([
+          getGraduationProgress(student.id),
+          getAbeekEvaluation(abeekId).catch(() => null),
+        ])
+        if (!cancelled) {
+          setGraduation(grad)
+          setAbeekEvaluation(abeek)
+        }
       } catch {
-        if (!cancelled) setGraduation(null)
+        if (!cancelled) {
+          setGraduation(null)
+          setAbeekEvaluation(null)
+        }
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [student?.id])
+  }, [student?.id, student?.studentNo])
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -1030,15 +1055,59 @@ export function CurriculumPage() {
     return [...byId.values()]
   }, [viewKind, abeekRawCourses, abeekRoadmap, generalFlat, graduation, student?.admissionYear])
 
+  const courseAlertIndex = useMemo(() => {
+    const designCodes = new Set<string>()
+    const designNames = new Set<string>()
+    for (const c of abeekEvaluation?.designDetail?.courses ?? []) {
+      if (c.recognized !== false) continue
+      if (c.courseCode?.trim()) designCodes.add(c.courseCode.trim())
+      if (c.courseName?.trim()) designNames.add(normalizeAlertKey(c.courseName))
+    }
+
+    const failCodes = new Set<string>()
+    const failNames = new Set<string>()
+    const markFail = (code?: string | null, name?: string | null, grade?: string | null) => {
+      if (!isFailGrade(grade)) return
+      if (code?.trim()) failCodes.add(code.trim())
+      if (name?.trim()) failNames.add(normalizeAlertKey(name))
+    }
+
+    for (const { course } of generalFlat) {
+      markFail(course.courseCode, course.courseName, course.grade)
+    }
+    for (const course of abeekRawCourses) {
+      markFail(course.abeekCourseCode, course.courseName, course.grade)
+    }
+
+    return { designCodes, designNames, failCodes, failNames }
+  }, [abeekEvaluation, generalFlat, abeekRawCourses])
+
+  const allCoursesWithAlerts = useMemo(() => {
+    const { designCodes, designNames, failCodes, failNames } = courseAlertIndex
+    return allCourses.map((course) => {
+      const nameKey = normalizeAlertKey(course.name)
+      const designHit = designCodes.has(course.id) || designNames.has(nameKey)
+      const failHit = failCodes.has(course.id) || failNames.has(nameKey)
+      if (!designHit && !failHit) return course
+      return {
+        ...course,
+        showAlert: true,
+        alertReason: failHit
+          ? 'F 성적'
+          : '설계학점 불인정 (이수했으나 설계학점 미인정)',
+      }
+    })
+  }, [allCourses, courseAlertIndex])
+
   const activeRowDefs = viewKind === 'abeek' ? abeekRowDefs : generalRowDefs
 
   const hasCompletionData = useMemo(
-    () => allCourses.some((c) => c.completed === true),
-    [allCourses],
+    () => allCoursesWithAlerts.some((c) => c.completed === true),
+    [allCoursesWithAlerts],
   )
 
   const courses = useMemo(() => {
-    let list = allCourses
+    let list = allCoursesWithAlerts
     if (mode === 'mine') list = list.filter((c) => c.completed)
     if (filter === 'liberal') list = list.filter((c) => c.category === 'liberal')
     if (filter === 'bsm') list = list.filter((c) => c.category === 'bsm')
@@ -1048,7 +1117,7 @@ export function CurriculumPage() {
     if (filter === 'major-required') list = list.filter((c) => c.category === 'major-required')
     if (filter === 'major-elective') list = list.filter((c) => c.category === 'major-elective')
     return list
-  }, [allCourses, mode, filter])
+  }, [allCoursesWithAlerts, mode, filter])
 
   const visibleIds = useMemo(() => new Set(courses.map((c) => c.id)), [courses])
 
@@ -1518,7 +1587,7 @@ export function CurriculumPage() {
                                   course.category === 'major-required' && !course.completed
                                     ? ' · 전공필수'
                                     : ''
-                                }`}
+                                }${course.alertReason ? ` · ${course.alertReason}` : ''}`}
                                 className={`relative box-border flex w-full flex-col items-center gap-0.5 rounded-2xl border-2 px-2.5 py-1.5 text-center shadow-sm ${courseBadgeClass(
                                   course,
                                   hasCompletionData,
@@ -1546,8 +1615,9 @@ export function CurriculumPage() {
                                 </p>
                                 <div className="flex items-center justify-center gap-1 whitespace-nowrap text-[10px] font-medium opacity-90">
                                   <span>{course.hours}</span>
-                                  {course.name.toLowerCase().includes('capstone') && (
+                                  {course.showAlert && (
                                     <span
+                                      title={course.alertReason}
                                       className={`inline-flex size-3.5 items-center justify-center rounded-full text-[9px] font-bold ${
                                         course.completed
                                           ? 'bg-white text-sejong'

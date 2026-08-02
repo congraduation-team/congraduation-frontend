@@ -539,6 +539,8 @@ export type RoadmapCourse = {
   /** 실제 이수 순번 학기 */
   standingTermKey?: string | null
   prerequisiteCourseCodes?: string[]
+  /** 성적 (있으면 F 경고에 사용) */
+  grade?: string | null
 }
 
 export type TermRoadmap = {
