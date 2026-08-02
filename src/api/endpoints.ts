@@ -1,5 +1,6 @@
 import { apiForm, apiJson } from './client'
 import type {
+  AbeekEvaluationDetailResponse,
   AbeekEvaluationResponse,
   AbeekTranscriptEvaluationResponse,
   AdminUploadResponse,
@@ -154,6 +155,13 @@ export function uploadClassSchedule(file: File, year: number, semester: number) 
 /** 공학인증(ABEEK) 평가 — studentId는 학번(string) 기준 */
 export function getAbeekEvaluation(studentId: string | number) {
   return apiJson<AbeekEvaluationResponse>(`/api/abeek/students/${studentId}/abeek-evaluation`)
+}
+
+/** 공학인증 카테고리 상세(학수번호·남은영역 등) */
+export function getAbeekEvaluationDetail(studentId: string | number) {
+  return apiJson<AbeekEvaluationDetailResponse>(
+    `/api/abeek/students/${studentId}/abeek-evaluation/detail`,
+  )
 }
 
 export function getCurriculumCourses(departmentCode: string, year: number) {

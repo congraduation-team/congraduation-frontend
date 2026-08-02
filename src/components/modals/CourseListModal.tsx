@@ -20,10 +20,14 @@ type CourseListModalProps = {
 function CourseRow({ course }: { course: Course }) {
   const code = displayCourseCode(course.code)
   return (
-    <li className="grid grid-cols-[1fr_auto_auto] items-center gap-4">
+    <li className="grid grid-cols-[minmax(0,1fr)_auto_minmax(5rem,auto)] items-center gap-3">
       <span className="truncate text-[15px] font-medium text-ink">{course.name}</span>
-      <span className="w-14 text-right text-[15px] font-semibold text-ink">{course.credits}학점</span>
-      <span className="w-20 text-right text-sm text-ink-faint">{code || '—'}</span>
+      <span className="w-14 shrink-0 text-right text-[15px] font-semibold text-ink">
+        {course.credits}학점
+      </span>
+      <span className="truncate text-right text-sm text-ink-faint" title={code || undefined}>
+        {code || '—'}
+      </span>
     </li>
   )
 }

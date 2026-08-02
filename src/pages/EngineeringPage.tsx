@@ -3,10 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import {
   getAbeekEvaluation,
+  getAbeekEvaluationDetail,
   getAbeekFullRoadmap,
   getAbeekFullRoadmapByStudent,
 } from '../api/endpoints'
 import type {
+  AbeekDetailCourse,
+  AbeekEvaluationCategoryDetail,
+  AbeekEvaluationDetailResponse,
   AbeekEvaluationResponse,
   FullRoadmapResponse,
   RoadmapCourse,
@@ -106,6 +110,30 @@ function toCourse(c: {
   }
 }
 
+/** detail API 과목 → UI Course. 학수번호는 sejongCourseCode만 사용 */
+function detailToCourse(
+  c: AbeekDetailCourse,
+  opts?: { codeFromArea?: boolean },
+): Course {
+  const code = opts?.codeFromArea
+    ? (c.electiveAreaLabel || c.electiveArea || '').trim()
+    : (c.sejongCourseCode || '').trim()
+  return {
+    code,
+    name: c.courseName,
+    credits: toNumber(c.credits ?? c.credit),
+  }
+}
+
+function findAbeekCategory(
+  detail: AbeekEvaluationDetailResponse | null | undefined,
+  key: string,
+): AbeekEvaluationCategoryDetail | undefined {
+  return detail?.categories?.find(
+    (c) => (c.categoryKey || '').toUpperCase() === key.toUpperCase(),
+  )
+}
+
 function roadmapToCourse(course: RoadmapCourse, creditOverride?: number): Course {
   return toCourse({
     courseCode: course.abeekCourseCode,
@@ -146,6 +174,8 @@ export function EngineeringPage() {
   const { student } = useAuth()
   const { active } = useMajorTrack()
   const [evaluation, setEvaluation] = useState<AbeekEvaluationResponse | null>(null)
+  const [evaluationDetail, setEvaluationDetail] =
+    useState<AbeekEvaluationDetailResponse | null>(null)
   const [roadmap, setRoadmap] = useState<FullRoadmapResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -171,9 +201,13 @@ export function EngineeringPage() {
           student.tracks?.[0]?.departmentCode ||
           'CSE'
 
-        const data = await getAbeekEvaluation(abeekId)
+        const [data, detail] = await Promise.all([
+          getAbeekEvaluation(abeekId),
+          getAbeekEvaluationDetail(abeekId).catch(() => null),
+        ])
         if (cancelled) return
         setEvaluation(data)
+        setEvaluationDetail(detail)
 
         const year =
           data.graduationAbeekYear ||
@@ -228,14 +262,108 @@ export function EngineeringPage() {
   )
   const designAll = useMemo(() => roadmapCourses.filter(hasDesign), [roadmapCourses])
 
-  /** 전문교양 미이수(로드맵 REQUIRED) — 남은 과목 모달용. 학점·목록 표시는 evaluation.general 사용 */
-  const generalRequiredRemaining = useMemo(
-    () => splitRoadmap(generalRequiredAll).remaining,
-    [generalRequiredAll],
+  const generalCat = useMemo(
+    () => findAbeekCategory(evaluationDetail, 'GENERAL'),
+    [evaluationDetail],
   )
+  const bsmCat = useMemo(() => findAbeekCategory(evaluationDetail, 'BSM'), [evaluationDetail])
+  const majorCat = useMemo(() => findAbeekCategory(evaluationDetail, 'MAJOR'), [evaluationDetail])
+  const certElectiveCat = useMemo(
+    () =>
+      findAbeekCategory(evaluationDetail, 'CERT_ELECTIVE') ||
+      findAbeekCategory(evaluationDetail, 'GENERAL_ELECTIVE'),
+    [evaluationDetail],
+  )
+
+  /** 전문교양 남은 필수 — detail GENERAL.remainingCourses 우선 */
+  const generalRequiredRemaining = useMemo(() => {
+    if (generalCat?.remainingCourses) {
+      return generalCat.remainingCourses.map((c) => detailToCourse(c))
+    }
+    return splitRoadmap(generalRequiredAll).remaining
+  }, [generalCat, generalRequiredAll])
+
+  const generalCompleted = useMemo(() => {
+    if (generalCat?.completedCourses?.length) {
+      return generalCat.completedCourses.map((c) => detailToCourse(c))
+    }
+    return (evaluation?.general?.completedCourses ?? []).map((c) =>
+      toCourse({
+        courseCode: '',
+        courseName: c.courseName,
+        credits: c.credits ?? c.credit,
+      }),
+    )
+  }, [generalCat, evaluation?.general?.completedCourses])
+
   const generalElective = useMemo(() => splitRoadmap(generalElectiveAll), [generalElectiveAll])
-  const bsm = useMemo(() => splitRoadmap(bsmAll), [bsmAll])
-  const major = useMemo(() => splitRoadmap(majorAll), [majorAll])
+  const bsmFromRoadmap = useMemo(() => splitRoadmap(bsmAll), [bsmAll])
+  const majorFromRoadmap = useMemo(() => splitRoadmap(majorAll), [majorAll])
+
+  const bsm = useMemo(() => {
+    if (bsmCat?.completedCourses || bsmCat?.remainingCourses) {
+      return {
+        completed: (bsmCat.completedCourses ?? []).map((c) => detailToCourse(c)),
+        remaining: (bsmCat.remainingCourses ?? []).map((c) => detailToCourse(c)),
+      }
+    }
+    return bsmFromRoadmap
+  }, [bsmCat, bsmFromRoadmap])
+
+  const major = useMemo(() => {
+    if (majorCat?.completedCourses || majorCat?.remainingCourses) {
+      return {
+        completed: (majorCat.completedCourses ?? []).map((c) => detailToCourse(c)),
+        remaining: (majorCat.remainingCourses ?? []).map((c) => detailToCourse(c)),
+      }
+    }
+    return majorFromRoadmap
+  }, [majorCat, majorFromRoadmap])
+
+  /** 인증선택 카드: remainingAreas 영역 목록 */
+  const certElectiveRemainingAreas = useMemo(() => {
+    const areas = certElectiveCat?.remainingAreas ?? []
+    if (areas.length > 0) {
+      return areas.map((a) =>
+        toCourse({
+          courseCode: (a.areaLabel || a.area || '').trim(),
+          courseName: a.areaLabel || a.area || '미충족 영역',
+          credits: a.remainingCourseCount ?? 0,
+        }),
+      )
+    }
+    return generalElective.remaining
+  }, [certElectiveCat, generalElective.remaining])
+
+  const certElectiveCompleted = useMemo(() => {
+    if (certElectiveCat?.completedCourses?.length) {
+      return certElectiveCat.completedCourses.map((c) =>
+        detailToCourse(c, { codeFromArea: true }),
+      )
+    }
+    return generalElective.completed
+  }, [certElectiveCat, generalElective.completed])
+
+  const certElectiveRemainingGroups = useMemo(() => {
+    const areas = certElectiveCat?.remainingAreas ?? []
+    return areas
+      .filter((a) => (a.areaLabel || a.area)?.trim())
+      .map((a) => ({
+        title: a.areaLabel || a.area || '',
+        courses: (a.remainingCourses ?? []).map((c) =>
+          detailToCourse(c, { codeFromArea: true }),
+        ),
+      }))
+  }, [certElectiveCat])
+
+  const certElectiveRemainingCoursesFlat = useMemo(() => {
+    if (certElectiveCat?.remainingCourses?.length) {
+      return certElectiveCat.remainingCourses.map((c) =>
+        detailToCourse(c, { codeFromArea: true }),
+      )
+    }
+    return certElectiveRemainingGroups.flatMap((g) => g.courses)
+  }, [certElectiveCat, certElectiveRemainingGroups])
 
   const designLists = useMemo(() => {
     const completed = designAll
@@ -245,7 +373,7 @@ export function EngineeringPage() {
       .filter((c) => !isActuallyCompleted(c))
       .map((c) =>
         toCourse({
-          courseCode: c.abeekCourseCode,
+          courseCode: '',
           courseName: c.courseName,
           credits: c.designCredits,
           semester: c.recommendedTerm,
@@ -257,44 +385,39 @@ export function EngineeringPage() {
   const displayName = evaluation?.studentName || roadmap?.studentName || student?.name || '학생'
 
   // 전문교양 = evaluation.general (로드맵 GENERAL+REQUIRED로 재계산하지 않음)
-  const generalEarned = toNumber(evaluation?.general?.earnedCredits)
-  const generalRequiredCredits = toNumber(evaluation?.general?.requiredCredits)
-  const generalPct = toPercent(evaluation?.general?.progressPercent)
-  const generalCompleted = useMemo(
-    () =>
-      (evaluation?.general?.completedCourses ?? []).map((c) =>
-        toCourse({
-          courseCode: c.courseCode,
-          courseName: c.courseName,
-          credits: c.credits ?? c.credit,
-        }),
-      ),
-    [evaluation?.general?.completedCourses],
+  const generalEarned = toNumber(
+    generalCat?.earnedCredits ?? evaluation?.general?.earnedCredits,
+  )
+  const generalRequiredCredits = toNumber(
+    generalCat?.requiredCredits ?? evaluation?.general?.requiredCredits,
+  )
+  const generalPct = toPercent(
+    generalCat?.progressPercent ?? evaluation?.general?.progressPercent,
   )
 
   const genElecEarned =
-    toNumber(evaluation?.certElective?.earnedCredits) ||
-    generalElective.completed.reduce((s, c) => s + c.credits, 0)
+    toNumber(certElectiveCat?.earnedCredits ?? evaluation?.certElective?.earnedCredits) ||
+    certElectiveCompleted.reduce((s, c) => s + c.credits, 0)
   const genElecRequired =
-    toNumber(evaluation?.certElective?.requiredCredits) ||
+    toNumber(certElectiveCat?.requiredCredits ?? evaluation?.certElective?.requiredCredits) ||
     generalElectiveAll.reduce((s, c) => s + toNumber(c.credits), 0)
   const genElecPct =
-    toNumber(evaluation?.certElective?.progressPercent) > 0
-      ? toPercent(evaluation?.certElective?.progressPercent)
+    toNumber(certElectiveCat?.progressPercent ?? evaluation?.certElective?.progressPercent) > 0
+      ? toPercent(certElectiveCat?.progressPercent ?? evaluation?.certElective?.progressPercent)
       : genElecRequired > 0
         ? Math.max(0, Math.min(100, Math.round((genElecEarned / genElecRequired) * 100)))
         : generalPct
 
-  const bsmEarned = toNumber(evaluation?.bsm?.earnedCredits)
-  const bsmRequired = toNumber(evaluation?.bsm?.requiredCredits)
+  const bsmEarned = toNumber(bsmCat?.earnedCredits ?? evaluation?.bsm?.earnedCredits)
+  const bsmRequired = toNumber(bsmCat?.requiredCredits ?? evaluation?.bsm?.requiredCredits)
   const bsmPct =
     bsmRequired > 0
       ? Math.max(0, Math.min(100, Math.round((bsmEarned / bsmRequired) * 100)))
-      : toPercent(evaluation?.bsm?.progressPercent)
+      : toPercent(bsmCat?.progressPercent ?? evaluation?.bsm?.progressPercent)
 
-  const majorEarned = toNumber(evaluation?.major?.earnedCredits)
-  const majorRequired = toNumber(evaluation?.major?.requiredCredits)
-  const majorPct = toPercent(evaluation?.major?.progressPercent)
+  const majorEarned = toNumber(majorCat?.earnedCredits ?? evaluation?.major?.earnedCredits)
+  const majorRequired = toNumber(majorCat?.requiredCredits ?? evaluation?.major?.requiredCredits)
+  const majorPct = toPercent(majorCat?.progressPercent ?? evaluation?.major?.progressPercent)
 
   const designEarned =
     roadmap?.summary?.completedDesignCredits ??
@@ -618,24 +741,34 @@ export function EngineeringPage() {
           {showCertElective && (
             <AbeekDetailCard
               title="인증선택"
-              remainingTitle="남은 인증선택 과목"
+              remainingTitle="남은 영역"
               percent={genElecPct}
               earned={genElecEarned}
               required={genElecRequired}
-              completed={generalElective.completed}
-              remaining={generalElective.remaining}
+              completed={certElectiveCompleted}
+              remaining={certElectiveRemainingAreas}
               onOpenCompleted={() =>
                 setListModal({
                   title: '인증선택 이수 과목',
-                  subtitle: `${genElecEarned}학점 · ${generalElective.completed.length}과목`,
-                  courses: generalElective.completed,
+                  subtitle: `${genElecEarned}학점 · ${certElectiveCompleted.length}과목`,
+                  courses: certElectiveCompleted,
                 })
               }
               onOpenRemaining={() =>
                 setListModal({
-                  title: '인증선택 남은 과목',
-                  subtitle: `${generalElective.remaining.length}과목`,
-                  courses: generalElective.remaining,
+                  title: '인증선택 남은 영역',
+                  subtitle:
+                    certElectiveRemainingAreas.length > 0
+                      ? `${certElectiveRemainingAreas.length}개 영역`
+                      : `${certElectiveRemainingCoursesFlat.length}과목`,
+                  courses:
+                    certElectiveRemainingGroups.length > 0
+                      ? []
+                      : certElectiveRemainingCoursesFlat,
+                  groups:
+                    certElectiveRemainingGroups.length > 0
+                      ? certElectiveRemainingGroups
+                      : undefined,
                 })
               }
             />

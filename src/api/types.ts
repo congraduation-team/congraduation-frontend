@@ -457,6 +457,48 @@ export type AbeekEvaluationResponse = {
   messages?: string[]
 }
 
+/** GET .../abeek-evaluation/detail 의 과목 행 */
+export type AbeekDetailCourse = {
+  courseCode: string
+  /** 세종 학수번호 (예: 004310). 인증선택은 null */
+  sejongCourseCode?: string | null
+  courseName: string
+  credits?: number | string
+  credit?: string
+  role?: string
+  electiveArea?: string | null
+  electiveAreaLabel?: string | null
+}
+
+export type AbeekRemainingArea = {
+  area?: string
+  areaLabel?: string
+  remainingCourseCount?: number
+  remainingCourses?: AbeekDetailCourse[]
+}
+
+export type AbeekEvaluationCategoryDetail = {
+  categoryKey?: string
+  categoryLabel?: string
+  earnedCredits?: string | number
+  requiredCredits?: string | number
+  progressPercent?: string | number
+  satisfied?: boolean
+  completedCourses?: AbeekDetailCourse[]
+  /** GENERAL 등: 필수 남은 과목만 */
+  remainingCourses?: AbeekDetailCourse[]
+  /** CERT_ELECTIVE: 미충족 영역 */
+  remainingAreas?: AbeekRemainingArea[]
+}
+
+/** GET /api/abeek/students/{id}/abeek-evaluation/detail */
+export type AbeekEvaluationDetailResponse = {
+  studentId?: string
+  studentNo?: string
+  studentName?: string
+  categories?: AbeekEvaluationCategoryDetail[]
+}
+
 export type CurriculumCourseCategory = 'GENERAL' | 'BSM' | 'MAJOR'
 export type CurriculumCourseRole = 'REQUIRED' | 'CERT_ELECTIVE' | 'ELECTIVE' | 'BSM_REQUIRED'
 

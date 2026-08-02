@@ -8,8 +8,13 @@ export function isAcademicCourseCode(code?: string | null): boolean {
   return true
 }
 
+/** 목록 학수번호 칸 표시값 (학수번호 또는 인증선택 영역라벨). 내부코드면 빈 문자열 */
 export function displayCourseCode(code?: string | null): string {
-  return isAcademicCourseCode(code) ? String(code).trim() : ''
+  if (!code?.trim()) return ''
+  const trimmed = code.trim()
+  if (/^[A-Z][A-Z0-9_]*$/.test(trimmed) && trimmed.includes('_')) return ''
+  if (/^[A-Z]{2,}_/.test(trimmed)) return ''
+  return trimmed
 }
 
 export function normalizeCourseNameKey(name?: string | null): string {
