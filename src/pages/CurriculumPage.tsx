@@ -430,8 +430,9 @@ function generalToMapCourse(
 ): MapCourse | null {
   if (!course.courseCode) return null
 
-  const semester = pickGeneralDisplayTerm([termKey])
-  if (!semester) return null
+  // 미이수: API term.termKey 그대로 (재계산·재정렬하지 않음)
+  const semester = termKey.trim()
+  if (!isSemesterKey(semester)) return null
 
   return {
     id: course.courseCode,
@@ -541,7 +542,9 @@ function flattenStudentRoadmapCourses(
   const seen = new Set<string>()
 
   for (const term of roadmap.terms ?? []) {
-    const termKey = (term.standingTermKey || term.termKey || '').trim()
+    const calendarTermKey = (term.termKey || '').trim()
+    // 기이수: standing 우선 / 미이수: termKey 그대로 (달력·standing으로 덮지 않음)
+    const completedTermKey = (term.standingTermKey || term.termKey || '').trim()
     const fromCourses = term.courses ?? []
     const fromCategories = Object.values(term.categories ?? {}).flat()
     // courses와 categories 모두 병합 (한쪽만 쓰면 GENERAL/BSM이 빠질 수 있음)
@@ -549,6 +552,9 @@ function flattenStudentRoadmapCourses(
 
     for (const course of merged) {
       if (!course?.courseCode) continue
+      const termKey =
+        course.completed === true ? completedTermKey : calendarTermKey
+      if (!termKey) continue
       const key = `${termKey}:${course.courseCode}`
       if (seen.has(key)) continue
       seen.add(key)
@@ -1010,13 +1016,32 @@ export function CurriculumPage() {
         continue
       }
 
-      for (const { course, termKey } of instances) {
-        const mapped = generalToMapCourse(course, termKey)
-        if (mapped) fromTimetable.push(mapped)
-      }
+      // incomplete 동일 courseCode 중복: last-wins 금지 → 앞쪽 학기(termKey) 하나만
+      const preferred = instances
+        .slice()
+        .sort((a, b) => semesterOrder(a.termKey) - semesterOrder(b.termKey))[0]
+      const mapped = generalToMapCourse(preferred.course, preferred.termKey)
+      if (mapped) fromTimetable.push(mapped)
     }
 
-    const byId = new Map(fromTimetable.map((c) => [c.id, c]))
+    // last-wins Map 대신 이수 우선·동일하면 앞쪽 학기 유지
+    const byId = new Map<string, MapCourse>()
+    for (const course of fromTimetable) {
+      const existing = byId.get(course.id)
+      if (!existing) {
+        byId.set(course.id, course)
+        continue
+      }
+      if (course.completed && !existing.completed) {
+        byId.set(course.id, course)
+        continue
+      }
+      if (course.completed === existing.completed) {
+        if (semesterOrder(course.semester) < semesterOrder(existing.semester)) {
+          byId.set(course.id, course)
+        }
+      }
+    }
     const majorCodes = new Set(
       [...byId.values()].filter((c) => c.category.startsWith('major')).map((c) => c.id),
     )
