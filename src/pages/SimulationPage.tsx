@@ -830,9 +830,12 @@ export function SimulationPage() {
                                   ⋮⋮
                                 </span>
                                 <div className="min-w-0 flex-1">
-                                  <div className="flex items-start gap-1.5">
-                                    <p className="min-w-0 flex-1 text-[12px] font-semibold leading-snug text-ink">
-                                      <CourseNameText name={course.courseName} />
+                                  <div className="flex items-center gap-1.5">
+                                    <p
+                                      className="min-w-0 flex-1 truncate text-[12px] font-semibold text-ink"
+                                      title={course.courseName}
+                                    >
+                                      {course.courseName}
                                     </p>
                                     <select
                                       value={normalizeGrade(course.expectedGrade)}
