@@ -795,16 +795,16 @@ function CreditStatusSummary({
   const shortfall = hasRequirement ? Math.max(0, need - earned) : 0
 
   return (
-    <div className="mt-1.5 min-w-[8.25rem] rounded-xl bg-[#f7f8fa] px-3 py-2.5 text-center">
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-baseline justify-between gap-3">
+    <div className="mt-1.5 min-w-[7.5rem] text-center">
+      <div className="flex flex-col gap-1">
+        <div className="flex items-baseline justify-between gap-2.5">
           <span className="text-[11px] font-semibold text-ink-muted">이수</span>
           <span className="text-[15px] font-extrabold tracking-tight text-ink">
             {earned}
             <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
           </span>
         </div>
-        <div className="flex items-baseline justify-between gap-3">
+        <div className="flex items-baseline justify-between gap-2.5">
           <span className="text-[11px] font-semibold text-ink-muted">필요</span>
           <span className="text-[15px] font-extrabold tracking-tight text-ink">
             {hasRequirement ? need : '-'}
@@ -816,8 +816,8 @@ function CreditStatusSummary({
       </div>
       {hasRequirement && (
         <p
-          className={`mt-2 rounded-full px-2.5 py-1 text-[10px] font-bold leading-none ${
-            satisfied ? 'bg-[#e8f5ee] text-[#1f7a4d]' : 'bg-sejong/10 text-sejong'
+          className={`mt-1.5 text-[11px] font-bold leading-none ${
+            satisfied ? 'text-[#1f7a4d]' : 'text-sejong'
           }`}
         >
           {satisfied ? '요건 충족' : `${shortfall}학점 부족`}
