@@ -233,6 +233,7 @@ export function getAbeekTimetableTerms() {
 
 /** 계획용 교과목 카탈로그 (시간표 기반)
  * studentId 전달 시: 교양/자기주도창의전공 노출, 타학과→전공선택 보정, B0↑ 기이수 제외
+ * semester: 활성 학기 카드 기준 1 또는 2 (개설 학기 필터)
  */
 export function getPlannedCourseCatalog(options: {
   studentId?: number | string
@@ -241,6 +242,7 @@ export function getPlannedCourseCatalog(options: {
   offeredTerm?: string
   departmentName?: string
   category?: string
+  semester?: number | string
 } = {}) {
   const params = new URLSearchParams()
   if (options.studentId != null && options.studentId !== '') {
@@ -251,6 +253,9 @@ export function getPlannedCourseCatalog(options: {
   if (options.offeredTerm) params.set('offeredTerm', options.offeredTerm)
   if (options.departmentName) params.set('departmentName', options.departmentName)
   if (options.category) params.set('category', options.category)
+  if (options.semester != null && options.semester !== '') {
+    params.set('semester', String(options.semester))
+  }
   const qs = params.toString()
   return apiJson<PlannableCourseCatalogResponse>(
     `/api/planned-courses/catalog${qs ? `?${qs}` : ''}`,

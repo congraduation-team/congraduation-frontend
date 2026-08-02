@@ -204,9 +204,28 @@ export type GraduationProgressResponse = {
   swCodingCertification?: SwCodingCertificationProgress
   /** 일부 배포에서 graduation-progress에 포함될 수 있음 */
   readingStatus?: SejongReadingStatus
-  /** 계획 과목 반영 후 졸업 가능 여부 */
+  /** 계획 과목 반영 후 졸업 가능 여부 (레거시·호환) */
   graduationEligible?: boolean
-  /** 아직 부족한 조건 목록 */
+  /** 아직 부족한 조건 목록 (레거시·호환) */
+  graduationBlockers?: string[]
+  /**
+   * 계획 과목 반영 시뮬레이션 결과.
+   * top-level 학점/평점은 기이수 기준, simulation은 계획 반영 기준.
+   */
+  simulation?: GraduationSimulationResult
+}
+
+/** graduation-progress.simulation — 계획 과목 반영 결과 */
+export type GraduationSimulationResult = {
+  averageGradePoint?: string
+  majorGradePoint?: string
+  liberalGradePoint?: string
+  totalCredits?: CreditProgress
+  majorCredits?: MajorCreditSummary
+  commonLiberalCredits?: CreditProgress
+  electiveLiberalCredits?: CreditProgress
+  balancedLiberalCredits?: CreditProgress
+  graduationEligible?: boolean
   graduationBlockers?: string[]
 }
 

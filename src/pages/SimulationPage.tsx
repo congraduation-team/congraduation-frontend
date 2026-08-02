@@ -385,9 +385,17 @@ export function SimulationPage() {
     let cancelled = false
     ;(async () => {
       try {
+        const activeSem =
+          planned?.semesters?.find((s) => s.plannedSemesterId === activeSemesterId) ??
+          planned?.semesters?.[0]
+        const semester =
+          activeSem?.semester === 1 || activeSem?.semester === 2
+            ? activeSem.semester
+            : undefined
         const res = await getPlannedCourseCatalog({
           studentId: student.id,
           departmentName: student.major || undefined,
+          semester,
         })
         if (cancelled) return
         const map = new Map<string, string>()
@@ -403,17 +411,25 @@ export function SimulationPage() {
     return () => {
       cancelled = true
     }
-  }, [student])
+  }, [student, planned, activeSemesterId])
 
   useEffect(() => {
     if (!student) return
     let cancelled = false
+    const activeSem =
+      planned?.semesters?.find((s) => s.plannedSemesterId === activeSemesterId) ??
+      planned?.semesters?.[0]
+    const semester =
+      activeSem?.semester === 1 || activeSem?.semester === 2
+        ? activeSem.semester
+        : undefined
     const timer = window.setTimeout(async () => {
       try {
         const res = await getPlannedCourseCatalog({
           studentId: student.id,
           keyword: query.trim() || undefined,
           departmentName: student.major || undefined,
+          semester,
         })
         if (cancelled) return
         const items = (res.courses ?? [])
@@ -435,7 +451,7 @@ export function SimulationPage() {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [student, query])
+  }, [student, query, planned, activeSemesterId])
 
   const resolveCourseCode = useCallback(
     (course: PlannedCourseItem) => {
@@ -461,13 +477,20 @@ export function SimulationPage() {
   )
 
   const earnedTotal = toNumber(progress?.totalCredits?.earnedCredits)
-  const requiredTotal = toNumber(progress?.totalCredits?.requiredCredits) || 130
+  const requiredTotal =
+    toNumber(
+      progress?.simulation?.totalCredits?.requiredCredits ??
+        progress?.totalCredits?.requiredCredits,
+    ) || 130
   const earnedMajor = toNumber(
     progress?.majorCredits?.earnedMajorCredits ?? evaluation?.major?.earnedCredits,
   )
   const requiredMajor =
-    toNumber(progress?.majorCredits?.requiredMajorCredits ?? evaluation?.major?.requiredCredits) ||
-    45
+    toNumber(
+      progress?.simulation?.majorCredits?.requiredMajorCredits ??
+        progress?.majorCredits?.requiredMajorCredits ??
+        evaluation?.major?.requiredCredits,
+    ) || 45
 
   const plannedCredits =
     toNumber(planned?.totalPlannedCredits) ||
@@ -479,8 +502,14 @@ export function SimulationPage() {
     })
     .reduce((s, c) => s + toNumber(c.credit), 0)
 
-  const projectedTotal = earnedTotal + plannedCredits
-  const projectedMajor = earnedMajor + plannedMajorCredits
+  // top-level = 기이수, simulation = 계획 반영. 시뮬 없으면 FE에서 합산
+  const sim = progress?.simulation
+  const projectedTotal = sim?.totalCredits
+    ? toNumber(sim.totalCredits.earnedCredits)
+    : earnedTotal + plannedCredits
+  const projectedMajor = sim?.majorCredits
+    ? toNumber(sim.majorCredits.earnedMajorCredits)
+    : earnedMajor + plannedMajorCredits
   const totalPct =
     requiredTotal > 0 ? Math.min(100, Math.round((projectedTotal / requiredTotal) * 100)) : 0
   const majorPct =
@@ -489,8 +518,14 @@ export function SimulationPage() {
     requiredTotal > 0 ? Math.min(100, Math.round((earnedTotal / requiredTotal) * 100)) : 0
 
   const canGraduate =
+    sim?.graduationEligible === true ||
     progress?.graduationEligible === true ||
     (projectedTotal >= requiredTotal && projectedMajor >= requiredMajor)
+
+  const simTotalGpa = toNumber(sim?.averageGradePoint)
+  const simMajorGpa = toNumber(sim?.majorGradePoint)
+  const simLiberalGpa = toNumber(sim?.liberalGradePoint)
+  const hasSimGpa = simTotalGpa > 0 || simMajorGpa > 0 || simLiberalGpa > 0
 
   const gradeDist = useMemo(() => {
     const counts: Record<string, number> = {}
@@ -509,7 +544,8 @@ export function SimulationPage() {
 
   const missingItems = useMemo(() => {
     const items: string[] = []
-    for (const blocker of progress?.graduationBlockers ?? []) {
+    const blockers = sim?.graduationBlockers ?? progress?.graduationBlockers ?? []
+    for (const blocker of blockers) {
       if (blocker) items.push(blocker)
     }
     if (projectedMajor < requiredMajor) {
@@ -522,7 +558,15 @@ export function SimulationPage() {
       if (msg.includes('미이수')) items.push(msg.replace(/^[·•\s]+/, ''))
     }
     return [...new Set(items)].slice(0, 6)
-  }, [progress?.graduationBlockers, projectedMajor, requiredMajor, projectedTotal, requiredTotal, evaluation])
+  }, [
+    sim?.graduationBlockers,
+    progress?.graduationBlockers,
+    projectedMajor,
+    requiredMajor,
+    projectedTotal,
+    requiredTotal,
+    evaluation,
+  ])
 
   const recommendations = useMemo(() => {
     const admit = student?.admissionYear ?? progress?.admissionYear
@@ -1057,23 +1101,51 @@ export function SimulationPage() {
           <div className="space-y-5">
             <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
               <h2 className="mb-4 text-base font-bold text-ink">예상 성적 분포</h2>
-              {gradeDist.length === 0 ? (
-                <p className="text-xs text-ink-faint">계획 과목의 예상 성적이 여기 표시됩니다.</p>
+              {(hasSimGpa || gradeDist.length > 0) ? (
+                <>
+                  <div className="mb-4 grid grid-cols-3 gap-2">
+                    <div className="rounded-xl bg-panel/70 px-2.5 py-2.5 text-center">
+                      <p className="text-[11px] font-semibold text-ink-muted">예상 총평점</p>
+                      <p className="mt-1 text-lg font-extrabold tracking-tight text-ink">
+                        {simTotalGpa > 0 ? simTotalGpa.toFixed(2) : '-'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-panel/70 px-2.5 py-2.5 text-center">
+                      <p className="text-[11px] font-semibold text-ink-muted">예상 전공</p>
+                      <p className="mt-1 text-lg font-extrabold tracking-tight text-ink">
+                        {simMajorGpa > 0 ? simMajorGpa.toFixed(2) : '-'}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-panel/70 px-2.5 py-2.5 text-center">
+                      <p className="text-[11px] font-semibold text-ink-muted">예상 교양</p>
+                      <p className="mt-1 text-lg font-extrabold tracking-tight text-ink">
+                        {simLiberalGpa > 0 ? simLiberalGpa.toFixed(2) : '-'}
+                      </p>
+                    </div>
+                  </div>
+                  {gradeDist.length === 0 ? (
+                    <p className="text-xs text-ink-faint">계획 과목의 예상 성적이 여기 표시됩니다.</p>
+                  ) : (
+                    <ul className="space-y-2.5">
+                      {gradeDist.map((item) => (
+                        <li key={item.grade} className="flex items-center gap-2 text-xs">
+                          <span className="w-8 font-bold text-ink">{item.grade}</span>
+                          <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-panel">
+                            <div
+                              className="h-full rounded-full bg-sejong"
+                              style={{ width: `${(item.count / maxGradeCount) * 100}%` }}
+                            />
+                          </div>
+                          <span className="w-6 text-right font-semibold text-ink-muted">
+                            {item.count}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
               ) : (
-                <ul className="space-y-2.5">
-                  {gradeDist.map((item) => (
-                    <li key={item.grade} className="flex items-center gap-2 text-xs">
-                      <span className="w-8 font-bold text-ink">{item.grade}</span>
-                      <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-panel">
-                        <div
-                          className="h-full rounded-full bg-sejong"
-                          style={{ width: `${(item.count / maxGradeCount) * 100}%` }}
-                        />
-                      </div>
-                      <span className="w-6 text-right font-semibold text-ink-muted">{item.count}</span>
-                    </li>
-                  ))}
-                </ul>
+                <p className="text-xs text-ink-faint">계획 과목의 예상 성적이 여기 표시됩니다.</p>
               )}
             </section>
 
