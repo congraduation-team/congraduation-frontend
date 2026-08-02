@@ -430,6 +430,12 @@ export function EngineeringPage() {
     evaluation?.certElectiveApplicable ??
     ((evaluation?.entranceYear ?? student?.admissionYear ?? 9999) >= 2022)
 
+  // GENERAL: 21학번까지 전문교양, 22학번부터 인증필수
+  const generalLabel =
+    (evaluation?.entranceYear ?? student?.admissionYear ?? 9999) >= 2022
+      ? '인증필수'
+      : '전문교양'
+
   if (loading) {
     return <div className="py-20 text-center text-sm text-ink-muted">공학인증을 불러오는 중...</div>
   }
@@ -502,7 +508,7 @@ export function EngineeringPage() {
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <SummaryMiniGauge
-              label="인증필수"
+              label={generalLabel}
               percent={generalPct}
               earned={generalEarned}
               required={generalRequiredCredits}
@@ -636,7 +642,7 @@ export function EngineeringPage() {
         {/* 카테고리 상세 — 졸업요건 DetailCreditCard와 동일 형식 */}
         <div className="grid items-stretch gap-4 lg:grid-cols-2">
           <AbeekDetailCard
-            title="인증필수"
+            title={generalLabel}
             remainingTitle="남은 필수 과목"
             percent={generalPct}
             earned={generalEarned}
@@ -645,14 +651,14 @@ export function EngineeringPage() {
             remaining={generalRequiredRemaining}
             onOpenCompleted={() =>
               setListModal({
-                title: '인증필수 이수 과목',
+                title: `${generalLabel} 이수 과목`,
                 subtitle: `${generalEarned}학점 · ${generalCompleted.length}과목`,
                 courses: generalCompleted,
               })
             }
             onOpenRemaining={() =>
               setListModal({
-                title: '인증필수 남은 과목',
+                title: `${generalLabel} 남은 과목`,
                 subtitle: `${generalRequiredRemaining.length}과목`,
                 courses: generalRequiredRemaining,
               })
