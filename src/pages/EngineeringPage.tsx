@@ -111,15 +111,9 @@ function toCourse(c: {
 }
 
 /** detail API 과목 → UI Course. 학수번호는 sejongCourseCode만 사용 */
-function detailToCourse(
-  c: AbeekDetailCourse,
-  opts?: { codeFromArea?: boolean },
-): Course {
-  const code = opts?.codeFromArea
-    ? (c.electiveAreaLabel || c.electiveArea || '').trim()
-    : (c.sejongCourseCode || '').trim()
+function detailToCourse(c: AbeekDetailCourse): Course {
   return {
-    code,
+    code: (c.sejongCourseCode || '').trim(),
     name: c.courseName,
     credits: toNumber(c.credits ?? c.credit),
   }
@@ -337,9 +331,7 @@ export function EngineeringPage() {
 
   const certElectiveCompleted = useMemo(() => {
     if (certElectiveCat?.completedCourses?.length) {
-      return certElectiveCat.completedCourses.map((c) =>
-        detailToCourse(c, { codeFromArea: true }),
-      )
+      return certElectiveCat.completedCourses.map((c) => detailToCourse(c))
     }
     return generalElective.completed
   }, [certElectiveCat, generalElective.completed])
@@ -350,17 +342,13 @@ export function EngineeringPage() {
       .filter((a) => (a.areaLabel || a.area)?.trim())
       .map((a) => ({
         title: a.areaLabel || a.area || '',
-        courses: (a.remainingCourses ?? []).map((c) =>
-          detailToCourse(c, { codeFromArea: true }),
-        ),
+        courses: (a.remainingCourses ?? []).map((c) => detailToCourse(c)),
       }))
   }, [certElectiveCat])
 
   const certElectiveRemainingCoursesFlat = useMemo(() => {
     if (certElectiveCat?.remainingCourses?.length) {
-      return certElectiveCat.remainingCourses.map((c) =>
-        detailToCourse(c, { codeFromArea: true }),
-      )
+      return certElectiveCat.remainingCourses.map((c) => detailToCourse(c))
     }
     return certElectiveRemainingGroups.flatMap((g) => g.courses)
   }, [certElectiveCat, certElectiveRemainingGroups])
