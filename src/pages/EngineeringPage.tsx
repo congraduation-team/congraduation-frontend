@@ -86,6 +86,7 @@ export function EngineeringPage() {
     title: string
     subtitle?: string
     courses: Course[]
+    groups?: Array<{ title: string; courses: Course[] }>
   } | null>(null)
 
   useEffect(() => {
@@ -261,7 +262,17 @@ export function EngineeringPage() {
         credits: row.credits ?? row.credit,
       })
     })
-    // BE missingBalancedLiberalAreas 우선 (0학점·미이수 영역 포함)
+    const details = graduation?.missingBalancedLiberalAreaDetails ?? []
+    const remainingFromDetails = details
+      .filter((d) => d.area?.trim())
+      .map((d) => {
+        const hit = areas.find((a) => a.area === d.area)
+        return toCourse({
+          courseCode: d.area,
+          courseName: d.area,
+          credits: hit?.earnedCredits,
+        })
+      })
     const missingFromApi = (graduation?.missingBalancedLiberalAreas ?? [])
       .map((name) => name?.trim())
       .filter((name): name is string => !!name)
@@ -282,12 +293,31 @@ export function EngineeringPage() {
           credits: a.earnedCredits,
         }),
       )
+    const remainingGroups = details
+      .filter((d) => d.area?.trim())
+      .map((d) => ({
+        title: d.area,
+        courses: (d.candidateCourses ?? []).map((c) =>
+          toCourse({
+            courseCode: c.courseCode,
+            courseName: c.courseName,
+            credits: c.credit,
+          }),
+        ),
+      }))
+
     return {
       earned: toNumber(fromCredits?.earnedCredits),
       required: toNumber(fromCredits?.requiredCredits),
       percent: toPercent(fromCredits?.progressPercent),
       completed,
-      remaining: missingFromApi.length > 0 ? missingFromApi : unsatisfiedAreas,
+      remaining:
+        remainingFromDetails.length > 0
+          ? remainingFromDetails
+          : missingFromApi.length > 0
+            ? missingFromApi
+            : unsatisfiedAreas,
+      remainingGroups,
       requiredAreas: graduation?.balancedLiberalRequiredAreaCount ?? 0,
       completedAreas: graduation?.balancedLiberalCompletedAreaCount ?? 0,
     }
@@ -642,7 +672,14 @@ export function EngineeringPage() {
                             balancedLiberal.requiredAreas > 0
                               ? `${balancedLiberal.completedAreas}/${balancedLiberal.requiredAreas}개 영역`
                               : `${balancedLiberal.remaining.length}개`,
-                          courses: balancedLiberal.remaining,
+                          courses:
+                            balancedLiberal.remainingGroups.length > 0
+                              ? []
+                              : balancedLiberal.remaining,
+                          groups:
+                            balancedLiberal.remainingGroups.length > 0
+                              ? balancedLiberal.remainingGroups
+                              : undefined,
                         })
                       }
                     />
@@ -734,6 +771,7 @@ export function EngineeringPage() {
           title={listModal?.title ?? '과목 목록'}
           subtitle={listModal?.subtitle}
           courses={listModal?.courses ?? []}
+          groups={listModal?.groups}
         />
       </div>
     </div>

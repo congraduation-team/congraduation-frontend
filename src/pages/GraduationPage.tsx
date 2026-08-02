@@ -43,6 +43,7 @@ export function GraduationPage() {
     title: string
     subtitle?: string
     courses: ReturnType<typeof toUiCourses>
+    groups?: Array<{ title: string; courses: ReturnType<typeof toUiCourses> }>
   } | null>(null)
 
   useEffect(() => {
@@ -134,6 +135,10 @@ export function GraduationPage() {
         c.category.includes('공통교양') ||
         c.category === '교필',
     )
+    const remainingFromApi = (progress?.remainingCommonLiberalRequiredCourses ?? [])
+      .map((row) => row.course)
+      .filter((c): c is NonNullable<typeof c> => !!c?.courseName)
+
     return {
       earned: toNumber(fromCredits?.earnedCredits ?? fromSummary?.earnedCredits),
       required: toNumber(fromCredits?.requiredCredits ?? fromSummary?.requiredCredits),
@@ -144,11 +149,13 @@ export function GraduationPage() {
         progress?.commonLiberalCourses ??
         [],
       remaining:
-        fromCredits?.remainingCourses ??
-        fromCredits?.missingCourses ??
-        fromSummary?.remainingCourses ??
-        fromSummary?.missingCourses ??
-        [],
+        remainingFromApi.length > 0
+          ? remainingFromApi
+          : fromCredits?.remainingCourses ??
+            fromCredits?.missingCourses ??
+            fromSummary?.remainingCourses ??
+            fromSummary?.missingCourses ??
+            [],
     }
   }, [progress])
 
@@ -187,19 +194,31 @@ export function GraduationPage() {
     )
     const areas = progress?.balancedLiberalAreaProgresses ?? []
     const completedFromAreas = areas.flatMap((a) => a.courses ?? [])
-    // BE missingBalancedLiberalAreas: 정책상 가능한 영역 중 미충족 (0학점 영역 포함)
-    const missingAreaNames = progress?.missingBalancedLiberalAreas ?? []
-    const missingFromApi = missingAreaNames
-      .map((name) => name?.trim())
-      .filter((name): name is string => !!name)
-      .map((name) => {
-        const hit = areas.find((a) => a.area === name)
-        return {
-          name,
-          credits: toNumber(hit?.earnedCredits),
-          code: name,
-        }
-      })
+    const details = progress?.missingBalancedLiberalAreaDetails ?? []
+
+    // 영역명 목록 (카드 우측 미리보기)
+    const remainingAreas =
+      details.length > 0
+        ? details.map((d) => {
+            const hit = areas.find((a) => a.area === d.area)
+            return {
+              name: d.area,
+              credits: toNumber(hit?.earnedCredits),
+              code: d.area,
+            }
+          })
+        : (progress?.missingBalancedLiberalAreas ?? [])
+            .map((name) => name?.trim())
+            .filter((name): name is string => !!name)
+            .map((name) => {
+              const hit = areas.find((a) => a.area === name)
+              return {
+                name,
+                credits: toNumber(hit?.earnedCredits),
+                code: name,
+              }
+            })
+
     const unsatisfiedAreas = areas
       .filter((a) => a.satisfied !== true)
       .map((a) => ({
@@ -207,6 +226,7 @@ export function GraduationPage() {
         credits: toNumber(a.earnedCredits),
         code: a.area,
       }))
+
     const fallbackRemaining = toUiCourses(
       fromCredits?.remainingCourses ??
         fromCredits?.missingCourses ??
@@ -214,6 +234,14 @@ export function GraduationPage() {
         fromSummary?.missingCourses ??
         [],
     )
+
+    // 모달용: 영역별 추천 과목
+    const remainingGroups = details
+      .filter((d) => d.area?.trim())
+      .map((d) => ({
+        title: d.area,
+        courses: toUiCourses(d.candidateCourses ?? []),
+      }))
 
     return {
       earned: toNumber(fromCredits?.earnedCredits ?? fromSummary?.earnedCredits),
@@ -223,11 +251,12 @@ export function GraduationPage() {
         fromCredits?.completedCourses ?? fromSummary?.courses ?? completedFromAreas,
       ),
       remaining:
-        missingFromApi.length > 0
-          ? missingFromApi
+        remainingAreas.length > 0
+          ? remainingAreas
           : unsatisfiedAreas.length > 0
             ? unsatisfiedAreas
             : fallbackRemaining,
+      remainingGroups,
       requiredAreas: progress?.balancedLiberalRequiredAreaCount ?? 0,
       completedAreas: progress?.balancedLiberalCompletedAreaCount ?? 0,
       areas,
@@ -622,7 +651,14 @@ export function GraduationPage() {
                     balancedLiberal.requiredAreas > 0
                       ? `${balancedLiberal.completedAreas}/${balancedLiberal.requiredAreas}개 영역`
                       : `${balancedLiberal.remaining.length}개`,
-                  courses: balancedLiberal.remaining,
+                  courses:
+                    balancedLiberal.remainingGroups.length > 0
+                      ? []
+                      : balancedLiberal.remaining,
+                  groups:
+                    balancedLiberal.remainingGroups.length > 0
+                      ? balancedLiberal.remainingGroups
+                      : undefined,
                 })
               }
             />
@@ -674,6 +710,7 @@ export function GraduationPage() {
         title={listModal?.title ?? '과목 목록'}
         subtitle={listModal?.subtitle}
         courses={listModal?.courses ?? []}
+        groups={listModal?.groups}
       />
     </div>
   )

@@ -100,6 +100,18 @@ export type CategoryCourse = {
   credit: string
 }
 
+/** 남은 공통교양 필수 (동등 이수 정보 포함) */
+export type RemainingCommonLiberalRequiredCourse = {
+  course: CategoryCourse
+  equivalentCompletedCourses?: string[]
+}
+
+/** 균필 미충족 영역 + 추천 과목 */
+export type MissingBalancedLiberalAreaDetail = {
+  area: string
+  candidateCourses?: CategoryCourse[]
+}
+
 export type CreditProgress = {
   category?: string
   earnedCredits?: string | number
@@ -154,6 +166,8 @@ export type GraduationProgressResponse = {
   commonLiberalCredits?: CreditProgress
   /** 공통교양(공필/교필) 상세 과목 목록 */
   commonLiberalCourses?: CategoryCourse[]
+  /** 남은 공통교양 필수 과목 */
+  remainingCommonLiberalRequiredCourses?: RemainingCommonLiberalRequiredCourse[]
   electiveLiberalCredits?: CreditProgress
   balancedLiberalCredits?: CreditProgress
   academicFoundationCredits?: CreditProgress
@@ -167,7 +181,10 @@ export type GraduationProgressResponse = {
   remainingMajorRequiredCourses?: RequirementCourse[]
   /** 주전공 선택 미이수 과목 (있으면 사용) */
   remainingMajorElectiveCourses?: RequirementCourse[]
+  /** 균필 미충족 영역명 */
   missingBalancedLiberalAreas?: string[]
+  /** 균필 미충족 영역별 추천 과목 */
+  missingBalancedLiberalAreaDetails?: MissingBalancedLiberalAreaDetail[]
   balancedLiberalAreaProgresses?: Array<{
     area: string
     earnedCredits: string
