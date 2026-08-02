@@ -23,6 +23,64 @@ import { useMajorTrack } from '../context/MajorTrackContext'
 import type { Course } from '../data/mockData'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 
+/** 안내 문구 속 "과목(사유), 과목(사유)" 목록을 괄호 깊이 기준으로 분리 */
+function splitCourseEntries(body: string): string[] {
+  const parts: string[] = []
+  let depth = 0
+  let buf = ''
+  for (const ch of body) {
+    if (ch === '(') depth += 1
+    if (ch === ')' && depth > 0) depth -= 1
+    if (ch === ',' && depth === 0) {
+      const s = buf.trim()
+      if (s) parts.push(s)
+      buf = ''
+      continue
+    }
+    buf += ch
+  }
+  const last = buf.trim()
+  if (last) parts.push(last)
+  return parts
+}
+
+/** 공학인증 안내 문구를 읽기 쉬운 줄로 나눔 */
+function splitAbeekNote(msg: string): string[] {
+  const text = msg.trim().replace(/^[·•\s]+/, '').replace(/\s+/g, ' ')
+  if (!text) return []
+
+  const designDenied = text.match(/^(설계학점\s*불인정(?:\s*[^:]+)?)\s*:\s*(.+)$/u)
+  if (designDenied?.[1] && designDenied[2]) {
+    const header = designDenied[1].replace(/\s+/g, ' ').trim()
+    const courses = splitCourseEntries(designDenied[2].trim())
+    return courses.length > 0 ? [header, ...courses] : [text]
+  }
+
+  return [text]
+}
+
+function AbeekNoteText({ msg }: { msg: string }) {
+  const lines = splitAbeekNote(msg)
+  if (lines.length === 0) return null
+  if (lines.length === 1) {
+    return <p className="break-keep text-pretty">{lines[0]}</p>
+  }
+
+  const [header, ...courses] = lines
+  return (
+    <div className="break-keep text-pretty">
+      <p className="font-semibold text-ink">{header}</p>
+      <ul className="mt-1 space-y-1">
+        {courses.map((course) => (
+          <li key={course} className="pl-0.5">
+            · {course}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function toCourse(c: {
   courseCode: string
   courseName: string
@@ -351,13 +409,22 @@ export function EngineeringPage() {
   }
 
   const designDetail = evaluation.designDetail
+  const unrecognizedDesignCourses = (designDetail?.courses ?? []).filter(
+    (c) => c.recognized === false,
+  )
   const waivedCourses = evaluation.waivedGraduationOnlyCourses ?? []
   const requirementNotes: string[] = []
   const waivedNotes: string[] = []
   for (const msg of evaluation.messages ?? []) {
     if (msg.includes('면제')) waivedNotes.push(msg)
     else if (msg.includes('미이수')) continue
-    else if (msg.includes('학점') || msg.includes('최소') || msg.includes('유리')) {
+    else if (
+      msg.includes('설계학점') &&
+      msg.includes('불인정') &&
+      unrecognizedDesignCourses.length > 0
+    ) {
+      continue
+    } else if (msg.includes('학점') || msg.includes('최소') || msg.includes('유리') || msg.includes('불인정')) {
       requirementNotes.push(msg)
     }
   }
@@ -458,6 +525,21 @@ export function EngineeringPage() {
                   기초 → 요소 → 종합 순서를 모두 이수해야 설계 시퀀스가 충족됩니다.
                 </p>
               )}
+              {unrecognizedDesignCourses.length > 0 && (
+                <div className="mt-2 border-t border-black/5 pt-2">
+                  <p className="mb-1 text-[11px] font-semibold text-sejong">설계학점 불인정</p>
+                  <ul className="space-y-1.5">
+                    {unrecognizedDesignCourses.map((c) => (
+                      <li key={c.courseCode} className="text-[11px] leading-snug text-ink-muted">
+                        <span className="font-semibold text-ink">{c.courseName}</span>
+                        {c.reason && (
+                          <span className="mt-0.5 block break-keep text-pretty">{c.reason}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </section>
 
             <section className="rounded-xl bg-panel/70 px-3.5 py-3">
@@ -485,10 +567,10 @@ export function EngineeringPage() {
                 </div>
               )}
               {requirementNotes.length > 0 ? (
-                <ul className="space-y-1">
+                <ul className="space-y-2">
                   {requirementNotes.slice(0, 3).map((msg) => (
                     <li key={msg} className="text-[11px] leading-relaxed text-ink-muted">
-                      {msg.replace(/^[·•\s]+/, '')}
+                      <AbeekNoteText msg={msg} />
                     </li>
                   ))}
                 </ul>
