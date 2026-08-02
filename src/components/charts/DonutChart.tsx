@@ -26,8 +26,10 @@ export function DonutChart({
   const arcLength = circumference * arcRatio
   const progressLength = arcLength * (Math.min(Math.max(percent, 0), 100) / 100)
   const center = size / 2
-  // 270° 아크라 하단이 비어 있어 보이는 높이만 줄임
-  const visibleHeight = Math.round(size * 0.78)
+  // 하단 열린 아크 끝(둥근 캡 포함)까지만 보이게 — 너무 자르면 아래 텍스트와 겹침
+  const visibleHeight = Math.ceil(
+    center + radius * Math.SQRT1_2 + stroke / 2 + 4,
+  )
 
   return (
     <div

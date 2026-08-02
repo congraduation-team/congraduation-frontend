@@ -795,7 +795,7 @@ function CreditStatusSummary({
   const shortfall = hasRequirement ? Math.max(0, need - earned) : 0
 
   return (
-    <div className="mt-0.5 min-w-[7.75rem] text-center">
+    <div className="mt-1.5 min-w-[7.75rem] text-center">
       <div className="flex flex-col gap-1">
         <div className="flex items-baseline justify-between gap-2.5">
           <span className="text-[11px] font-semibold text-ink-muted">이수</span>
