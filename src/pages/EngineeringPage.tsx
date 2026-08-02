@@ -269,7 +269,7 @@ export function EngineeringPage() {
     [evaluationDetail],
   )
 
-  /** 전문교양 남은 필수 — detail GENERAL.remainingCourses 우선 */
+  /** 인증필수(GENERAL) 남은 필수 — detail remainingCourses 우선 */
   const generalRequiredRemaining = useMemo(() => {
     if (generalCat?.remainingCourses) {
       return generalCat.remainingCourses.map((c) => detailToCourse(c))
@@ -279,7 +279,14 @@ export function EngineeringPage() {
 
   const generalCompleted = useMemo(() => {
     if (generalCat?.completedCourses?.length) {
-      return generalCat.completedCourses.map((c) => detailToCourse(c))
+      return generalCat.completedCourses
+        .filter((c) => {
+          const role = (c.role || '').toUpperCase()
+          if (role.includes('CERT_ELECTIVE') || role === 'ELECTIVE') return false
+          if (c.electiveArea || c.electiveAreaLabel) return false
+          return true
+        })
+        .map((c) => detailToCourse(c))
     }
     return (evaluation?.general?.completedCourses ?? []).map((c) =>
       toCourse({
@@ -372,7 +379,7 @@ export function EngineeringPage() {
 
   const displayName = evaluation?.studentName || roadmap?.studentName || student?.name || '학생'
 
-  // 전문교양 = evaluation.general (로드맵 GENERAL+REQUIRED로 재계산하지 않음)
+  // 인증필수 = evaluation.general (로드맵 GENERAL+REQUIRED로 재계산하지 않음)
   const generalEarned = toNumber(
     generalCat?.earnedCredits ?? evaluation?.general?.earnedCredits,
   )
@@ -495,7 +502,7 @@ export function EngineeringPage() {
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <SummaryMiniGauge
-              label="전문교양"
+              label="인증필수"
               percent={generalPct}
               earned={generalEarned}
               required={generalRequiredCredits}
@@ -629,7 +636,7 @@ export function EngineeringPage() {
         {/* 카테고리 상세 — 졸업요건 DetailCreditCard와 동일 형식 */}
         <div className="grid items-stretch gap-4 lg:grid-cols-2">
           <AbeekDetailCard
-            title="전문교양"
+            title="인증필수"
             remainingTitle="남은 필수 과목"
             percent={generalPct}
             earned={generalEarned}
@@ -638,14 +645,14 @@ export function EngineeringPage() {
             remaining={generalRequiredRemaining}
             onOpenCompleted={() =>
               setListModal({
-                title: '전문교양 이수 과목',
+                title: '인증필수 이수 과목',
                 subtitle: `${generalEarned}학점 · ${generalCompleted.length}과목`,
                 courses: generalCompleted,
               })
             }
             onOpenRemaining={() =>
               setListModal({
-                title: '전문교양 남은 과목',
+                title: '인증필수 남은 과목',
                 subtitle: `${generalRequiredRemaining.length}과목`,
                 courses: generalRequiredRemaining,
               })
