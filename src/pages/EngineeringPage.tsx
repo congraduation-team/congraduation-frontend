@@ -299,11 +299,6 @@ export function EngineeringPage() {
     evaluation?.certElectiveApplicable ??
     ((evaluation?.entranceYear ?? student?.admissionYear ?? 9999) >= 2022)
 
-  const incompleteRequiredCourses = useMemo(
-    () => (evaluation?.entranceRequiredCourses ?? []).filter((c) => c.completed === false),
-    [evaluation?.entranceRequiredCourses],
-  )
-
   if (loading) {
     return <div className="py-20 text-center text-sm text-ink-muted">공학인증을 불러오는 중...</div>
   }
@@ -368,14 +363,6 @@ export function EngineeringPage() {
             {evaluation.overallSatisfied ? '요건 충족' : '요건 미충족'}
           </span>
         </div>
-        {!evaluation.overallSatisfied && incompleteRequiredCourses.length > 0 && (
-          <p className="mt-2 text-sm text-ink-muted">
-            미이수 인증필수 과목:{' '}
-            <span className="font-semibold text-sejong">
-              {incompleteRequiredCourses.map((c) => c.courseName).join(', ')}
-            </span>
-          </p>
-        )}
       </div>
 
       <div className="mx-auto max-w-[1280px] space-y-4 px-1">
@@ -410,9 +397,9 @@ export function EngineeringPage() {
           </div>
 
           <div className="mt-4 grid gap-3 lg:grid-cols-2">
-            <section className="rounded-xl bg-panel/70 px-3.5 py-3">
-              <p className="mb-2 text-sm font-bold text-ink">설계 시퀀스</p>
-              <ul className="space-y-2">
+            <section className="rounded-xl bg-panel/70 px-4 py-3.5">
+              <p className="mb-2.5 text-[15px] font-bold text-ink">설계 시퀀스</p>
+              <ul className="space-y-2.5">
                 <DesignCheck
                   label="기초설계 (공학설계기초)"
                   done={designDetail?.hasBasicDesign === true}
@@ -427,19 +414,21 @@ export function EngineeringPage() {
                 />
               </ul>
               {designDetail?.sequenceSatisfied === false && (
-                <p className="mt-2 text-[11px] text-ink-muted">
+                <p className="mt-3 text-[13px] leading-relaxed text-ink-muted">
                   기초 → 요소 → 종합 순서를 모두 이수해야 설계 시퀀스가 충족됩니다.
                 </p>
               )}
               {unrecognizedDesignCourses.length > 0 && (
-                <div className="mt-2 border-t border-black/5 pt-2">
-                  <p className="mb-1 text-[11px] font-semibold text-sejong">설계학점 불인정</p>
-                  <ul className="space-y-1.5">
+                <div className="mt-3 border-t border-black/5 pt-3">
+                  <p className="mb-2 text-[13px] font-bold text-sejong">설계학점 불인정</p>
+                  <ul className="space-y-2.5">
                     {unrecognizedDesignCourses.map((c) => (
-                      <li key={c.courseCode} className="text-[11px] leading-snug text-ink-muted">
+                      <li key={c.courseCode} className="text-[13px] leading-snug text-ink-muted">
                         <span className="font-semibold text-ink">{c.courseName}</span>
                         {c.reason && (
-                          <span className="mt-0.5 block break-keep text-pretty">{c.reason}</span>
+                          <span className="mt-0.5 block break-keep text-pretty text-[12px] leading-relaxed">
+                            {c.reason}
+                          </span>
                         )}
                       </li>
                     ))}
@@ -448,62 +437,44 @@ export function EngineeringPage() {
               )}
             </section>
 
-            <section className="rounded-xl bg-panel/70 px-3.5 py-3">
-              <p className="mb-2 text-sm font-bold text-ink">적용 요건 · 안내</p>
+            <section className="rounded-xl bg-panel/70 px-4 py-3.5">
+              <p className="mb-2.5 text-[15px] font-bold text-ink">적용 요건 · 안내</p>
               {evaluation.graduationAbeekBasisLabel && (
-                <p className="mb-2 text-xs font-semibold text-ink">
+                <p className="mb-2.5 text-[13px] font-semibold text-ink">
                   {evaluation.graduationAbeekBasisLabel}
                 </p>
               )}
-              {incompleteRequiredCourses.length > 0 && (
-                <div className="mb-2">
-                  <p className="mb-1 text-[11px] font-semibold text-sejong">미이수 인증필수 과목</p>
-                  <ul className="space-y-0.5">
-                    {incompleteRequiredCourses.slice(0, 4).map((c) => (
-                      <li key={c.courseCode} className="text-[11px] text-ink-muted">
-                        {c.courseName}
-                      </li>
-                    ))}
-                    {incompleteRequiredCourses.length > 4 && (
-                      <li className="text-[11px] text-ink-faint">
-                        외 {incompleteRequiredCourses.length - 4}과목
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              )}
               {requirementNotes.length > 0 ? (
-                <ul className="space-y-2">
+                <ul className="space-y-2.5">
                   {requirementNotes.slice(0, 3).map((msg) => (
-                    <li key={msg} className="text-[11px] leading-relaxed text-ink-muted">
+                    <li key={msg} className="text-[13px] leading-relaxed text-ink-muted">
                       <AbeekNoteText msg={msg} />
                     </li>
                   ))}
                 </ul>
               ) : (
-                !evaluation.graduationAbeekBasisLabel &&
-                incompleteRequiredCourses.length === 0 && (
-                  <p className="text-[11px] text-ink-muted">
+                !evaluation.graduationAbeekBasisLabel && (
+                  <p className="text-[13px] leading-relaxed text-ink-muted">
                     입학 {evaluation.entranceYear ?? '-'}년도 기준으로 평가합니다.
                   </p>
                 )
               )}
 
               {(waivedCourses.length > 0 || waivedNotes.length > 0) && (
-                <div className="mt-2 border-t border-black/5 pt-2">
-                  <p className="mb-1 text-[11px] font-semibold text-ink">면제 과목</p>
+                <div className="mt-3 border-t border-black/5 pt-3">
+                  <p className="mb-2 text-[13px] font-bold text-ink">면제 과목</p>
                   {waivedCourses.length > 0 ? (
-                    <ul className="space-y-1">
+                    <ul className="space-y-1.5">
                       {waivedCourses.slice(0, 3).map((c) => (
-                        <li key={c.courseCode} className="text-[11px] text-ink-muted">
+                        <li key={c.courseCode} className="text-[13px] text-ink-muted">
                           {c.courseName}
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <ul className="space-y-1">
+                    <ul className="space-y-1.5">
                       {waivedNotes.slice(0, 2).map((msg) => (
-                        <li key={msg} className="text-[11px] text-ink-muted">
+                        <li key={msg} className="text-[13px] leading-relaxed text-ink-muted">
                           {msg.replace(/^[·•\s]+/, '')}
                         </li>
                       ))}
@@ -812,20 +783,20 @@ function MetaChip({ children }: { children: ReactNode }) {
 
 function DesignCheck({ label, done }: { label: string; done: boolean }) {
   return (
-    <li className="flex items-center gap-2 text-sm">
+    <li className="flex items-center gap-2.5">
       <span
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
           done ? 'bg-emerald-100 text-emerald-700' : 'bg-black/5 text-ink-faint'
         }`}
         aria-hidden
       >
         {done ? '✓' : '–'}
       </span>
-      <span className={done ? 'text-[13px] font-medium text-ink' : 'text-[13px] text-ink-muted'}>
+      <span className={done ? 'text-sm font-medium text-ink' : 'text-sm text-ink-muted'}>
         {label}
       </span>
       <span
-        className={`ml-auto text-[11px] font-semibold ${
+        className={`ml-auto text-[13px] font-semibold ${
           done ? 'text-emerald-700' : 'text-sejong'
         }`}
       >
