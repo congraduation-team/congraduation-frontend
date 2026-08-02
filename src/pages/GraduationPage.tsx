@@ -582,9 +582,6 @@ export function GraduationPage() {
                       </div>
                     ))}
                   </div>
-                  {englishCert?.primaryRequirement && (
-                    <p className="mt-1 text-[11px] text-ink-muted">{englishCert.primaryRequirement}</p>
-                  )}
                   <button
                     type="button"
                     onClick={() => setEnglishOpen(true)}

@@ -45,10 +45,6 @@ export function EnglishCertModal({
             </ul>
           </div>
 
-          {primaryRequirement && (
-            <p className="mt-3 text-sm text-ink-muted">{primaryRequirement}</p>
-          )}
-
           <p className="mb-2 mt-5 text-sm text-ink-muted">대체과목</p>
           <div className="flex items-center justify-between rounded-xl bg-panel px-5 py-4">
             <span className="text-[15px] font-semibold text-ink">Intensive English</span>
