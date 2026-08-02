@@ -533,7 +533,7 @@ export function EngineeringPage() {
           </div>
 
           <section className="mt-5 overflow-hidden rounded-2xl border border-[#e8eaee] bg-white">
-            <div className="grid lg:grid-cols-2 lg:divide-x lg:divide-[#e8eaee]">
+            <div className="grid lg:grid-cols-2">
               <div className="px-5 py-5">
                 <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
                   <h4 className="text-[15px] font-bold text-ink">설계 시퀀스</h4>
@@ -579,7 +579,7 @@ export function EngineeringPage() {
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-[#e8eaee] px-5 py-5 lg:border-t-0">
+              <div className="space-y-3 px-5 py-5">
                 <div className="flex flex-wrap items-center gap-2">
                   <h4 className="text-[15px] font-bold text-ink">적용 요건 · 안내</h4>
                   {evaluation.graduationAbeekBasisLabel && (
