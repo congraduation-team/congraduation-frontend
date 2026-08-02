@@ -32,6 +32,8 @@ export type StudentLoginResponse = {
   role?: UserRole
   /** role 대신 boolean으로 주는 경우 */
   isAdmin?: boolean
+  /** DB students.admin 컬럼 매핑 (true / 1) */
+  admin?: boolean | number
   /** 로그인 응답의 세종 고전독서 인증 현황 */
   readingStatus?: SejongReadingStatus
 }
@@ -90,6 +92,7 @@ export type AdminUploadResponse = {
 export function isAdminUser(student: StudentLoginResponse | null | undefined): boolean {
   if (!student) return false
   if (student.isAdmin === true) return true
+  if (student.admin === true || student.admin === 1) return true
   const role = student.role?.toUpperCase()
   return role === 'ADMIN' || role === 'ROLE_ADMIN'
 }
