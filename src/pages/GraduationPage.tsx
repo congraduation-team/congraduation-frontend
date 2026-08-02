@@ -347,6 +347,15 @@ export function GraduationPage() {
       progress?.majorCredits?.majorElectiveProgressPercent,
   )
 
+  const majorEarned = toNumber(
+    activeTrack?.totalCredits?.earnedCredits ??
+      progress?.majorCredits?.earnedMajorCredits,
+  )
+  const majorNeed = toNumber(
+    activeTrack?.totalCredits?.requiredCredits ??
+      progress?.majorCredits?.requiredMajorCredits,
+  )
+
   const majorRequiredLabel = toNumber(
     activeTrack?.requiredCredits?.earnedCredits ??
       progress?.majorCredits?.earnedMajorRequiredCredits,
@@ -453,12 +462,30 @@ export function GraduationPage() {
           </h3>
 
           <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-1.5 sm:gap-2">
-            <SummaryGauge title="전체 학점" percent={totalPct} size={176} stroke={18} fill />
-            <SummaryGauge title="전공 학점" percent={majorPct} size={176} stroke={18} fill />
+            <SummaryGauge
+              title="전체 학점"
+              percent={totalPct}
+              earned={totalEarned}
+              required={totalRequired}
+              size={176}
+              stroke={18}
+              fill
+            />
+            <SummaryGauge
+              title="전공 학점"
+              percent={majorPct}
+              earned={majorEarned}
+              required={majorNeed}
+              size={176}
+              stroke={18}
+              fill
+            />
             <div className="flex flex-col items-center gap-2.5 pl-0.5">
               <SummaryGauge
                 title="전공 필수"
                 percent={majorReqPct}
+                earned={majorRequiredLabel}
+                required={majorRequiredNeed}
                 size={92}
                 stroke={11}
                 compact
@@ -466,6 +493,8 @@ export function GraduationPage() {
               <SummaryGauge
                 title="전공 선택"
                 percent={majorElecPct}
+                earned={majorElectiveEarned}
+                required={majorElectiveNeed}
                 size={92}
                 stroke={11}
                 compact
@@ -836,6 +865,8 @@ function formatGpa(gpa: number) {
 function SummaryGauge({
   title,
   percent,
+  earned,
+  required,
   size,
   stroke,
   compact = false,
@@ -843,6 +874,8 @@ function SummaryGauge({
 }: {
   title: string
   percent: number
+  earned: number
+  required: number
   size: number
   stroke: number
   compact?: boolean
@@ -872,6 +905,17 @@ function SummaryGauge({
         trackColor="#eef0f3"
         label={formatPercentLabel(percent)}
       />
+      <p
+        className={`mt-1 text-center font-bold tracking-tight text-ink ${
+          compact ? 'text-[11px]' : 'text-sm'
+        }`}
+      >
+        <span className="text-sejong">{earned}</span>
+        <span className="text-ink-muted">/{required > 0 ? required : '-'}</span>
+        <span className={`ml-0.5 font-semibold text-ink-muted ${compact ? 'text-[10px]' : 'text-xs'}`}>
+          학점
+        </span>
+      </p>
     </div>
   )
 }
