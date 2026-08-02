@@ -94,6 +94,11 @@ export function MyCoursesPage() {
             label="전공 합계"
             value={`${majorCredits.totalMajorCredits ?? 0}`}
             unit="학점"
+            hint={`${
+              majorCredits.totalMajorCourseCount ??
+              (majorCredits.requiredMajorCourseCount ?? 0) +
+                (majorCredits.electiveMajorCourseCount ?? 0)
+            }과목`}
             accent
           />
           <CreditStat

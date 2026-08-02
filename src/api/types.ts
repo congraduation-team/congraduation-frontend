@@ -364,6 +364,9 @@ export type TranscriptMajorCreditSummary = {
   totalMajorCredits?: number
   requiredMajorCourseCount?: number
   electiveMajorCourseCount?: number
+  /** 전필+전선 전공 과목 수 (totalCourseCount와 다름) */
+  totalMajorCourseCount?: number
+  /** 전체 이수 과목 수 */
   totalCourseCount?: number
 }
 
