@@ -60,17 +60,30 @@ function splitAbeekNote(msg: string): string[] {
 function AbeekNoteText({ msg }: { msg: string }) {
   const lines = splitAbeekNote(msg)
   if (lines.length === 0) return null
+
+  const shortage = lines[0]?.match(
+    /^(인증선택\s*부족)\s*:\s*(.+)$/u,
+  )
+  if (lines.length === 1 && shortage?.[1] && shortage[2]) {
+    return (
+      <div className="break-keep text-pretty">
+        <p className="font-semibold text-sejong">{shortage[1]}</p>
+        <p className="mt-1 text-ink-muted">{shortage[2]}</p>
+      </div>
+    )
+  }
+
   if (lines.length === 1) {
-    return <p className="break-keep text-pretty">{lines[0]}</p>
+    return <p className="break-keep text-pretty text-ink-muted">{lines[0]}</p>
   }
 
   const [header, ...courses] = lines
   return (
     <div className="break-keep text-pretty">
       <p className="font-semibold text-ink">{header}</p>
-      <ul className="mt-1 space-y-1">
+      <ul className="mt-2 space-y-1.5">
         {courses.map((course) => (
-          <li key={course} className="pl-0.5">
+          <li key={course} className="text-ink-muted">
             · {course}
           </li>
         ))}
@@ -396,39 +409,49 @@ export function EngineeringPage() {
             />
           </div>
 
-          <div className="mt-4 grid gap-3 lg:grid-cols-2">
-            <section className="rounded-xl bg-panel/70 px-4 py-3.5">
-              <p className="mb-2.5 text-[15px] font-bold text-ink">설계 시퀀스</p>
-              <ul className="space-y-2.5">
+          <div className="mt-5 grid gap-4 lg:grid-cols-2 lg:items-stretch">
+            <section className="flex flex-col rounded-2xl border border-[#e8eaee] bg-[#fafbfc] px-5 py-5">
+              <div className="mb-4">
+                <h4 className="text-[15px] font-bold text-ink">설계 시퀀스</h4>
+                <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">
+                  기초 → 요소 → 종합 순서로 모두 이수해야 충족됩니다.
+                </p>
+              </div>
+
+              <ol className="space-y-2">
                 <DesignCheck
-                  label="기초설계 (공학설계기초)"
+                  step={1}
+                  label="기초설계"
+                  detail="공학설계기초"
                   done={designDetail?.hasBasicDesign === true}
                 />
                 <DesignCheck
+                  step={2}
                   label="요소설계"
                   done={designDetail?.hasElementDesign === true}
                 />
                 <DesignCheck
-                  label="종합설계 (Capstone)"
+                  step={3}
+                  label="종합설계"
+                  detail="Capstone"
                   done={designDetail?.hasComprehensiveDesign === true}
                 />
-              </ul>
-              {designDetail?.sequenceSatisfied === false && (
-                <p className="mt-3 text-[13px] leading-relaxed text-ink-muted">
-                  기초 → 요소 → 종합 순서를 모두 이수해야 설계 시퀀스가 충족됩니다.
-                </p>
-              )}
+              </ol>
+
               {unrecognizedDesignCourses.length > 0 && (
-                <div className="mt-3 border-t border-black/5 pt-3">
-                  <p className="mb-2 text-[13px] font-bold text-sejong">설계학점 불인정</p>
-                  <ul className="space-y-2.5">
+                <div className="mt-5 border-t border-[#e8eaee] pt-4">
+                  <p className="mb-2.5 text-[13px] font-bold text-sejong">설계학점 불인정</p>
+                  <ul className="space-y-2">
                     {unrecognizedDesignCourses.map((c) => (
-                      <li key={c.courseCode} className="text-[13px] leading-snug text-ink-muted">
-                        <span className="font-semibold text-ink">{c.courseName}</span>
+                      <li
+                        key={c.courseCode}
+                        className="rounded-xl border border-sejong/10 bg-white px-3.5 py-3"
+                      >
+                        <p className="text-sm font-semibold text-ink">{c.courseName}</p>
                         {c.reason && (
-                          <span className="mt-0.5 block break-keep text-pretty text-[12px] leading-relaxed">
+                          <p className="mt-1 break-keep text-pretty text-[13px] leading-relaxed text-ink-muted">
                             {c.reason}
-                          </span>
+                          </p>
                         )}
                       </li>
                     ))}
@@ -437,44 +460,54 @@ export function EngineeringPage() {
               )}
             </section>
 
-            <section className="rounded-xl bg-panel/70 px-4 py-3.5">
-              <p className="mb-2.5 text-[15px] font-bold text-ink">적용 요건 · 안내</p>
-              {evaluation.graduationAbeekBasisLabel && (
-                <p className="mb-2.5 text-[13px] font-semibold text-ink">
-                  {evaluation.graduationAbeekBasisLabel}
-                </p>
-              )}
-              {requirementNotes.length > 0 ? (
-                <ul className="space-y-2.5">
+            <section className="flex flex-col rounded-2xl border border-[#e8eaee] bg-[#fafbfc] px-5 py-5">
+              <div className="mb-4">
+                <h4 className="text-[15px] font-bold text-ink">적용 요건 · 안내</h4>
+                {evaluation.graduationAbeekBasisLabel ? (
+                  <p className="mt-2 inline-flex rounded-full bg-white px-3 py-1 text-[13px] font-semibold text-ink ring-1 ring-[#e8eaee]">
+                    {evaluation.graduationAbeekBasisLabel}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">
+                    입학 {evaluation.entranceYear ?? '-'}년도 기준으로 평가합니다.
+                  </p>
+                )}
+              </div>
+
+              {requirementNotes.length > 0 && (
+                <ul className="space-y-2">
                   {requirementNotes.slice(0, 3).map((msg) => (
-                    <li key={msg} className="text-[13px] leading-relaxed text-ink-muted">
+                    <li
+                      key={msg}
+                      className="rounded-xl border border-[#e8eaee] bg-white px-3.5 py-3 text-[13px] leading-relaxed text-ink"
+                    >
                       <AbeekNoteText msg={msg} />
                     </li>
                   ))}
                 </ul>
-              ) : (
-                !evaluation.graduationAbeekBasisLabel && (
-                  <p className="text-[13px] leading-relaxed text-ink-muted">
-                    입학 {evaluation.entranceYear ?? '-'}년도 기준으로 평가합니다.
-                  </p>
-                )
               )}
 
               {(waivedCourses.length > 0 || waivedNotes.length > 0) && (
-                <div className="mt-3 border-t border-black/5 pt-3">
-                  <p className="mb-2 text-[13px] font-bold text-ink">면제 과목</p>
+                <div className="mt-5 border-t border-[#e8eaee] pt-4 lg:mt-auto">
+                  <p className="mb-2.5 text-[13px] font-bold text-ink">면제 과목</p>
                   {waivedCourses.length > 0 ? (
-                    <ul className="space-y-1.5">
-                      {waivedCourses.slice(0, 3).map((c) => (
-                        <li key={c.courseCode} className="text-[13px] text-ink-muted">
+                    <ul className="flex flex-wrap gap-2">
+                      {waivedCourses.slice(0, 5).map((c) => (
+                        <li
+                          key={c.courseCode}
+                          className="rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-ink ring-1 ring-[#e8eaee]"
+                        >
                           {c.courseName}
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <ul className="space-y-1.5">
+                    <ul className="space-y-2">
                       {waivedNotes.slice(0, 2).map((msg) => (
-                        <li key={msg} className="text-[13px] leading-relaxed text-ink-muted">
+                        <li
+                          key={msg}
+                          className="rounded-xl border border-[#e8eaee] bg-white px-3.5 py-3 text-[13px] leading-relaxed text-ink-muted"
+                        >
                           {msg.replace(/^[·•\s]+/, '')}
                         </li>
                       ))}
@@ -781,23 +814,38 @@ function MetaChip({ children }: { children: ReactNode }) {
   )
 }
 
-function DesignCheck({ label, done }: { label: string; done: boolean }) {
+function DesignCheck({
+  step,
+  label,
+  detail,
+  done,
+}: {
+  step: number
+  label: string
+  detail?: string
+  done: boolean
+}) {
   return (
-    <li className="flex items-center gap-2.5">
+    <li
+      className={`flex items-center gap-3 rounded-xl px-3.5 py-3 ${
+        done ? 'bg-white ring-1 ring-[#e8eaee]' : 'bg-white ring-1 ring-sejong/15'
+      }`}
+    >
       <span
-        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-          done ? 'bg-emerald-100 text-emerald-700' : 'bg-black/5 text-ink-faint'
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+          done ? 'bg-emerald-100 text-emerald-700' : 'bg-sejong/10 text-sejong'
         }`}
         aria-hidden
       >
-        {done ? '✓' : '–'}
+        {done ? '✓' : step}
       </span>
-      <span className={done ? 'text-sm font-medium text-ink' : 'text-sm text-ink-muted'}>
-        {label}
-      </span>
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-semibold ${done ? 'text-ink' : 'text-ink'}`}>{label}</p>
+        {detail && <p className="mt-0.5 text-[12px] text-ink-muted">{detail}</p>}
+      </div>
       <span
-        className={`ml-auto text-[13px] font-semibold ${
-          done ? 'text-emerald-700' : 'text-sejong'
+        className={`shrink-0 rounded-full px-2.5 py-1 text-[12px] font-bold ${
+          done ? 'bg-emerald-50 text-emerald-700' : 'bg-sejong/10 text-sejong'
         }`}
       >
         {done ? '이수' : '미이수'}
