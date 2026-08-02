@@ -15,7 +15,7 @@ export function DonutChart({
   size = 120,
   stroke = 14,
   color = '#c8012e',
-  trackColor = '#e8e8ec',
+  trackColor = '#eef0f3',
   label,
   labelColor,
   subLabel,

@@ -447,26 +447,26 @@ export function GraduationPage() {
       </section>
 
       <section className="grid items-stretch gap-4 xl:grid-cols-[2fr_1fr_1fr]">
-        <article className="rounded-[20px] bg-white px-6 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+        <article className="rounded-[20px] bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)] sm:px-5">
           <h3 className="mb-3 text-base font-bold text-ink">
             현재 {totalEarned}/{totalRequired || '-'}학점 이수 완료!
           </h3>
 
-          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-4">
-            <SummaryGauge title="전체 학점" percent={totalPct} size={158} stroke={17} />
-            <SummaryGauge title="전공 학점" percent={majorPct} size={158} stroke={17} />
-            <div className="flex flex-col items-center gap-3 pl-1">
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-1.5 sm:gap-2">
+            <SummaryGauge title="전체 학점" percent={totalPct} size={176} stroke={18} fill />
+            <SummaryGauge title="전공 학점" percent={majorPct} size={176} stroke={18} fill />
+            <div className="flex flex-col items-center gap-2.5 pl-0.5">
               <SummaryGauge
                 title="전공 필수"
                 percent={majorReqPct}
-                size={84}
+                size={92}
                 stroke={11}
                 compact
               />
               <SummaryGauge
                 title="전공 선택"
                 percent={majorElecPct}
-                size={84}
+                size={92}
                 stroke={11}
                 compact
               />
@@ -795,27 +795,29 @@ function CreditStatusSummary({
   const shortfall = hasRequirement ? Math.max(0, need - earned) : 0
 
   return (
-    <div className="mt-1 w-[9.5rem] rounded-xl border border-[#e8eaee] bg-panel/80 px-2.5 py-2 text-center">
-      <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-2 gap-y-1 text-left text-[11px] leading-none">
-        <span className="font-semibold text-ink-muted">이수</span>
-        <span className="text-right text-sm font-extrabold tracking-tight text-ink">
-          {earned}
-          <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
-        </span>
-        <span className="font-semibold text-ink-muted">필요</span>
-        <span className="text-right text-sm font-extrabold tracking-tight text-ink">
-          {hasRequirement ? need : '-'}
-          {hasRequirement && (
+    <div className="mt-1.5 min-w-[8.25rem] rounded-xl bg-[#f7f8fa] px-3 py-2.5 text-center">
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[11px] font-semibold text-ink-muted">이수</span>
+          <span className="text-[15px] font-extrabold tracking-tight text-ink">
+            {earned}
             <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
-          )}
-        </span>
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[11px] font-semibold text-ink-muted">필요</span>
+          <span className="text-[15px] font-extrabold tracking-tight text-ink">
+            {hasRequirement ? need : '-'}
+            {hasRequirement && (
+              <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
+            )}
+          </span>
+        </div>
       </div>
       {hasRequirement && (
         <p
-          className={`mt-2 rounded-full px-2 py-1 text-[10px] font-bold leading-none ${
-            satisfied
-              ? 'bg-emerald-50 text-emerald-700'
-              : 'bg-sejong/10 text-sejong'
+          className={`mt-2 rounded-full px-2.5 py-1 text-[10px] font-bold leading-none ${
+            satisfied ? 'bg-[#e8f5ee] text-[#1f7a4d]' : 'bg-sejong/10 text-sejong'
           }`}
         >
           {satisfied ? '요건 충족' : `${shortfall}학점 부족`}
@@ -835,15 +837,20 @@ function SummaryGauge({
   size,
   stroke,
   compact = false,
+  fill = false,
 }: {
   title: string
   percent: number
   size: number
   stroke: number
   compact?: boolean
+  fill?: boolean
 }) {
   return (
-    <div className="flex flex-col items-center" style={{ width: size + 8 }}>
+    <div
+      className={`flex flex-col items-center ${fill ? 'w-full min-w-0' : ''}`}
+      style={fill ? undefined : { width: size + 4 }}
+    >
       <p
         className={`mb-1 w-full text-center font-bold text-ink ${
           compact ? 'text-xs' : 'text-sm'
@@ -854,12 +861,13 @@ function SummaryGauge({
       <ChartLegend
         secondaryLabel="총 학점"
         activeColor="#c8012e"
-        className={`mb-1.5 justify-center ${compact ? 'scale-[0.8]' : 'scale-90'}`}
+        className={`mb-1 justify-center ${compact ? 'scale-[0.78]' : 'scale-[0.85]'}`}
       />
       <DonutChart
         percent={percent}
         size={size}
         stroke={stroke}
+        trackColor="#eef0f3"
         label={formatPercentLabel(percent)}
       />
     </div>
