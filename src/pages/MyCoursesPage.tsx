@@ -102,10 +102,10 @@ export function MyCoursesPage() {
             accent
           />
           <CreditStat
-            label="전체 이수 과목"
-            value={`${majorCredits.totalCourseCount ?? 0}`}
-            unit="과목"
-            hint={totalListedCredits > 0 ? `목록 합계 ${totalListedCredits}학점` : undefined}
+            label="전체 이수학점"
+            value={`${totalListedCredits}`}
+            unit="학점"
+            hint={`${majorCredits.totalCourseCount ?? 0}과목`}
           />
         </section>
       ) : (
