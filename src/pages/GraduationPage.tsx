@@ -782,6 +782,49 @@ export function GraduationPage() {
   )
 }
 
+function CreditStatusSummary({
+  earned,
+  required,
+}: {
+  earned: number
+  required?: number
+}) {
+  const need = required && required > 0 ? required : 0
+  const hasRequirement = need > 0
+  const satisfied = hasRequirement && earned >= need
+  const shortfall = hasRequirement ? Math.max(0, need - earned) : 0
+
+  return (
+    <div className="mt-1 w-[9.5rem] rounded-xl border border-[#e8eaee] bg-panel/80 px-2.5 py-2 text-center">
+      <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-2 gap-y-1 text-left text-[11px] leading-none">
+        <span className="font-semibold text-ink-muted">이수</span>
+        <span className="text-right text-sm font-extrabold tracking-tight text-ink">
+          {earned}
+          <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
+        </span>
+        <span className="font-semibold text-ink-muted">필요</span>
+        <span className="text-right text-sm font-extrabold tracking-tight text-ink">
+          {hasRequirement ? need : '-'}
+          {hasRequirement && (
+            <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
+          )}
+        </span>
+      </div>
+      {hasRequirement && (
+        <p
+          className={`mt-2 rounded-full px-2 py-1 text-[10px] font-bold leading-none ${
+            satisfied
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'bg-sejong/10 text-sejong'
+          }`}
+        >
+          {satisfied ? '요건 충족' : `${shortfall}학점 부족`}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function formatGpa(gpa: number) {
   return gpa > 0 ? gpa.toFixed(2) : '-'
 }
@@ -901,15 +944,7 @@ function DetailCreditCard({
               stroke={11}
               label={formatPercentLabel(percent)}
             />
-            <div className="space-y-1 text-center text-xs leading-snug">
-              <p>
-                <span className="font-medium text-ink-muted">이수 학점 </span>
-                <span className="font-bold text-sejong">{earned}학점</span>
-              </p>
-              <p className="text-ink-faint">
-                필요 학점 {required || '-'}학점
-              </p>
-            </div>
+            <CreditStatusSummary earned={earned} required={required} />
           </div>
 
           <div
