@@ -795,7 +795,7 @@ function CreditStatusSummary({
   const shortfall = hasRequirement ? Math.max(0, need - earned) : 0
 
   return (
-    <div className="mt-1.5 min-w-[7.5rem] text-center">
+    <div className="mt-0.5 min-w-[7.75rem] text-center">
       <div className="flex flex-col gap-1">
         <div className="flex items-baseline justify-between gap-2.5">
           <span className="text-[11px] font-semibold text-ink-muted">이수</span>
@@ -816,8 +816,10 @@ function CreditStatusSummary({
       </div>
       {hasRequirement && (
         <p
-          className={`mt-1.5 text-[11px] font-bold leading-none ${
-            satisfied ? 'text-[#1f7a4d]' : 'text-sejong'
+          className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold leading-none ${
+            satisfied
+              ? 'bg-[#e7f6ee] text-[#1b7a4a]'
+              : 'bg-[#fde8ec] text-sejong'
           }`}
         >
           {satisfied ? '요건 충족' : `${shortfall}학점 부족`}
@@ -945,7 +947,7 @@ function DetailCreditCard({
         </div>
       ) : (
         <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="flex shrink-0 flex-col items-center gap-1.5 self-center sm:self-start">
+          <div className="flex shrink-0 flex-col items-center gap-0.5 self-center sm:self-start">
             <DonutChart
               percent={percent}
               size={100}
