@@ -563,31 +563,6 @@ export function EngineeringPage() {
               })
             }
           />
-          {showCertElective && (
-            <AbeekDetailCard
-              title="인증선택"
-              remainingTitle="남은 인증선택 과목"
-              percent={genElecPct}
-              earned={genElecEarned}
-              required={genElecRequired}
-              completed={generalElective.completed}
-              remaining={generalElective.remaining}
-              onOpenCompleted={() =>
-                setListModal({
-                  title: '인증선택 이수 과목',
-                  subtitle: `${genElecEarned}학점 · ${generalElective.completed.length}과목`,
-                  courses: generalElective.completed,
-                })
-              }
-              onOpenRemaining={() =>
-                setListModal({
-                  title: '인증선택 남은 과목',
-                  subtitle: `${generalElective.remaining.length}과목`,
-                  courses: generalElective.remaining,
-                })
-              }
-            />
-          )}
           <AbeekDetailCard
             title="전공"
             areaHint={
@@ -640,6 +615,31 @@ export function EngineeringPage() {
               })
             }
           />
+          {showCertElective && (
+            <AbeekDetailCard
+              title="인증선택"
+              remainingTitle="남은 인증선택 과목"
+              percent={genElecPct}
+              earned={genElecEarned}
+              required={genElecRequired}
+              completed={generalElective.completed}
+              remaining={generalElective.remaining}
+              onOpenCompleted={() =>
+                setListModal({
+                  title: '인증선택 이수 과목',
+                  subtitle: `${genElecEarned}학점 · ${generalElective.completed.length}과목`,
+                  courses: generalElective.completed,
+                })
+              }
+              onOpenRemaining={() =>
+                setListModal({
+                  title: '인증선택 남은 과목',
+                  subtitle: `${generalElective.remaining.length}과목`,
+                  courses: generalElective.remaining,
+                })
+              }
+            />
+          )}
         </div>
 
         <CourseListModal
@@ -736,7 +736,7 @@ function AbeekDetailCard({
     <article className="flex h-full flex-col rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
       <h3 className="mb-1.5 text-base font-bold leading-snug text-ink">{title}</h3>
       {areaHint && <p className="mb-2 text-xs font-semibold text-ink-muted">{areaHint}</p>}
-      <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-3" />
+      <ChartLegend secondaryLabel="총 학점" activeColor="#5b6470" className="mb-3" />
 
       <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start">
         <div className="flex shrink-0 flex-col items-center gap-0.5 self-center sm:self-start">
@@ -744,6 +744,7 @@ function AbeekDetailCard({
             percent={percent}
             size={100}
             stroke={11}
+            color="#5b6470"
             label={formatPercentLabel(percent)}
           />
           <CreditStatusSummary earned={earned} required={required} />
