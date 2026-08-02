@@ -206,8 +206,13 @@ export type GraduationProgressResponse = {
   readingStatus?: SejongReadingStatus
   /** 계획 과목 반영 후 졸업 가능 여부 (레거시·호환) */
   graduationEligible?: boolean
-  /** 아직 부족한 조건 목록 (레거시·호환) */
+  /** 기이수 기준 실제 부족 요건 */
   graduationBlockers?: string[]
+  /**
+   * 화면 표시용 부족 요건.
+   * simulation 있으면 simulation.graduationBlockers, 없으면 graduationBlockers.
+   */
+  displayGraduationBlockers?: string[]
   /**
    * 계획 과목 반영 시뮬레이션 결과.
    * top-level 학점/평점은 기이수 기준, simulation은 계획 반영 기준.

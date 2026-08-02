@@ -543,29 +543,17 @@ export function SimulationPage() {
   const maxGradeCount = Math.max(1, ...gradeDist.map((g) => g.count))
 
   const missingItems = useMemo(() => {
-    const items: string[] = []
-    const blockers = sim?.graduationBlockers ?? progress?.graduationBlockers ?? []
-    for (const blocker of blockers) {
-      if (blocker) items.push(blocker)
-    }
-    if (projectedMajor < requiredMajor) {
-      items.push(`전공 ${Math.max(0, requiredMajor - projectedMajor)}학점 부족`)
-    }
-    if (projectedTotal < requiredTotal) {
-      items.push(`전체 ${Math.max(0, requiredTotal - projectedTotal)}학점 부족`)
-    }
-    for (const msg of evaluation?.messages ?? []) {
-      if (msg.includes('미이수')) items.push(msg.replace(/^[·•\s]+/, ''))
-    }
-    return [...new Set(items)].slice(0, 6)
+    // displayGraduationBlockers: 시뮬 있으면 계획 반영, 없으면 기이수 기준
+    const blockers =
+      progress?.displayGraduationBlockers ??
+      sim?.graduationBlockers ??
+      progress?.graduationBlockers ??
+      []
+    return [...new Set(blockers.filter(Boolean))].slice(0, 6)
   }, [
+    progress?.displayGraduationBlockers,
     sim?.graduationBlockers,
     progress?.graduationBlockers,
-    projectedMajor,
-    requiredMajor,
-    projectedTotal,
-    requiredTotal,
-    evaluation,
   ])
 
   const recommendations = useMemo(() => {
