@@ -12,7 +12,7 @@ export function DashboardLayout() {
   return (
     <div className="flex min-h-screen bg-surface">
       <Sidebar />
-      <main className="flex-1 overflow-auto px-6 py-7 pb-10 sm:px-8">
+      <main className="flex-1 overflow-auto px-6 pb-12 pt-9 sm:px-8">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1 className="text-3xl font-bold text-ink">Dashboard</h1>
           <MajorTrackSwitcher />
@@ -35,7 +35,7 @@ export function DashboardLayout() {
             </NavLink>
           ))}
         </div>
-        <div className="mt-7">
+        <div className="mt-9">
           <Outlet />
         </div>
       </main>

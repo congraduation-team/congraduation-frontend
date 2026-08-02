@@ -343,8 +343,8 @@ export function EngineeringPage() {
   }
 
   return (
-    <div>
-      <div className="mb-5">
+    <div className="pt-1">
+      <div className="mb-6">
         <h2 className="text-xl font-bold text-ink">{displayName}님 공학인증 현황</h2>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {evaluation.entranceYear != null && (
@@ -646,7 +646,7 @@ function CreditStatusSummary({
   const shortfall = hasRequirement ? Math.max(0, need - earned) : 0
 
   return (
-    <div className="mt-1.5 min-w-[7.75rem] text-center">
+    <div className="mt-2 min-w-[7.75rem] text-center">
       <div className="flex flex-col gap-1">
         <div className="flex items-baseline justify-between gap-2.5">
           <span className="text-[11px] font-semibold text-ink-muted">이수</span>
@@ -704,13 +704,13 @@ function AbeekDetailCard({
   onOpenRemaining: () => void
 }) {
   return (
-    <article className="flex h-full flex-col rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-      <h3 className="mb-1.5 text-base font-bold leading-snug text-ink">{title}</h3>
-      {areaHint && <p className="mb-2 text-xs font-semibold text-ink-muted">{areaHint}</p>}
-      <ChartLegend secondaryLabel="총 학점" activeColor="#5b6470" className="mb-3" />
+    <article className="flex h-full flex-col rounded-[20px] bg-white px-5 pb-5 pt-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+      <h3 className="mb-3 text-base font-bold leading-snug text-ink">{title}</h3>
+      {areaHint && <p className="mb-3 text-xs font-semibold text-ink-muted">{areaHint}</p>}
+      <ChartLegend secondaryLabel="총 학점" activeColor="#5b6470" className="mb-4" />
 
       <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-        <div className="flex shrink-0 flex-col items-center gap-0.5 self-center sm:self-start">
+        <div className="flex shrink-0 flex-col items-center gap-1 self-center pt-1 sm:self-start sm:pt-2">
           <DonutChart
             percent={percent}
             size={100}

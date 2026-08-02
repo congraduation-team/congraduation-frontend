@@ -438,7 +438,7 @@ export function GraduationPage() {
   })()
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 pt-1">
       <div>
         <h2 className="text-[22px] font-bold leading-tight text-ink">{displayName}님 졸업요건 현황</h2>
         <p className="mt-1.5 text-sm text-ink-muted">{analysisTermLabel}</p>
@@ -825,7 +825,7 @@ function CreditStatusSummary({
   const shortfall = hasRequirement ? Math.max(0, need - earned) : 0
 
   return (
-    <div className="mt-1.5 min-w-[7.75rem] text-center">
+    <div className="mt-2 min-w-[7.75rem] text-center">
       <div className="flex flex-col gap-1">
         <div className="flex items-baseline justify-between gap-2.5">
           <span className="text-[11px] font-semibold text-ink-muted">이수</span>
@@ -966,11 +966,11 @@ function DetailCreditCard({
   hideRemaining?: boolean
 }) {
   return (
-    <article className="flex h-full flex-col rounded-2xl bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-      <h3 className="mb-1.5 text-base font-bold leading-snug text-ink">{title}</h3>
-      {areaHint && <p className="mb-2 text-xs font-semibold text-ink-muted">{areaHint}</p>}
+    <article className="flex h-full flex-col rounded-2xl bg-white px-5 pb-5 pt-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+      <h3 className="mb-3 text-base font-bold leading-snug text-ink">{title}</h3>
+      {areaHint && <p className="mb-3 text-xs font-semibold text-ink-muted">{areaHint}</p>}
       {!earnedOnly && (
-        <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-3" />
+        <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-4" />
       )}
 
       {earnedOnly ? (
@@ -992,7 +992,7 @@ function DetailCreditCard({
         </div>
       ) : (
         <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="flex shrink-0 flex-col items-center gap-0.5 self-center sm:self-start">
+          <div className="flex shrink-0 flex-col items-center gap-1 self-center pt-1 sm:self-start sm:pt-2">
             <DonutChart
               percent={percent}
               size={100}
