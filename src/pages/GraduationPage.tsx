@@ -109,6 +109,7 @@ export function GraduationPage() {
       try {
         const [catalog, roadmap] = await Promise.all([
           getPlannedCourseCatalog({
+            studentId: student.id,
             departmentName: student.major || active?.label || undefined,
           }).catch(() => null),
           getStudentRoadmapByStudent(student.id).catch(() => null),

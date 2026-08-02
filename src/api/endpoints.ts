@@ -231,8 +231,11 @@ export function getAbeekTimetableTerms() {
   return apiJson<Array<Record<string, unknown>>>('/api/abeek/timetable-terms')
 }
 
-/** 계획용 교과목 카탈로그 (시간표 기반) */
+/** 계획용 교과목 카탈로그 (시간표 기반)
+ * studentId 전달 시: 교양/자기주도창의전공 노출, 타학과→전공선택 보정, B0↑ 기이수 제외
+ */
 export function getPlannedCourseCatalog(options: {
+  studentId?: number | string
   keyword?: string
   targetGrade?: string
   offeredTerm?: string
@@ -240,6 +243,9 @@ export function getPlannedCourseCatalog(options: {
   category?: string
 } = {}) {
   const params = new URLSearchParams()
+  if (options.studentId != null && options.studentId !== '') {
+    params.set('studentId', String(options.studentId))
+  }
   if (options.keyword) params.set('keyword', options.keyword)
   if (options.targetGrade) params.set('targetGrade', options.targetGrade)
   if (options.offeredTerm) params.set('offeredTerm', options.offeredTerm)

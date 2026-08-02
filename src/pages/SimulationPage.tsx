@@ -386,6 +386,7 @@ export function SimulationPage() {
     ;(async () => {
       try {
         const res = await getPlannedCourseCatalog({
+          studentId: student.id,
           departmentName: student.major || undefined,
         })
         if (cancelled) return
@@ -410,6 +411,7 @@ export function SimulationPage() {
     const timer = window.setTimeout(async () => {
       try {
         const res = await getPlannedCourseCatalog({
+          studentId: student.id,
           keyword: query.trim() || undefined,
           departmentName: student.major || undefined,
         })
