@@ -1071,6 +1071,8 @@ export function CurriculumPage() {
   }, [abeekEvaluation, generalFlat, abeekRawCourses])
 
   const allCoursesWithAlerts = useMemo(() => {
+    // 느낌표(!)는 공학인증 로드맵에서만 표시
+    if (viewKind !== 'abeek') return allCourses
     const { designCodes, designNames, failCodes, failNames } = courseAlertIndex
     return allCourses.map((course) => {
       const nameKey = normalizeAlertKey(course.name)
@@ -1085,7 +1087,7 @@ export function CurriculumPage() {
           : '설계학점 불인정 (이수했으나 설계학점 미인정)',
       }
     })
-  }, [allCourses, courseAlertIndex])
+  }, [allCourses, courseAlertIndex, viewKind])
 
   const activeRowDefs = viewKind === 'abeek' ? abeekRowDefs : generalRowDefs
 
