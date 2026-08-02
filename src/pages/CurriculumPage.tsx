@@ -1231,11 +1231,7 @@ export function CurriculumPage() {
           </div>
         </div>
 
-        <p className="mt-3 text-sm text-ink-muted">
-          {viewKind === 'abeek'
-            ? '공학인증(ABEEK) 이수체계도입니다. 전문교양·BSM·전공을 표시합니다.'
-            : '강의 시간표 기준 학과 로드맵입니다. 교양 → 기초필수 → 전공 순이며, 이수는 카테고리별 색으로 표시됩니다.'}
-        </p>
+
 
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-[#e5e5ea] py-3.5">
           <span className="shrink-0 text-sm font-medium text-ink">체계표 안내</span>
