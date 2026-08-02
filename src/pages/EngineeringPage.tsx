@@ -259,12 +259,18 @@ export function EngineeringPage() {
     [evaluation?.general?.completedCourses],
   )
 
-  const genElecEarned = generalElective.completed.reduce((s, c) => s + c.credits, 0)
-  const genElecNeed = generalElectiveAll.reduce((s, c) => s + toNumber(c.credits), 0) || 1
+  const genElecEarned =
+    toNumber(evaluation?.certElective?.earnedCredits) ||
+    generalElective.completed.reduce((s, c) => s + c.credits, 0)
+  const genElecRequired =
+    toNumber(evaluation?.certElective?.requiredCredits) ||
+    generalElectiveAll.reduce((s, c) => s + toNumber(c.credits), 0)
   const genElecPct =
-    generalElectiveAll.length > 0
-      ? Math.max(0, Math.min(100, Math.round((genElecEarned / genElecNeed) * 100)))
-      : generalPct
+    toNumber(evaluation?.certElective?.progressPercent) > 0
+      ? toPercent(evaluation?.certElective?.progressPercent)
+      : genElecRequired > 0
+        ? Math.max(0, Math.min(100, Math.round((genElecEarned / genElecRequired) * 100)))
+        : generalPct
 
   const bsmEarned = toNumber(evaluation?.bsm?.earnedCredits)
   const bsmRequired = toNumber(evaluation?.bsm?.requiredCredits)
@@ -372,7 +378,7 @@ export function EngineeringPage() {
         )}
       </div>
 
-      <div className="mx-auto max-w-[1120px] space-y-4 px-1">
+      <div className="mx-auto max-w-[1280px] space-y-4 px-1">
         <article className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           <h3 className="mb-3 text-base font-bold text-ink">인증 요약</h3>
 
@@ -509,173 +515,132 @@ export function EngineeringPage() {
           </div>
         </article>
 
-        {/* 1행: 전문교양 | BSM */}
+        {/* 카테고리 상세 — 졸업요건 DetailCreditCard와 동일 형식 */}
         <div className="grid items-stretch gap-4 lg:grid-cols-2">
-          <article className="rounded-[20px] bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-base font-bold text-ink">
-                전문교양{' '}
-                <span className="text-sejong">{generalEarned}</span>
-                {generalRequiredCredits ? (
-                  <span className="text-ink-muted">/{generalRequiredCredits}</span>
-                ) : null}
-                학점
-              </h3>
-              {generalRequiredRemaining.length > 0 && (
-                <RemainingButton
-                  onClick={() =>
-                    setListModal({
-                      title: '전문교양 남은 과목',
-                      subtitle: `${generalRequiredRemaining.length}과목`,
-                      courses: generalRequiredRemaining,
-                    })
-                  }
-                />
-              )}
-            </div>
-            <AbeekCategoryBlock
-              percent={generalPct}
-              courses={generalCompleted}
-              totalValue={generalEarned}
-              legend="최소 이수 학점"
-              onMore={() =>
-                setListModal({
-                  title: '전문교양 이수 과목',
-                  subtitle: `${generalEarned}학점 · ${generalCompleted.length}과목`,
-                  courses: generalCompleted,
-                })
-              }
-            />
-          </article>
-
-          <article className="rounded-[20px] bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-base font-bold text-ink">
-                BSM{' '}
-                <span className="text-sejong">
-                  {bsmEarned}/{bsmRequired || '-'}
-                </span>
-                학점
-              </h3>
-              {bsm.remaining.length > 0 && (
-                <RemainingButton
-                  onClick={() =>
-                    setListModal({
-                      title: 'BSM 남은 과목',
-                      subtitle: `${bsm.remaining.length}과목`,
-                      courses: bsm.remaining,
-                    })
-                  }
-                />
-              )}
-            </div>
-            <AbeekCategoryBlock
-              percent={bsmPct}
-              courses={bsm.completed}
-              totalValue={bsmEarned}
-              legend="총 학점"
-              onMore={() =>
-                setListModal({
-                  title: 'BSM 이수 과목',
-                  subtitle: `${bsmEarned}학점 · ${bsm.completed.length}과목`,
-                  courses: bsm.completed,
-                })
-              }
-            />
-          </article>
-        </div>
-
-        {/* 인증선택 (2022학번~) */}
-        {showCertElective && (
-          <article className="rounded-[20px] bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-base font-bold text-ink">
-                인증선택{' '}
-                <span className="text-sejong">{genElecEarned}</span>
-                학점
-              </h3>
-              {generalElective.remaining.length > 0 && (
-                <RemainingButton
-                  onClick={() =>
-                    setListModal({
-                      title: '인증선택 남은 과목',
-                      subtitle: `${generalElective.remaining.length}과목`,
-                      courses: generalElective.remaining,
-                    })
-                  }
-                />
-              )}
-            </div>
-            <AbeekCategoryBlock
+          <AbeekDetailCard
+            title="전문교양"
+            remainingTitle="남은 필수 과목"
+            percent={generalPct}
+            earned={generalEarned}
+            required={generalRequiredCredits}
+            completed={generalCompleted}
+            remaining={generalRequiredRemaining}
+            onOpenCompleted={() =>
+              setListModal({
+                title: '전문교양 이수 과목',
+                subtitle: `${generalEarned}학점 · ${generalCompleted.length}과목`,
+                courses: generalCompleted,
+              })
+            }
+            onOpenRemaining={() =>
+              setListModal({
+                title: '전문교양 남은 과목',
+                subtitle: `${generalRequiredRemaining.length}과목`,
+                courses: generalRequiredRemaining,
+              })
+            }
+          />
+          <AbeekDetailCard
+            title="BSM"
+            remainingTitle="남은 BSM 과목"
+            percent={bsmPct}
+            earned={bsmEarned}
+            required={bsmRequired}
+            completed={bsm.completed}
+            remaining={bsm.remaining}
+            onOpenCompleted={() =>
+              setListModal({
+                title: 'BSM 이수 과목',
+                subtitle: `${bsmEarned}학점 · ${bsm.completed.length}과목`,
+                courses: bsm.completed,
+              })
+            }
+            onOpenRemaining={() =>
+              setListModal({
+                title: 'BSM 남은 과목',
+                subtitle: `${bsm.remaining.length}과목`,
+                courses: bsm.remaining,
+              })
+            }
+          />
+          {showCertElective && (
+            <AbeekDetailCard
+              title="인증선택"
+              remainingTitle="남은 인증선택 과목"
               percent={genElecPct}
-              courses={generalElective.completed}
-              totalValue={genElecEarned}
-              legend="최소 이수 학점"
-              onMore={() =>
+              earned={genElecEarned}
+              required={genElecRequired}
+              completed={generalElective.completed}
+              remaining={generalElective.remaining}
+              onOpenCompleted={() =>
                 setListModal({
                   title: '인증선택 이수 과목',
                   subtitle: `${genElecEarned}학점 · ${generalElective.completed.length}과목`,
                   courses: generalElective.completed,
                 })
               }
-            />
-          </article>
-        )}
-
-        <article className="rounded-[20px] bg-white px-6 py-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-base font-bold text-ink">
-                전공{' '}
-                <span className="text-sejong">
-                  {majorEarned}/{majorRequired || '-'}
-                </span>
-                학점
-              </h3>
-              <p className="mt-0.5 text-xs text-ink-muted">
-                설계 {designEarned}
-                {designRequired ? `/${designRequired}` : ''}학점
-                {evaluation.designSequenceSatisfied === false ? ' · 시퀀스 미충족' : ''}
-              </p>
-            </div>
-            {(major.remaining.length > 0 || designLists.remaining.length > 0) && (
-              <RemainingButton
-                onClick={() =>
-                  setListModal({
-                    title: '전공·설계 남은 과목',
-                    subtitle: `전공 ${major.remaining.length} · 설계 ${designLists.remaining.length}`,
-                    courses: [...major.remaining, ...designLists.remaining],
-                  })
-                }
-              />
-            )}
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <AbeekCategoryBlock
-              title="전공교과목"
-              percent={majorPct}
-              courses={major.completed}
-              totalValue={majorEarned}
-              legend="총 학점"
-              onMore={() => setMajorOpen(true)}
-            />
-            <AbeekCategoryBlock
-              title="설계"
-              percent={designPct}
-              courses={designLists.completed}
-              totalValue={designEarned}
-              legend="총 학점"
-              onMore={() =>
+              onOpenRemaining={() =>
                 setListModal({
-                  title: '설계 이수 과목',
-                  subtitle: `${designEarned}학점 · ${designLists.completed.length}과목`,
-                  courses: designLists.completed,
+                  title: '인증선택 남은 과목',
+                  subtitle: `${generalElective.remaining.length}과목`,
+                  courses: generalElective.remaining,
                 })
               }
             />
-          </div>
-        </article>
+          )}
+          <AbeekDetailCard
+            title="전공"
+            areaHint={
+              designRequired > 0
+                ? `설계 ${designEarned}/${designRequired}학점${
+                    evaluation.designSequenceSatisfied === false ? ' · 시퀀스 미충족' : ''
+                  }`
+                : undefined
+            }
+            remainingTitle="남은 전공 과목"
+            percent={majorPct}
+            earned={majorEarned}
+            required={majorRequired}
+            completed={major.completed}
+            remaining={major.remaining}
+            onOpenCompleted={() => setMajorOpen(true)}
+            onOpenRemaining={() =>
+              setListModal({
+                title: '남은 전공 과목',
+                subtitle: `${major.remaining.length}과목`,
+                courses: major.remaining,
+              })
+            }
+          />
+          <AbeekDetailCard
+            title="설계"
+            areaHint={
+              evaluation.designSequenceSatisfied === false
+                ? '기초 → 요소 → 종합 시퀀스 미충족'
+                : undefined
+            }
+            remainingTitle="남은 설계 과목"
+            percent={designPct}
+            earned={toNumber(designEarned)}
+            required={designRequired}
+            completed={designLists.completed}
+            remaining={designLists.remaining}
+            onOpenCompleted={() =>
+              setListModal({
+                title: '설계 이수 과목',
+                subtitle: `${designEarned}학점 · ${designLists.completed.length}과목`,
+                courses: designLists.completed,
+              })
+            }
+            onOpenRemaining={() =>
+              setListModal({
+                title: '남은 설계 과목',
+                subtitle: `${designLists.remaining.length}과목`,
+                courses: designLists.remaining,
+              })
+            }
+          />
+        </div>
 
         <CourseListModal
           open={majorOpen}
@@ -697,15 +662,114 @@ export function EngineeringPage() {
   )
 }
 
-function RemainingButton({ onClick }: { onClick: () => void }) {
+function CreditStatusSummary({
+  earned,
+  required,
+}: {
+  earned: number
+  required?: number
+}) {
+  const need = required && required > 0 ? required : 0
+  const hasRequirement = need > 0
+  const satisfied = hasRequirement && earned >= need
+  const shortfall = hasRequirement ? Math.max(0, need - earned) : 0
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-full border border-[#e5e7eb] bg-white px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-panel"
-    >
-      남은 과목 보기
-    </button>
+    <div className="mt-1.5 min-w-[7.75rem] text-center">
+      <div className="flex flex-col gap-1">
+        <div className="flex items-baseline justify-between gap-2.5">
+          <span className="text-[11px] font-semibold text-ink-muted">이수</span>
+          <span className="text-[15px] font-extrabold tracking-tight text-ink">
+            {earned}
+            <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-2.5">
+          <span className="text-[11px] font-semibold text-ink-muted">필요</span>
+          <span className="text-[15px] font-extrabold tracking-tight text-ink">
+            {hasRequirement ? need : '-'}
+            {hasRequirement && (
+              <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
+            )}
+          </span>
+        </div>
+      </div>
+      {hasRequirement && (
+        <p
+          className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold leading-none ${
+            satisfied
+              ? 'bg-[#e7f6ee] text-[#1b7a4a]'
+              : 'bg-[#fde8ec] text-sejong'
+          }`}
+        >
+          {satisfied ? '요건 충족' : `${shortfall}학점 부족`}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function AbeekDetailCard({
+  title,
+  remainingTitle,
+  percent = 0,
+  earned,
+  required = 0,
+  completed,
+  remaining = [],
+  areaHint,
+  onOpenCompleted,
+  onOpenRemaining,
+}: {
+  title: string
+  remainingTitle: string
+  percent?: number
+  earned: number
+  required?: number
+  completed: Course[]
+  remaining?: Course[]
+  areaHint?: string
+  onOpenCompleted: () => void
+  onOpenRemaining: () => void
+}) {
+  return (
+    <article className="flex h-full flex-col rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+      <h3 className="mb-1.5 text-base font-bold leading-snug text-ink">{title}</h3>
+      {areaHint && <p className="mb-2 text-xs font-semibold text-ink-muted">{areaHint}</p>}
+      <ChartLegend secondaryLabel="총 학점" activeColor="#c8012e" className="mb-3" />
+
+      <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-start">
+        <div className="flex shrink-0 flex-col items-center gap-0.5 self-center sm:self-start">
+          <DonutChart
+            percent={percent}
+            size={100}
+            stroke={11}
+            label={formatPercentLabel(percent)}
+          />
+          <CreditStatusSummary earned={earned} required={required} />
+        </div>
+
+        <div className="grid min-w-0 flex-1 gap-5 sm:grid-cols-2">
+          <CourseMiniList
+            title="이수한 과목"
+            courses={completed}
+            previewCount={4}
+            showMoreLink
+            totalValue={earned}
+            emptyText="이수한 과목이 없습니다."
+            onMoreClick={onOpenCompleted}
+          />
+          <CourseMiniList
+            title={remainingTitle}
+            courses={remaining}
+            previewCount={4}
+            showMoreLink
+            emptyText="남은 항목이 없습니다."
+            onMoreClick={onOpenRemaining}
+          />
+        </div>
+      </div>
+    </article>
   )
 }
 
@@ -734,56 +798,6 @@ function SummaryMiniGauge({
         <span className="text-ink">{earned}</span>/{required || '-'}학점
       </p>
     </div>
-  )
-}
-
-function AbeekCategoryBlock({
-  title,
-  percent,
-  courses,
-  totalValue,
-  legend,
-  onMore,
-}: {
-  title?: string
-  percent: number
-  courses: Course[]
-  totalValue: number | string
-  legend: '최소 이수 학점' | '총 학점'
-  onMore: () => void
-}) {
-  return (
-    <section className="w-full min-w-0">
-      <div className="flex w-full min-w-0 items-start gap-4 pr-1">
-        <div className="flex shrink-0 flex-col items-center self-center">
-          {title && (
-            <p className="mb-1 text-center text-sm font-bold text-ink">{title}</p>
-          )}
-          <ChartLegend
-            secondaryLabel={legend}
-            activeColor="#5b6470"
-            className="mb-2 justify-center scale-90"
-          />
-          <DonutChart
-            percent={percent}
-            size={112}
-            stroke={12}
-            color="#5b6470"
-            label={formatPercentLabel(percent)}
-          />
-        </div>
-        <CourseMiniList
-          title="이수한 과목"
-          courses={courses}
-          totalValue={totalValue}
-          previewCount={4}
-          showMoreLink
-          className="min-w-0 flex-1"
-          emptyText="이수한 과목이 없습니다."
-          onMoreClick={onMore}
-        />
-      </div>
-    </section>
   )
 }
 
