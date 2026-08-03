@@ -15,6 +15,10 @@ import { trackTypeLabel } from '../utils/majorTrack'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 import { CertDetailText } from '../utils/certDetail'
 import {
+  englishRequirementPreview,
+  englishRequirementsForAdmission,
+} from '../utils/englishCertification'
+import {
   isAcademicCourseCode,
   lookupAcademicCodeByName,
   normalizeCourseNameKey,
@@ -401,6 +405,13 @@ export function GraduationPage() {
   const swSatisfied = swCert?.satisfied === true
   const englishApplicable = englishCert == null || englishCert.applicable !== false
   const swApplicable = swCert == null || swCert.applicable !== false
+  const englishAdmissionYear = progress?.admissionYear ?? student?.admissionYear
+  const englishMajorName = progress?.major ?? student?.major
+  const englishPreview = englishRequirementPreview(englishAdmissionYear, englishMajorName)
+  const englishRequirements = englishRequirementsForAdmission(
+    englishAdmissionYear,
+    englishMajorName,
+  )
 
   const totalGpa = toNumber(progress?.averageGradePoint)
   const majorGpa = toNumber(progress?.majorGradePoint)
@@ -562,19 +573,15 @@ export function GraduationPage() {
               ) : (
                 <>
                   <div className="overflow-hidden rounded-lg border border-[#e5e7eb]">
-                    {[
-                      { name: 'TOEIC', value: '800점 이상' },
-                      { name: 'TOEFL iBT', value: '80점 이상' },
-                      { name: 'TOEIC Speaking', value: 'IM 1 이상' },
-                    ].map((item, index) => (
+                    {englishPreview.map((item, index) => (
                       <div
-                        key={item.name}
+                        key={item.label}
                         className={`flex items-center justify-between gap-1.5 px-2 py-1.5 ${
-                          index < 2 ? 'border-b border-[#e5e7eb]' : ''
+                          index < englishPreview.length - 1 ? 'border-b border-[#e5e7eb]' : ''
                         }`}
                       >
                         <span className="whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2 py-0.5 text-[11px] font-medium text-ink">
-                          {item.name}
+                          {item.label}
                         </span>
                         <span className="shrink-0 whitespace-nowrap text-[11px] text-ink">
                           {item.value}
@@ -788,6 +795,7 @@ export function GraduationPage() {
         satisfied={englishSatisfied}
         detail={englishCert?.detail}
         primaryRequirement={englishCert?.primaryRequirement}
+        requirements={englishRequirements}
       />
       <SWCodingCertModal
         open={swOpen}

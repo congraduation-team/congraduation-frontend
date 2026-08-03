@@ -1,5 +1,5 @@
-import { englishRequirements } from '../../data/mockData'
 import { CertDetailText } from '../../utils/certDetail'
+import type { EnglishRequirementRow } from '../../utils/englishCertification'
 import { Modal } from './Modal'
 
 type Props = {
@@ -8,6 +8,7 @@ type Props = {
   satisfied?: boolean
   detail?: string
   primaryRequirement?: string
+  requirements?: EnglishRequirementRow[]
 }
 
 export function EnglishCertModal({
@@ -16,6 +17,7 @@ export function EnglishCertModal({
   satisfied = false,
   detail,
   primaryRequirement,
+  requirements = [],
 }: Props) {
   return (
     <Modal
@@ -36,10 +38,12 @@ export function EnglishCertModal({
         <>
           <div className="rounded-xl bg-panel px-5 py-4">
             <ul className="space-y-3.5">
-              {englishRequirements.map((item) => (
+              {requirements.map((item) => (
                 <li key={item.label} className="flex items-center justify-between gap-4">
                   <span className="text-[15px] font-semibold text-ink">{item.label}</span>
-                  <span className="text-[15px] font-semibold text-ink">{item.value}</span>
+                  <span className="text-right text-[15px] font-semibold text-ink">
+                    {item.value || '—'}
+                  </span>
                 </li>
               ))}
             </ul>
