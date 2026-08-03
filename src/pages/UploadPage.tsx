@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getTranscriptStatus, uploadAcademicRecord } from '../api/endpoints'
-import { BrandHeader } from '../components/common/BrandHeader'
-import { UniversitySeal } from '../components/common/UniversitySeal'
+import { AppLogo } from '../components/common/AppLogo'
 import { useAuth } from '../context/AuthContext'
 
 export function UploadPage() {
@@ -91,16 +90,12 @@ export function UploadPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <BrandHeader />
-
-      <form
-        onSubmit={handleSubmit}
-        className="mx-auto flex max-w-2xl flex-col items-center px-6 pb-16 pt-14"
-      >
-        <UniversitySeal />
-        <h1 className="mt-6 text-center text-3xl font-extrabold text-ink">
+      <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-28">
+        <AppLogo size={104} />
+        <h1 className="mt-6 text-center text-3xl font-extrabold tracking-tight text-ink">
           {isUpdate ? '기이수성적 업데이트' : '기이수성적조회 엑셀 파일 업로드'}
         </h1>
+        <p className="mt-2 text-center text-sm text-ink-muted">세종대학교 졸업인증 분석</p>
         <p className="mt-3 text-center text-xs text-ink-muted">
           학사정보시스템 &gt; 수업/성적 &gt; 성적 및 강의 평가 &gt; 기이수성적조회 엑셀 다운로드
         </p>
@@ -113,54 +108,58 @@ export function UploadPage() {
           </p>
         )}
 
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => {
-            e.preventDefault()
-            setDragging(true)
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={onDrop}
-          className={`mt-10 w-full rounded-2xl px-6 py-14 text-center transition ${
-            dragging ? 'bg-sejong-light ring-2 ring-sejong' : 'bg-panel'
-          }`}
-        >
-          <p className="text-sm text-ink-muted">파일 형식 : XLSX</p>
-          <p className="mt-1 text-sm text-ink-muted">파일 용량 : 최대 1MB</p>
-          <p className="mt-3 text-xs text-ink-faint">*업로드한 파일은 서버에 별도로 저장되지 않음*</p>
-          {file && <p className="mt-4 text-sm font-semibold text-sejong">{file.name}</p>}
-        </button>
-
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".xlsx"
-          className="hidden"
-          onChange={(e) => pickFile(e.target.files?.[0])}
-        />
-
-        <p className="mt-5 text-sm font-medium text-ink">파일을 드래그하거나 클릭하여 선택해주세요!</p>
-        {error && <p className="mt-3 max-w-md text-center text-sm text-sejong">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={!file || loading}
-          className="mt-10 w-full max-w-md rounded-full bg-sejong py-3.5 text-base font-bold text-white transition hover:bg-sejong-dark disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {loading ? '졸업요건·공학인증 반영 중...' : isUpdate ? '업데이트' : '완료'}
-        </button>
-
-        {isUpdate && (
+        <form onSubmit={handleSubmit} className="mt-10 w-full">
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
-            className="mt-3 text-sm font-medium text-ink-muted hover:text-sejong"
+            onClick={() => inputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault()
+              setDragging(true)
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            className={`w-full rounded-2xl px-6 py-14 text-center transition ${
+              dragging ? 'bg-sejong-light ring-2 ring-sejong' : 'bg-[#f3f4f6]'
+            }`}
           >
-            대시보드로 돌아가기
+            <p className="text-sm text-ink-muted">파일 형식 : XLSX</p>
+            <p className="mt-1 text-sm text-ink-muted">파일 용량 : 최대 1MB</p>
+            <p className="mt-3 text-xs text-ink-faint">*업로드한 파일은 서버에 별도로 저장되지 않음*</p>
+            {file && <p className="mt-4 text-sm font-semibold text-sejong">{file.name}</p>}
           </button>
-        )}
-      </form>
+
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx"
+            className="hidden"
+            onChange={(e) => pickFile(e.target.files?.[0])}
+          />
+
+          <p className="mt-5 text-center text-sm font-medium text-ink">
+            파일을 드래그하거나 클릭하여 선택해주세요!
+          </p>
+          {error && <p className="mt-3 text-center text-sm text-sejong">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={!file || loading}
+            className="mt-10 w-full rounded-full bg-sejong py-3.5 text-base font-bold text-white transition hover:bg-sejong-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? '졸업요건·공학인증 반영 중...' : isUpdate ? '업데이트' : '완료'}
+          </button>
+
+          {isUpdate && (
+            <button
+              type="button"
+              onClick={() => navigate('/dashboard')}
+              className="mt-3 w-full text-center text-sm font-medium text-ink-muted hover:text-sejong"
+            >
+              대시보드로 돌아가기
+            </button>
+          )}
+        </form>
+      </div>
     </div>
   )
 }
