@@ -6,10 +6,12 @@ import { RequireAuth } from './components/auth/RequireAuth'
 import { DashboardLayout } from './components/layout/DashboardLayout'
 import { AuthProvider } from './context/AuthContext'
 import { MajorTrackProvider } from './context/MajorTrackContext'
+import { AdminInquiriesPage } from './pages/AdminInquiriesPage'
 import { AdminPage } from './pages/AdminPage'
 import { CurriculumPage } from './pages/CurriculumPage'
 import { EngineeringPage } from './pages/EngineeringPage'
 import { GraduationPage } from './pages/GraduationPage'
+import { InquiryPage } from './pages/InquiryPage'
 import { LoginPage } from './pages/LoginPage'
 import { MyCoursesPage } from './pages/MyCoursesPage'
 import { SimulationPage } from './pages/SimulationPage'
@@ -32,8 +34,10 @@ createRoot(document.getElementById('root')!).render(
             </Route>
             <Route path="/curriculum" element={<CurriculumPage />} />
             <Route path="/simulation" element={<SimulationPage />} />
+            <Route path="/inquiry" element={<InquiryPage />} />
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminPage />} />
+              <Route path="/admin/inquiries" element={<AdminInquiriesPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
