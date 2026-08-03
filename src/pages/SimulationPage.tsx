@@ -10,14 +10,15 @@ import {
   getPlannedCourses,
   updatePlannedCourseExpectedGrade,
 } from '../api/endpoints'
-import type {
-  AbeekEvaluationResponse,
-  ExpectedGrade,
-  GraduationProgressResponse,
-  PlannableCourse,
-  PlannedCourseItem,
-  PlannedCoursesResponse,
-  PlannedSemester,
+import {
+  isAdminUser,
+  type AbeekEvaluationResponse,
+  type ExpectedGrade,
+  type GraduationProgressResponse,
+  type PlannableCourse,
+  type PlannedCourseItem,
+  type PlannedCoursesResponse,
+  type PlannedSemester,
 } from '../api/types'
 import { DonutChart } from '../components/charts/DonutChart'
 import { Sidebar } from '../components/layout/Sidebar'
@@ -829,7 +830,13 @@ export function SimulationPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <MajorTrackSwitcher />
+            {isAdminUser(student) ? (
+              <MajorTrackSwitcher />
+            ) : student?.major ? (
+              <span className="rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-ink-muted">
+                {trackTypeLabel(student.majorType)} · {student.major}
+              </span>
+            ) : null}
             <button
               type="button"
               onClick={handleReset}
