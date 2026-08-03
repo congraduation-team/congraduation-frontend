@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 import { isAdminUser } from '../../api/types'
 import { useAuth } from '../../context/AuthContext'
 import { AppLogo } from '../common/AppLogo'
@@ -89,13 +89,16 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#eee] bg-white px-5 py-6">
-      <div className="mb-10 flex items-center gap-3">
+      <Link
+        to="/dashboard"
+        className="mb-10 flex items-center gap-3 rounded-lg outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sejong"
+      >
         <AppLogo size={44} />
         <div className="min-w-0">
           <p className="text-lg font-bold leading-tight text-sejong">세종대학교</p>
           <p className="mt-0.5 text-sm font-medium text-ink">졸업 인증 분석</p>
         </div>
-      </div>
+      </Link>
 
       <p className="mb-3 text-xs font-medium text-ink-muted">Main page</p>
       <nav className="flex flex-col gap-1">
