@@ -246,8 +246,8 @@ export type GraduationProgressResponse = {
   /** 기이수 기준 실제 부족 요건 */
   graduationBlockers?: string[]
   /**
-   * 화면 표시용 부족 요건.
-   * simulation 있으면 simulation.graduationBlockers, 없으면 graduationBlockers.
+   * 화면 표시용 부족 요건 (레거시·호환).
+   * 시뮬 페이지는 simulation.displayGraduationBlockers를 우선 사용.
    */
   displayGraduationBlockers?: string[]
   /**
@@ -267,8 +267,12 @@ export type GraduationSimulationResult = {
   commonLiberalCredits?: CreditProgress
   electiveLiberalCredits?: CreditProgress
   balancedLiberalCredits?: CreditProgress
+  /** 계획 반영 후 남은 공통교양 필수 */
+  remainingCommonLiberalRequiredCourses?: RemainingCommonLiberalRequiredCourse[]
   graduationEligible?: boolean
   graduationBlockers?: string[]
+  /** 화면 표시용 부족 요건 (계획 반영) */
+  displayGraduationBlockers?: string[]
 }
 
 export type ExpectedGrade =

@@ -652,19 +652,31 @@ export function SimulationPage() {
   const maxGradeCount = Math.max(1, ...gradeDist.map((g) => g.count))
 
   const missingItems = useMemo(() => {
-    // displayGraduationBlockers: 시뮬 있으면 계획 반영, 없으면 기이수 기준
-    const blockers =
-      progress?.displayGraduationBlockers ??
-      sim?.graduationBlockers ??
-      progress?.graduationBlockers ??
-      []
-    return [...new Set(blockers.filter(Boolean))].slice(0, 6)
-  }, [
-    progress?.displayGraduationBlockers,
-    sim?.graduationBlockers,
-    progress?.graduationBlockers,
-  ])
+    // 시뮬 화면: top-level(기이수)이 아니라 simulation 계획 반영값을 사용
+    const blockers = [
+      ...(sim != null
+        ? (sim.displayGraduationBlockers ?? sim.graduationBlockers ?? [])
+        : (progress?.displayGraduationBlockers ?? progress?.graduationBlockers ?? [])),
+    ].filter(Boolean)
 
+    const remaining =
+      sim != null
+        ? (sim.remainingCommonLiberalRequiredCourses ?? [])
+        : (progress?.remainingCommonLiberalRequiredCourses ?? [])
+    for (const row of remaining) {
+      const name = row.course?.courseName?.trim()
+      if (!name) continue
+      if (blockers.some((b) => b.includes(name))) continue
+      blockers.push(`공통교양 필수 미이수: ${name}`)
+    }
+
+    return [...new Set(blockers)].slice(0, 8)
+  }, [
+    sim,
+    progress?.displayGraduationBlockers,
+    progress?.graduationBlockers,
+    progress?.remainingCommonLiberalRequiredCourses,
+  ])
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase()
     return catalog
