@@ -696,7 +696,7 @@ export function EngineeringPage() {
                   }`
                 : undefined
             }
-            remainingTitle="남은 전공 과목"
+            remainingTitle="추천 전공과목"
             percent={majorPct}
             earned={majorEarned}
             required={majorRequired}
@@ -705,7 +705,7 @@ export function EngineeringPage() {
             onOpenCompleted={() => setMajorOpen(true)}
             onOpenRemaining={() =>
               setListModal({
-                title: '남은 전공 과목',
+                title: '추천 전공과목',
                 subtitle: `${major.remaining.length}과목`,
                 courses: major.remaining,
               })
@@ -718,7 +718,7 @@ export function EngineeringPage() {
                 ? '기초 → 요소 → 종합 시퀀스 미충족'
                 : undefined
             }
-            remainingTitle="남은 설계 과목"
+            remainingTitle="추천 설계과목"
             percent={designPct}
             earned={toNumber(designEarned)}
             required={designRequired}
@@ -733,7 +733,7 @@ export function EngineeringPage() {
             }
             onOpenRemaining={() =>
               setListModal({
-                title: '남은 설계 과목',
+                title: '추천 설계과목',
                 subtitle: `${designLists.remaining.length}과목`,
                 courses: designLists.remaining,
               })
