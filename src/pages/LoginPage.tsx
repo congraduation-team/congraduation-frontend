@@ -121,6 +121,12 @@ export function LoginPage() {
             {loading ? '로그인 중...' : '로그인'}
           </button>
         </form>
+
+        <p className="mt-10 max-w-xs text-center text-[11px] leading-relaxed text-ink-faint">
+          본 서비스의 졸업·인증 분석 결과는 참고용이며,
+          <br />
+          실제 졸업 요건과 다를 수 있습니다.
+        </p>
       </div>
     </div>
   )
