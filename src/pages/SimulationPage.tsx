@@ -1076,9 +1076,9 @@ export function SimulationPage() {
                   <thead className="sticky top-0 bg-panel text-ink-muted">
                     <tr>
                       <th className="px-3 py-2 font-semibold">과목</th>
-                      <th className="px-2 py-2 font-semibold">구분</th>
-                      <th className="px-2 py-2 font-semibold">학점</th>
-                      <th className="px-2 py-2 font-semibold">개설</th>
+                      <th className="px-2 py-2 font-semibold whitespace-nowrap">구분</th>
+                      <th className="px-2 py-2 font-semibold whitespace-nowrap">학점</th>
+                      <th className="px-2 py-2 font-semibold whitespace-nowrap">개설</th>
                       <th className="px-2 py-2 font-semibold" />
                     </tr>
                   </thead>
