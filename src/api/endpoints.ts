@@ -5,8 +5,10 @@ import type {
   AbeekTranscriptEvaluationResponse,
   AdminUploadResponse,
   AddPlannedCourseRequest,
+  CreateFeedbackRequest,
   CurriculumCourse,
   ExpectedGrade,
+  FeedbackItem,
   FullRoadmapResponse,
   GraduationProgressResponse,
   OfferedCurriculumResponse,
@@ -20,6 +22,7 @@ import type {
   MajorOption,
   StudentMajorTracksResponse,
   StudentMajorTrackUpdateRequest,
+  UpdateFeedbackRequest,
 } from './types'
 
 export function login(userId: string, password: string) {
@@ -320,4 +323,42 @@ export function deletePlannedSemester(studentId: number, plannedSemesterId: numb
     `/api/students/${studentId}/planned-semesters/${plannedSemesterId}`,
     { method: 'DELETE' },
   )
+}
+
+/** 오류 신고 / 문의 접수 */
+export function createFeedback(body: CreateFeedbackRequest) {
+  return apiJson<FeedbackItem>('/api/feedbacks', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
+/** 내 문의·오류 목록 */
+export function getMyFeedbacks(studentId: number) {
+  return apiJson<FeedbackItem[]>(
+    `/api/feedbacks/mine?studentId=${encodeURIComponent(String(studentId))}`,
+  )
+}
+
+/** 관리자: 전체 문의·오류 목록 */
+export function getAdminFeedbacks(adminStudentId?: number) {
+  const params = new URLSearchParams()
+  if (adminStudentId != null) params.set('adminStudentId', String(adminStudentId))
+  const q = params.toString()
+  return apiJson<FeedbackItem[]>(`/api/admin/feedbacks${q ? `?${q}` : ''}`)
+}
+
+/** 관리자: 상태/메모 수정 */
+export function updateAdminFeedback(
+  id: number,
+  body: UpdateFeedbackRequest,
+  adminStudentId?: number,
+) {
+  const params = new URLSearchParams()
+  if (adminStudentId != null) params.set('adminStudentId', String(adminStudentId))
+  const q = params.toString()
+  return apiJson<FeedbackItem>(`/api/admin/feedbacks/${id}${q ? `?${q}` : ''}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
 }

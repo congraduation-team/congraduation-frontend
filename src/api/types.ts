@@ -89,6 +89,40 @@ export type AdminUploadResponse = {
   count?: number
 }
 
+/** POST/GET feedbacks */
+export type FeedbackType = 'BUG' | 'INQUIRY'
+export type FeedbackStatus = 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'
+
+export type FeedbackItem = {
+  id: number
+  type: FeedbackType
+  title: string
+  content: string
+  status: FeedbackStatus
+  studentId: number | null
+  studentNo: string | null
+  studentName: string | null
+  major: string | null
+  createdAt: string
+  updatedAt: string
+  adminNote: string | null
+}
+
+export type CreateFeedbackRequest = {
+  type: FeedbackType
+  title: string
+  content: string
+  studentId?: number
+  studentNo?: string
+  studentName?: string
+  major?: string
+}
+
+export type UpdateFeedbackRequest = {
+  status?: FeedbackStatus
+  adminNote?: string | null
+}
+
 export function isAdminUser(student: StudentLoginResponse | null | undefined): boolean {
   if (!student) return false
   if (student.isAdmin === true) return true
