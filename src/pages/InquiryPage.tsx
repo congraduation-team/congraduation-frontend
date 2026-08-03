@@ -127,11 +127,6 @@ export function InquiryPage() {
               />
             </label>
 
-            <div className="mt-4 rounded-xl bg-panel px-4 py-3 text-xs leading-relaxed text-ink-muted">
-              학번 {student?.studentNo ?? '—'} · {student?.major ?? '학과 미확인'} 정보가 함께
-              전달됩니다. (미리보기)
-            </div>
-
             <button
               type="submit"
               disabled={!canSubmit}
