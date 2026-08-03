@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getTranscriptStatus, uploadAcademicRecord } from '../api/endpoints'
-import { AppLogo } from '../components/common/AppLogo'
+import { UniversitySeal } from '../components/common/UniversitySeal'
 import { useAuth } from '../context/AuthContext'
 
 export function UploadPage() {
@@ -90,12 +90,11 @@ export function UploadPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-28">
-        <AppLogo size={104} />
+      <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-16">
+        <UniversitySeal size={88} />
         <h1 className="mt-6 text-center text-3xl font-extrabold tracking-tight text-ink">
           {isUpdate ? '기이수성적 업데이트' : '기이수성적조회 엑셀 파일 업로드'}
         </h1>
-        <p className="mt-2 text-center text-sm text-ink-muted">세종대학교 졸업인증 분석</p>
         <p className="mt-3 text-center text-xs text-ink-muted">
           학사정보시스템 &gt; 수업/성적 &gt; 성적 및 강의 평가 &gt; 기이수성적조회 엑셀 다운로드
         </p>
