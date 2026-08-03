@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   addNextPlannedSemesters,
   addPlannedCourse,
@@ -335,6 +335,7 @@ export function SimulationPage() {
   const [query, setQuery] = useState('')
   const [kindFilter, setKindFilter] = useState<string>('all')
   const [dragId, setDragId] = useState<number | null>(null)
+  const catalogRequestIdRef = useRef(0)
 
   const applyPlanned = useCallback((data: PlannedCoursesResponse) => {
     setPlanned(data)
@@ -415,7 +416,8 @@ export function SimulationPage() {
 
   useEffect(() => {
     if (!student) return
-    let cancelled = false
+    const requestId = ++catalogRequestIdRef.current
+    const keyword = query.trim()
     const activeSem =
       planned?.semesters?.find((s) => s.plannedSemesterId === activeSemesterId) ??
       planned?.semesters?.[0]
@@ -427,11 +429,12 @@ export function SimulationPage() {
       try {
         const res = await getPlannedCourseCatalog({
           studentId: student.id,
-          keyword: query.trim() || undefined,
+          keyword: keyword || undefined,
           departmentName: student.major || undefined,
           semester,
         })
-        if (cancelled) return
+        // 이전 검색어 응답이 늦게 도착해도 덮어쓰지 않음
+        if (requestId !== catalogRequestIdRef.current) return
         const items = (res.courses ?? [])
           .map(toCatalogItem)
           .filter((c): c is CatalogItem => c != null)
@@ -444,11 +447,11 @@ export function SimulationPage() {
           return next
         })
       } catch {
-        if (!cancelled) setCatalog([])
+        if (requestId !== catalogRequestIdRef.current) return
+        setCatalog([])
       }
-    }, query.trim() ? 250 : 0)
+    }, keyword ? 250 : 0)
     return () => {
-      cancelled = true
       window.clearTimeout(timer)
     }
   }, [student, query, planned, activeSemesterId])
@@ -611,14 +614,23 @@ export function SimulationPage() {
   ])
 
   const searchResults = useMemo(() => {
+    const q = query.trim().toLowerCase()
     return catalog
       .filter((c) => !plannedCodes.has(c.code))
       .filter((c) => {
         if (kindFilter === 'all') return true
         return classifyByCategory(c.category).kind === kindFilter
       })
+      .filter((c) => {
+        if (!q) return true
+        return (
+          c.name.toLowerCase().includes(q) ||
+          c.code.toLowerCase().includes(q) ||
+          c.category.toLowerCase().includes(q)
+        )
+      })
       .slice(0, 50)
-  }, [catalog, kindFilter, plannedCodes])
+  }, [catalog, kindFilter, plannedCodes, query])
 
   const runAction = async (fn: () => Promise<void>) => {
     if (!student) return
