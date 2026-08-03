@@ -44,7 +44,7 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-14">
+      <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-28">
         <AppLogo size={104} />
         <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-ink">SJU GRADUATION</h1>
         <p className="mt-2 text-sm text-ink-muted">세종대학교 졸업인증 분석</p>
