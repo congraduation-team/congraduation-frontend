@@ -653,30 +653,17 @@ export function SimulationPage() {
 
   const missingItems = useMemo(() => {
     // 시뮬 화면: top-level(기이수)이 아니라 simulation 계획 반영값을 사용
+    // 공통교양은 요약 문구만 표시 (과목별 "필수 미이수: …" 제외)
     const blockers = [
       ...(sim != null
         ? (sim.displayGraduationBlockers ?? sim.graduationBlockers ?? [])
         : (progress?.displayGraduationBlockers ?? progress?.graduationBlockers ?? [])),
-    ].filter(Boolean)
-
-    const remaining =
-      sim != null
-        ? (sim.remainingCommonLiberalRequiredCourses ?? [])
-        : (progress?.remainingCommonLiberalRequiredCourses ?? [])
-    for (const row of remaining) {
-      const name = row.course?.courseName?.trim()
-      if (!name) continue
-      if (blockers.some((b) => b.includes(name))) continue
-      blockers.push(`공통교양 필수 미이수: ${name}`)
-    }
+    ]
+      .filter(Boolean)
+      .filter((b) => !/공통교양\s*필수\s*미이수/.test(b))
 
     return [...new Set(blockers)].slice(0, 8)
-  }, [
-    sim,
-    progress?.displayGraduationBlockers,
-    progress?.graduationBlockers,
-    progress?.remainingCommonLiberalRequiredCourses,
-  ])
+  }, [sim, progress?.displayGraduationBlockers, progress?.graduationBlockers])
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase()
     return catalog
