@@ -65,11 +65,30 @@ function CourseNameText({ name, className = '' }: { name: string; className?: st
   )
 }
 
-/** API 카테고리 enum / 한글 라벨 → UI 구분 */
+/** API 카테고리 → UI 구분 (백엔드 category 기준) */
 function classifyByCategory(category?: string, grade?: string): { kind: CourseKind; label: string } {
   if (grade === 'P' || grade === 'NP') return { kind: 'pass', label: 'P/NP' }
   const c = category || ''
   const upper = c.toUpperCase()
+
+  // 전필 우선 (백엔드: 전필+전기 성격 → 전필로 응답)
+  if (
+    c.includes('전필') ||
+    (c.includes('전공') && c.includes('필수') && !c.includes('기초')) ||
+    upper.includes('MAJOR_REQ') ||
+    (upper.includes('REQUIRED') && !upper.includes('FOUND') && !upper.includes('BASIC'))
+  ) {
+    return { kind: 'required', label: '전필' }
+  }
+  if (
+    c.includes('필수') &&
+    !c.includes('기초') &&
+    !c.includes('교양') &&
+    !c.includes('공통') &&
+    !c.includes('균형')
+  ) {
+    return { kind: 'required', label: '전필' }
+  }
 
   if (
     c.includes('설계') ||
@@ -78,6 +97,32 @@ function classifyByCategory(category?: string, grade?: string): { kind: CourseKi
   ) {
     return { kind: 'design', label: '설계' }
   }
+
+  // 순수 전기 / 전공기초 (전필과 겹치면 위에서 전필 처리됨)
+  if (
+    c.includes('전기') ||
+    c.includes('전공기초') ||
+    upper.includes('MAJOR_BASIC') ||
+    upper.includes('MAJOR_FOUND') ||
+    upper.includes('FOUNDATION') ||
+    upper.includes('BSM') ||
+    (c.includes('기초') && !c.includes('설계'))
+  ) {
+    return { kind: 'foundation', label: '전기' }
+  }
+
+  if (
+    c.includes('전선') ||
+    (c.includes('전공') && c.includes('선택')) ||
+    upper.includes('MAJOR_ELE') ||
+    upper.includes('ELECTIVE')
+  ) {
+    return { kind: 'elective', label: '전선' }
+  }
+  if (c.includes('선택')) {
+    return { kind: 'elective', label: '전선' }
+  }
+
   if (
     c.includes('교양') ||
     c.includes('균형') ||
@@ -88,25 +133,7 @@ function classifyByCategory(category?: string, grade?: string): { kind: CourseKi
   ) {
     return { kind: 'general', label: '교양' }
   }
-  if (upper.includes('BSM') || (c.includes('기초') && !c.includes('설계'))) {
-    return { kind: 'foundation', label: '기초' }
-  }
-  if (
-    c.includes('필수') ||
-    c.includes('전필') ||
-    upper.includes('REQUIRED') ||
-    upper.includes('MAJOR_REQ')
-  ) {
-    return { kind: 'required', label: '전필' }
-  }
-  if (
-    c.includes('선택') ||
-    c.includes('전선') ||
-    upper.includes('ELECTIVE') ||
-    upper.includes('MAJOR_ELE')
-  ) {
-    return { kind: 'elective', label: '전선' }
-  }
+
   // MAJ_* 같은 enum은 그대로 노출하지 않음
   if (/^[A-Z][A-Z0-9_]+$/.test(c)) {
     return { kind: 'elective', label: '전공' }
@@ -513,10 +540,18 @@ export function SimulationPage() {
   const plannedCredits =
     toNumber(planned?.totalPlannedCredits) ||
     plannedCourses.reduce((s, c) => s + toNumber(c.credit), 0)
+  // 21~23학번: 백엔드가 전공기초(전기)를 전선처럼 계산 — FE 로컬 합산도 동일
+  const admitYear = student?.admissionYear ?? progress?.admissionYear ?? 0
+  const foundationCountsAsElective = admitYear >= 2021 && admitYear <= 2023
   const plannedMajorCredits = plannedCourses
     .filter((c) => {
       const { kind } = classifyByCategory(c.category, c.expectedGrade)
-      return kind === 'required' || kind === 'elective' || kind === 'design'
+      return (
+        kind === 'required' ||
+        kind === 'elective' ||
+        kind === 'design' ||
+        (foundationCountsAsElective && kind === 'foundation')
+      )
     })
     .reduce((s, c) => s + toNumber(c.credit), 0)
   const plannedRequiredMajorCredits = plannedCourses
@@ -525,7 +560,11 @@ export function SimulationPage() {
   const plannedElectiveMajorCredits = plannedCourses
     .filter((c) => {
       const { kind } = classifyByCategory(c.category, c.expectedGrade)
-      return kind === 'elective' || kind === 'design'
+      return (
+        kind === 'elective' ||
+        kind === 'design' ||
+        (foundationCountsAsElective && kind === 'foundation')
+      )
     })
     .reduce((s, c) => s + toNumber(c.credit), 0)
 
@@ -1016,8 +1055,8 @@ export function SimulationPage() {
                 >
                   <option value="all">전체 구분</option>
                   <option value="required">전필</option>
-                  <option value="foundation">기초</option>
                   <option value="elective">전선</option>
+                  <option value="foundation">전공기초</option>
                   <option value="general">교양</option>
                   <option value="design">설계</option>
                 </select>
