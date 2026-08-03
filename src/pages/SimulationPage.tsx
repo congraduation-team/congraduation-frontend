@@ -11,7 +11,6 @@ import {
   updatePlannedCourseExpectedGrade,
 } from '../api/endpoints'
 import {
-  isAdminUser,
   type AbeekEvaluationResponse,
   type ExpectedGrade,
   type GraduationProgressResponse,
@@ -830,13 +829,7 @@ export function SimulationPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {isAdminUser(student) ? (
-              <MajorTrackSwitcher />
-            ) : student?.major ? (
-              <span className="rounded-full bg-panel px-3 py-1.5 text-xs font-semibold text-ink-muted">
-                {trackTypeLabel(student.majorType)} · {student.major}
-              </span>
-            ) : null}
+            <MajorTrackSwitcher />
             <button
               type="button"
               onClick={handleReset}

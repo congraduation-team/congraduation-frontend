@@ -16,7 +16,7 @@ import type {
   StudentRoadmapCourse,
   StudentRoadmapResponse,
 } from '../api/types'
-import { flattenRoadmapCourses } from '../api/types'
+import { flattenRoadmapCourses, isAdminUser } from '../api/types'
 import { Sidebar } from '../components/layout/Sidebar'
 import { MajorTrackSwitcher } from '../components/modals/MajorTrackSwitcher'
 import { useAuth } from '../context/AuthContext'
@@ -1270,23 +1270,25 @@ export function CurriculumPage() {
                 마이
               </button>
             </div>
-            <label className="flex items-center gap-2 text-sm font-semibold text-ink">
-              학과
-              <select
-                value={departmentName}
-                onChange={(e) => {
-                  setDepartmentName(e.target.value)
-                  setViewKind('general')
-                }}
-                className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-sejong/30"
-              >
-                {departmentOptions.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {isAdminUser(student) && (
+              <label className="flex items-center gap-2 text-sm font-semibold text-ink">
+                학과
+                <select
+                  value={departmentName}
+                  onChange={(e) => {
+                    setDepartmentName(e.target.value)
+                    setViewKind('general')
+                  }}
+                  className="rounded-lg border border-[#e5e7eb] bg-white px-3 py-1.5 text-sm font-medium outline-none focus:ring-2 focus:ring-sejong/30"
+                >
+                  {departmentOptions.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {abeekTarget && (
               <div className="flex overflow-hidden rounded-full border border-[#ddd] text-sm font-semibold">
                 <button
