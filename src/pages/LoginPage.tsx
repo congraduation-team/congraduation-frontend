@@ -2,7 +2,6 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ApiError } from '../api/client'
 import { getTranscriptStatus, login } from '../api/endpoints'
-import { BrandHeader } from '../components/common/BrandHeader'
 import { AppLogo } from '../components/common/AppLogo'
 import { useAuth } from '../context/AuthContext'
 
@@ -45,12 +44,10 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <BrandHeader />
-
       <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-14">
         <AppLogo size={104} />
         <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-ink">SJU GRADUATION</h1>
-        <p className="mt-2 text-sm text-ink-muted">hope you graduate soon</p>
+        <p className="mt-2 text-sm text-ink-muted">세종대학교 졸업인증 분석</p>
 
         <form onSubmit={handleSubmit} className="mt-10 w-full space-y-5">
           <label className="block">
