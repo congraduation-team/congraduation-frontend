@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { isAdminUser } from '../../api/types'
 import { useAuth } from '../../context/AuthContext'
+import { AppLogo } from '../common/AppLogo'
 
 const navItems = [
   {
@@ -88,9 +89,12 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#eee] bg-white px-5 py-6">
-      <div className="mb-10">
-        <p className="text-lg font-bold text-sejong">세종대학교</p>
-        <p className="mt-0.5 text-sm font-medium text-ink">졸업 인증 분석</p>
+      <div className="mb-10 flex items-center gap-3">
+        <AppLogo size={44} />
+        <div className="min-w-0">
+          <p className="text-lg font-bold leading-tight text-sejong">세종대학교</p>
+          <p className="mt-0.5 text-sm font-medium text-ink">졸업 인증 분석</p>
+        </div>
       </div>
 
       <p className="mb-3 text-xs font-medium text-ink-muted">Main page</p>
