@@ -501,21 +501,51 @@ export function SimulationPage() {
       return kind === 'required' || kind === 'elective' || kind === 'design'
     })
     .reduce((s, c) => s + toNumber(c.credit), 0)
+  const plannedRequiredMajorCredits = plannedCourses
+    .filter((c) => classifyByCategory(c.category, c.expectedGrade).kind === 'required')
+    .reduce((s, c) => s + toNumber(c.credit), 0)
+  const plannedElectiveMajorCredits = plannedCourses
+    .filter((c) => {
+      const { kind } = classifyByCategory(c.category, c.expectedGrade)
+      return kind === 'elective' || kind === 'design'
+    })
+    .reduce((s, c) => s + toNumber(c.credit), 0)
 
   // top-level = 기이수, simulation = 계획 반영. 시뮬 없으면 FE에서 합산
   const sim = progress?.simulation
+  const simMajor = sim?.majorCredits
   const projectedTotal = sim?.totalCredits
     ? toNumber(sim.totalCredits.earnedCredits)
     : earnedTotal + plannedCredits
-  const projectedMajor = sim?.majorCredits
-    ? toNumber(sim.majorCredits.earnedMajorCredits)
+  const projectedMajor = simMajor
+    ? toNumber(simMajor.earnedMajorCredits)
     : earnedMajor + plannedMajorCredits
+  const projectedMajorRequired = simMajor
+    ? toNumber(simMajor.earnedMajorRequiredCredits)
+    : toNumber(progress?.majorCredits?.earnedMajorRequiredCredits) + plannedRequiredMajorCredits
+  const requiredMajorRequired =
+    toNumber(
+      simMajor?.requiredMajorRequiredCredits ??
+        progress?.majorCredits?.requiredMajorRequiredCredits,
+    ) || 0
+  const projectedMajorElective = simMajor
+    ? toNumber(simMajor.earnedMajorElectiveCredits)
+    : toNumber(progress?.majorCredits?.earnedMajorElectiveCredits) + plannedElectiveMajorCredits
+  const requiredMajorElective =
+    toNumber(
+      simMajor?.requiredMajorElectiveCredits ??
+        progress?.majorCredits?.requiredMajorElectiveCredits,
+    ) || 0
   const totalPct =
     requiredTotal > 0 ? Math.min(100, Math.round((projectedTotal / requiredTotal) * 100)) : 0
-  const majorPct =
-    requiredMajor > 0 ? Math.min(100, Math.round((projectedMajor / requiredMajor) * 100)) : 0
-  const completedPct =
-    requiredTotal > 0 ? Math.min(100, Math.round((earnedTotal / requiredTotal) * 100)) : 0
+  const majorRequiredPct =
+    requiredMajorRequired > 0
+      ? Math.min(100, Math.round((projectedMajorRequired / requiredMajorRequired) * 100))
+      : 0
+  const majorElectivePct =
+    requiredMajorElective > 0
+      ? Math.min(100, Math.round((projectedMajorElective / requiredMajorElective) * 100))
+      : 0
 
   const canGraduate =
     sim?.graduationEligible === true ||
@@ -1050,27 +1080,26 @@ export function SimulationPage() {
                 </div>
                 <div className="flex flex-col items-center">
                   <DonutChart
-                    percent={majorPct}
+                    percent={majorRequiredPct}
                     size={96}
                     stroke={10}
-                    label={formatPercentLabel(majorPct)}
+                    label={formatPercentLabel(majorRequiredPct)}
                   />
-                  <p className="mt-2 text-xs font-bold text-ink">전공 학점</p>
+                  <p className="mt-2 text-xs font-bold text-ink">전공 필수</p>
                   <p className="text-[11px] text-ink-muted">
-                    {projectedMajor}/{requiredMajor}
+                    {projectedMajorRequired}/{requiredMajorRequired}
                   </p>
                 </div>
                 <div className="flex flex-col items-center">
                   <DonutChart
-                    percent={completedPct}
+                    percent={majorElectivePct}
                     size={96}
                     stroke={10}
-                    color="#5b6470"
-                    label={formatPercentLabel(completedPct)}
+                    label={formatPercentLabel(majorElectivePct)}
                   />
-                  <p className="mt-2 text-xs font-bold text-ink">기이수</p>
+                  <p className="mt-2 text-xs font-bold text-ink">전공 선택</p>
                   <p className="text-[11px] text-ink-muted">
-                    {earnedTotal}/{requiredTotal}
+                    {projectedMajorElective}/{requiredMajorElective}
                   </p>
                 </div>
               </div>
