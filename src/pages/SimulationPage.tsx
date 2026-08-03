@@ -30,7 +30,7 @@ import { formatPercentLabel, toNumber } from '../utils/number'
 const GRADES = ['A+', 'A0', 'B+', 'B0', 'C+', 'C0', 'D+', 'D0', 'F', 'P', 'NP'] as const
 type Grade = (typeof GRADES)[number]
 
-type CourseKind = 'required' | 'elective' | 'foundation' | 'general' | 'design' | 'pass'
+type CourseKind = 'required' | 'elective' | 'foundation' | 'general' | 'design' | 'other' | 'pass'
 
 type CatalogItem = {
   code: string
@@ -47,6 +47,7 @@ const kindStyle: Record<CourseKind, string> = {
   foundation: 'bg-[#4a5568] text-white',
   general: 'bg-[#e8eaee] text-[#4a5568]',
   design: 'bg-[#fff1e6] text-[#c45c12]',
+  other: 'bg-[#e7f3ef] text-[#1f6b52]',
   pass: 'bg-[#e8f1fb] text-[#2b6cb0]',
 }
 
@@ -65,8 +66,24 @@ function CourseNameText({ name, className = '' }: { name: string; className?: st
   )
 }
 
+function isOtherCategory(category: string, name?: string) {
+  const blob = `${category} ${name || ''}`.replace(/\s+/g, '')
+  return (
+    blob.includes('교직') ||
+    blob.includes('무관') ||
+    blob.includes('후보생') ||
+    blob.includes('ROTC') ||
+    blob.includes('rotc') ||
+    blob.includes('군사')
+  )
+}
+
 /** API 카테고리 → UI 구분 (백엔드 category 기준) */
-function classifyByCategory(category?: string, grade?: string): { kind: CourseKind; label: string } {
+function classifyByCategory(
+  category?: string,
+  grade?: string,
+  name?: string,
+): { kind: CourseKind; label: string } {
   if (grade === 'P' || grade === 'NP') return { kind: 'pass', label: 'P/NP' }
   const c = category || ''
   const upper = c.toUpperCase()
@@ -85,9 +102,15 @@ function classifyByCategory(category?: string, grade?: string): { kind: CourseKi
     !c.includes('기초') &&
     !c.includes('교양') &&
     !c.includes('공통') &&
-    !c.includes('균형')
+    !c.includes('균형') &&
+    !c.includes('교직')
   ) {
     return { kind: 'required', label: '전필' }
+  }
+
+  // 교직·무관후보생 등은 전선이 아닌 기타
+  if (isOtherCategory(c, name)) {
+    return { kind: 'other', label: '기타' }
   }
 
   if (
@@ -114,12 +137,11 @@ function classifyByCategory(category?: string, grade?: string): { kind: CourseKi
   if (
     c.includes('전선') ||
     (c.includes('전공') && c.includes('선택')) ||
-    upper.includes('MAJOR_ELE') ||
-    upper.includes('ELECTIVE')
+    upper.includes('MAJOR_ELE')
   ) {
     return { kind: 'elective', label: '전선' }
   }
-  if (c.includes('선택')) {
+  if (c.includes('선택') && !c.includes('교직') && !c.includes('일반선택')) {
     return { kind: 'elective', label: '전선' }
   }
 
@@ -138,7 +160,7 @@ function classifyByCategory(category?: string, grade?: string): { kind: CourseKi
   if (/^[A-Z][A-Z0-9_]+$/.test(c)) {
     return { kind: 'elective', label: '전공' }
   }
-  return { kind: 'elective', label: c || '기타' }
+  return { kind: 'other', label: c.trim() ? c : '기타' }
 }
 
 /** 학수번호 여부 (MAJ_BASIC_DESIGN 같은 카테고리 enum 제외) */
@@ -170,7 +192,7 @@ function dedupeCatalogItems(items: CatalogItem[]): CatalogItem[] {
   for (const item of items) {
     const code = item.code.trim()
     if (!code) continue
-    const kind = classifyByCategory(item.category).kind
+    const kind = classifyByCategory(item.category, undefined, item.name).kind
     const key = `${code}::${kind}`
     if (!byKey.has(key)) byKey.set(key, item)
   }
@@ -545,7 +567,7 @@ export function SimulationPage() {
   const foundationCountsAsElective = admitYear >= 2021 && admitYear <= 2023
   const plannedMajorCredits = plannedCourses
     .filter((c) => {
-      const { kind } = classifyByCategory(c.category, c.expectedGrade)
+      const { kind } = classifyByCategory(c.category, c.expectedGrade, c.courseName)
       return (
         kind === 'required' ||
         kind === 'elective' ||
@@ -555,11 +577,11 @@ export function SimulationPage() {
     })
     .reduce((s, c) => s + toNumber(c.credit), 0)
   const plannedRequiredMajorCredits = plannedCourses
-    .filter((c) => classifyByCategory(c.category, c.expectedGrade).kind === 'required')
+    .filter((c) => classifyByCategory(c.category, c.expectedGrade, c.courseName).kind === 'required')
     .reduce((s, c) => s + toNumber(c.credit), 0)
   const plannedElectiveMajorCredits = plannedCourses
     .filter((c) => {
-      const { kind } = classifyByCategory(c.category, c.expectedGrade)
+      const { kind } = classifyByCategory(c.category, c.expectedGrade, c.courseName)
       return (
         kind === 'elective' ||
         kind === 'design' ||
@@ -649,7 +671,7 @@ export function SimulationPage() {
       .filter((c) => !plannedCodes.has(c.code))
       .filter((c) => {
         if (kindFilter === 'all') return true
-        return classifyByCategory(c.category).kind === kindFilter
+        return classifyByCategory(c.category, undefined, c.name).kind === kindFilter
       })
       .filter((c) => {
         if (!q) return true
@@ -919,6 +941,7 @@ export function SimulationPage() {
                           const { kind, label } = classifyByCategory(
                             course.category,
                             course.expectedGrade,
+                            course.courseName,
                           )
                           const courseNo = resolveCourseCode(course)
                           return (
@@ -1034,7 +1057,7 @@ export function SimulationPage() {
                   <option value="elective">전선</option>
                   <option value="foundation">전공기초</option>
                   <option value="general">교양</option>
-                  <option value="design">설계</option>
+                  <option value="other">기타</option>
                 </select>
                 <button
                   type="button"
@@ -1060,10 +1083,14 @@ export function SimulationPage() {
                   </thead>
                   <tbody>
                     {searchResults.map((course) => {
-                      const { label, kind } = classifyByCategory(course.category)
+                      const { label, kind } = classifyByCategory(
+                        course.category,
+                        undefined,
+                        course.name,
+                      )
                       return (
                         <tr
-                          key={`${course.code}-${classifyByCategory(course.category).kind}`}
+                          key={`${course.code}-${kind}`}
                           className="border-t border-[#f0f0f3]"
                         >
                           <td className="px-3 py-2">
