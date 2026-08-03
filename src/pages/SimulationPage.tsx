@@ -137,6 +137,19 @@ function toCatalogItem(course: PlannableCourse): CatalogItem | null {
   }
 }
 
+/** 동일 학수번호+구분 중복만 제거. 전필·전선이 다르면 각각 유지 */
+function dedupeCatalogItems(items: CatalogItem[]): CatalogItem[] {
+  const byKey = new Map<string, CatalogItem>()
+  for (const item of items) {
+    const code = item.code.trim()
+    if (!code) continue
+    const kind = classifyByCategory(item.category).kind
+    const key = `${code}::${kind}`
+    if (!byKey.has(key)) byKey.set(key, item)
+  }
+  return [...byKey.values()]
+}
+
 function semesterLabel(sem: PlannedSemester, admissionYear?: number) {
   return formatGradeTerm(sem.gradeYear, sem.semester, admissionYear)
 }
@@ -435,9 +448,11 @@ export function SimulationPage() {
         })
         // 이전 검색어 응답이 늦게 도착해도 덮어쓰지 않음
         if (requestId !== catalogRequestIdRef.current) return
-        const items = (res.courses ?? [])
-          .map(toCatalogItem)
-          .filter((c): c is CatalogItem => c != null)
+        const items = dedupeCatalogItems(
+          (res.courses ?? [])
+            .map(toCatalogItem)
+            .filter((c): c is CatalogItem => c != null),
+        )
         setCatalog(items)
         setCodeByName((prev) => {
           const next = new Map(prev)
@@ -1032,7 +1047,10 @@ export function SimulationPage() {
                     {searchResults.map((course) => {
                       const { label, kind } = classifyByCategory(course.category)
                       return (
-                        <tr key={`${course.code}-${course.name}`} className="border-t border-[#f0f0f3]">
+                        <tr
+                          key={`${course.code}-${classifyByCategory(course.category).kind}`}
+                          className="border-t border-[#f0f0f3]"
+                        >
                           <td className="px-3 py-2">
                             <p className="font-semibold leading-snug text-ink">
                               <CourseNameText name={course.name} />
