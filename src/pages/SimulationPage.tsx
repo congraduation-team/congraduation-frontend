@@ -643,30 +643,6 @@ export function SimulationPage() {
     progress?.graduationBlockers,
   ])
 
-  const recommendations = useMemo(() => {
-    const admit = student?.admissionYear ?? progress?.admissionYear
-    const tips: string[] = []
-    const empty = semesters.find((s) => (s.courses?.length ?? 0) === 0)
-    if (empty) tips.push(`${semesterLabel(empty, admit)}에 과목을 배정하세요.`)
-    const heavy = semesters.find((s) => toNumber(s.totalCredits) > 21)
-    if (heavy) tips.push(`${semesterLabel(heavy, admit)} 학점이 21을 초과합니다. 분산을 권장합니다.`)
-    if (plannedCourses.some((c) => c.retake)) {
-      tips.push('재수강 계획이 있습니다. 기존 성적 대체 여부를 확인하세요.')
-    }
-    const lastLabel = formatLastCompletedLabel(planned, admit)
-    if (lastLabel) {
-      tips.push(`마지막 이수 학기: ${lastLabel}\n이후부터 계획 중입니다.`)
-    }
-    if (tips.length === 0) tips.push('현재 계획 균형이 양호합니다.\n개설 학기를 한 번 더 확인하세요.')
-    return tips.slice(0, 4)
-  }, [
-    semesters,
-    plannedCourses,
-    planned,
-    student?.admissionYear,
-    progress?.admissionYear,
-  ])
-
   const searchResults = useMemo(() => {
     const q = query.trim().toLowerCase()
     return catalog
@@ -1255,17 +1231,38 @@ export function SimulationPage() {
             </section>
 
             <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-              <h2 className="mb-3 text-base font-bold text-ink">추천 액션</h2>
-              <ul className="space-y-2">
-                {recommendations.map((tip) => (
-                  <li
-                    key={tip}
-                    className="rounded-lg border border-[#eee] bg-panel/60 px-3 py-2 text-xs leading-relaxed text-ink break-keep whitespace-pre-line"
-                  >
-                    {tip}
-                  </li>
-                ))}
-              </ul>
+              <h2 className="mb-3 text-base font-bold text-ink">계획 요약</h2>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-panel/70 px-3 py-3">
+                  <p className="text-[11px] font-semibold text-ink-muted">계획 과목</p>
+                  <p className="mt-1 text-lg font-extrabold text-ink">{plannedCourses.length}과목</p>
+                </div>
+                <div className="rounded-xl bg-panel/70 px-3 py-3">
+                  <p className="text-[11px] font-semibold text-ink-muted">계획 학점</p>
+                  <p className="mt-1 text-lg font-extrabold text-ink">{plannedCredits}학점</p>
+                </div>
+                <div className="rounded-xl bg-panel/70 px-3 py-3">
+                  <p className="text-[11px] font-semibold text-ink-muted">선택 학기</p>
+                  <p className="mt-1 text-sm font-extrabold leading-snug text-ink">
+                    {activeSemester
+                      ? semesterLabel(activeSemester, admissionYear)
+                      : '미선택'}
+                  </p>
+                </div>
+                <div className="rounded-xl bg-panel/70 px-3 py-3">
+                  <p className="text-[11px] font-semibold text-ink-muted">선택 학기 학점</p>
+                  <p className="mt-1 text-lg font-extrabold text-ink">
+                    {activeSemester
+                      ? `${toNumber(activeSemester.totalCredits) || (activeSemester.courses ?? []).reduce((s, c) => s + toNumber(c.credit), 0)}학점`
+                      : '-'}
+                  </p>
+                </div>
+              </div>
+              {plannedCourses.some((c) => c.retake) && (
+                <p className="mt-3 text-xs font-medium text-ink-muted">
+                  재수강 계획 {plannedCourses.filter((c) => c.retake).length}과목 포함
+                </p>
+              )}
             </section>
           </div>
         </div>
