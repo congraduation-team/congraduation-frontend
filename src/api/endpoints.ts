@@ -23,6 +23,9 @@ import type {
   StudentMajorTracksResponse,
   StudentMajorTrackUpdateRequest,
   UpdateFeedbackRequest,
+  SiteStatsSummary,
+  RecordVisitRequest,
+  RecordVisitResponse,
 } from './types'
 
 export function login(userId: string, password: string) {
@@ -359,6 +362,19 @@ export function updateAdminFeedback(
   const q = params.toString()
   return apiJson<FeedbackItem>(`/api/admin/feedbacks/${id}${q ? `?${q}` : ''}`, {
     method: 'PATCH',
+    body: JSON.stringify(body),
+  })
+}
+
+/** 사이트 방문·실사용 통계 요약 */
+export function getSiteStatsSummary() {
+  return apiJson<SiteStatsSummary>('/api/stats/summary')
+}
+
+/** 페이지 진입 방문 기록 (visitorKey 또는 studentId) */
+export function recordSiteVisit(body: RecordVisitRequest) {
+  return apiJson<RecordVisitResponse>('/api/stats/visit', {
+    method: 'POST',
     body: JSON.stringify(body),
   })
 }

@@ -123,6 +123,28 @@ export type UpdateFeedbackRequest = {
   adminNote?: string | null
 }
 
+/** GET /api/stats/summary */
+export type SiteStatsSummary = {
+  todayVisitors: number
+  monthlyVisitors: number
+  totalVisitors: number
+  transcriptUsers: number
+  timezone: string
+  today: string
+  monthStart: string
+}
+
+/** POST /api/stats/visit */
+export type RecordVisitRequest = {
+  visitorKey?: string
+  studentId?: number
+}
+
+export type RecordVisitResponse = {
+  visitorKey: string
+  recorded: boolean
+}
+
 export function isAdminUser(student: StudentLoginResponse | null | undefined): boolean {
   if (!student) return false
   if (student.isAdmin === true) return true

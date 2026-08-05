@@ -8,6 +8,7 @@ import { AuthProvider } from './context/AuthContext'
 import { MajorTrackProvider } from './context/MajorTrackContext'
 import { AdminInquiriesPage } from './pages/AdminInquiriesPage'
 import { AdminPage } from './pages/AdminPage'
+import { AdminStatsPage } from './pages/AdminStatsPage'
 import { CurriculumPage } from './pages/CurriculumPage'
 import { EngineeringPage } from './pages/EngineeringPage'
 import { GraduationPage } from './pages/GraduationPage'
@@ -16,6 +17,7 @@ import { LoginPage } from './pages/LoginPage'
 import { MyCoursesPage } from './pages/MyCoursesPage'
 import { SimulationPage } from './pages/SimulationPage'
 import { UploadPage } from './pages/UploadPage'
+import { VisitTracker } from './components/stats/VisitTracker'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(
@@ -23,6 +25,7 @@ createRoot(document.getElementById('root')!).render(
     <AuthProvider>
       <MajorTrackProvider>
       <BrowserRouter>
+        <VisitTracker />
         <Routes>
           <Route path="/" element={<LoginPage />} />
           <Route element={<RequireAuth />}>
@@ -38,6 +41,7 @@ createRoot(document.getElementById('root')!).render(
             <Route element={<RequireAdmin />}>
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/admin/inquiries" element={<AdminInquiriesPage />} />
+              <Route path="/admin/stats" element={<AdminStatsPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
