@@ -1,4 +1,6 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { getAdminFeedbacks } from '../../api/endpoints'
 import { isAdminUser } from '../../api/types'
 import { useAuth } from '../../context/AuthContext'
 import { AppLogo } from '../common/AppLogo'
@@ -80,13 +82,40 @@ const adminItems = [
         <path d="M8 17h6" />
       </svg>
     ),
+    badgeKey: 'openInquiries' as const,
   },
 ]
 
 export function Sidebar() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { student } = useAuth()
   const showAdmin = isAdminUser(student)
+  const [hasOpenInquiries, setHasOpenInquiries] = useState(false)
+
+  useEffect(() => {
+    if (!showAdmin || !student?.id) {
+      setHasOpenInquiries(false)
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const list = await getAdminFeedbacks(student.id)
+        if (cancelled) return
+        setHasOpenInquiries(
+          (Array.isArray(list) ? list : []).some((item) => item.status === 'OPEN'),
+        )
+      } catch {
+        if (!cancelled) setHasOpenInquiries(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [showAdmin, student?.id, location.pathname])
 
   return (
     <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#eee] bg-white px-5 py-6">
@@ -137,7 +166,16 @@ export function Sidebar() {
                 }
               >
                 {item.icon}
-                {item.label}
+                <span className="min-w-0 flex-1">{item.label}</span>
+                {'badgeKey' in item && item.badgeKey === 'openInquiries' && hasOpenInquiries && (
+                  <span
+                    className="inline-flex size-4 shrink-0 items-center justify-center rounded-full bg-sejong text-[10px] font-bold leading-none text-white"
+                    aria-label="대기 중인 문의 있음"
+                    title="대기 중인 문의가 있습니다"
+                  >
+                    !
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
