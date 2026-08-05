@@ -173,6 +173,10 @@ function isMajorFoundationLabel(label: string) {
   return t.includes('전공기초') || t === '전기' || t.startsWith('전기(') || t.includes('(전기)')
 }
 
+function normalizeCourseCode(code: string) {
+  return code.replace(/\s+/g, '').toUpperCase()
+}
+
 function isFoundationRequiredLabel(label: string) {
   // 전공기초는 교양필수가 아님
   if (isMajorFoundationLabel(label) || label.includes('전공')) return false
@@ -189,17 +193,14 @@ function isFoundationRequiredLabel(label: string) {
   )
 }
 
-/** 일반 로드맵: 공학인증 bucket + 시간표 이수구분 */
+/** 일반 로드맵: 시간표 이수구분 우선 — 공통교양·학문기초는 교양필수(bsm) 한 행 */
 function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
   const label = course.category || ''
 
-  // 전공기초는 전공 행 (BSM/GENERAL bucket보다 우선)
+  // 전공기초 → 전공 행
   if (isMajorFoundationLabel(label)) return 'major-required'
 
-  // 공학인증 대상 학과: API가 채운 GENERAL/BSM/MAJOR 우선
-  if (course.abeekBucket === 'GENERAL') return 'liberal'
-  if (course.abeekBucket === 'BSM') return 'bsm'
-
+  // 교양필수·공통교양·학문기초 → 교양필수 행 (행 분리하지 않음)
   if (isFoundationRequiredLabel(label)) return 'bsm'
 
   if (label.includes('전공')) {
@@ -207,19 +208,25 @@ function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
     return 'major-required'
   }
 
+  // 선택·균형 교양만 교양 행
   if (
-    label.includes('교양') ||
+    label.includes('교양선택') ||
+    label.includes('선택교양') ||
     label.includes('균형') ||
+    label.includes('균필') ||
     label.includes('일반선택') ||
     label.includes('통과')
   ) {
     return 'liberal'
   }
 
-  // MAJOR bucket 이거나 이수구분 불명 → 전공선택으로
+  // 이수구분 없을 때 bucket fallback: BSM·GENERAL 모두 교양필수 행에 합침
+  if (course.abeekBucket === 'BSM' || course.abeekBucket === 'GENERAL') return 'bsm'
   if (course.abeekBucket === 'MAJOR') {
     return label.includes('필수') ? 'major-required' : 'major-elective'
   }
+
+  if (label.includes('교양')) return 'liberal'
 
   return 'liberal'
 }
@@ -442,7 +449,7 @@ function generalToMapCourse(
   if (!isSemesterKey(semester)) return null
 
   return {
-    id: course.courseCode,
+    id: normalizeCourseCode(course.courseCode),
     name: course.courseName,
     hours: `${course.credits ?? 0}학점`,
     category: mapGeneralCategory(course),
@@ -474,7 +481,7 @@ function liberalCoursesFromProgress(
     category: MapCategory,
   ) => {
     for (const raw of courses ?? []) {
-      const code = String(raw.courseCode ?? '')
+      const code = normalizeCourseCode(String(raw.courseCode ?? ''))
       const name = String(raw.courseName ?? '')
       if (!code || !name || excludeCodes.has(code) || seen.has(code)) continue
       const cal = takenCalendarKey(
@@ -484,6 +491,7 @@ function liberalCoursesFromProgress(
       const term =
         (cal ? standingByTaken?.get(cal) : undefined) ||
         takenTermByCode.get(code) ||
+        takenTermByCode.get(String(raw.courseCode ?? '')) ||
         toTermKeyFromTaken(
           raw.takenYear as string | number | null | undefined,
           raw.takenSemester as string | number | null | undefined,
@@ -993,7 +1001,7 @@ export function CurriculumPage() {
     // 학수번호별 API 칸 모아서 이수순번/중복 정리
     const grouped = new Map<string, Array<{ course: StudentRoadmapCourse; termKey: string }>>()
     for (const item of generalFlat) {
-      const code = item.course.courseCode
+      const code = normalizeCourseCode(item.course.courseCode || '')
       if (!code) continue
       const list = grouped.get(code) ?? []
       list.push(item)
@@ -1016,7 +1024,7 @@ export function CurriculumPage() {
         })
         if (!semester) continue
         fromTimetable.push({
-          id: completedInst.course.courseCode,
+          id: normalizeCourseCode(completedInst.course.courseCode),
           name: completedInst.course.courseName,
           hours: `${completedInst.course.credits ?? 0}학점`,
           category: mapGeneralCategory(completedInst.course),
@@ -1064,8 +1072,8 @@ export function CurriculumPage() {
     for (const course of liberalExtra) {
       const existing = byId.get(course.id)
       if (existing) {
-        // 전공기초 등은 전공 행으로 승격 / 반대로 교양·교양필수로 재분류
-        if (course.category.startsWith('major') !== existing.category.startsWith('major')) {
+        // 기이수 분류로 행 보정 (전공기초→전공, 공통교양·학문기초→교양필수)
+        if (course.category !== existing.category) {
           existing.category = course.category
         }
         if (course.completed && course.semester) {
@@ -1076,7 +1084,21 @@ export function CurriculumPage() {
       }
       byId.set(course.id, course)
     }
-    return [...byId.values()]
+
+    // 동일 학기·동일 과목명 중복(학수번호 표기 차이) 제거 — 이수 우선
+    const byNameSem = new Map<string, MapCourse>()
+    for (const course of byId.values()) {
+      const key = `${course.semester}::${course.name.replace(/\s+/g, '')}`
+      const existing = byNameSem.get(key)
+      if (!existing) {
+        byNameSem.set(key, course)
+        continue
+      }
+      if (course.completed && !existing.completed) {
+        byNameSem.set(key, course)
+      }
+    }
+    return [...byNameSem.values()]
   }, [viewKind, abeekRawCourses, abeekRoadmap, generalFlat, graduation, student?.admissionYear])
 
   const courseAlertIndex = useMemo(() => {
