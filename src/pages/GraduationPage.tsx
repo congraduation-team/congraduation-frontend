@@ -15,8 +15,9 @@ import { trackTypeLabel } from '../utils/majorTrack'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 import { CertDetailText } from '../utils/certDetail'
 import {
-  englishRequirementPreview,
-  englishRequirementsForAdmission,
+  englishProgressLine,
+  englishRequirementPreviewFromCert,
+  englishRequirementsFromCert,
 } from '../utils/englishCertification'
 import {
   isAcademicCourseCode,
@@ -407,11 +408,17 @@ export function GraduationPage() {
   const swApplicable = swCert == null || swCert.applicable !== false
   const englishAdmissionYear = progress?.admissionYear ?? student?.admissionYear
   const englishMajorName = progress?.major ?? student?.major
-  const englishPreview = englishRequirementPreview(englishAdmissionYear, englishMajorName)
-  const englishRequirements = englishRequirementsForAdmission(
+  const englishRequirements = englishRequirementsFromCert(
+    englishCert?.primaryRequirement,
     englishAdmissionYear,
     englishMajorName,
   )
+  const englishPreview = englishRequirementPreviewFromCert(
+    englishCert?.primaryRequirement,
+    englishAdmissionYear,
+    englishMajorName,
+  )
+  const englishProgress = englishProgressLine(englishCert?.detail)
 
   const totalGpa = toNumber(progress?.averageGradePoint)
   const majorGpa = toNumber(progress?.majorGradePoint)
@@ -572,6 +579,9 @@ export function GraduationPage() {
                 </div>
               ) : (
                 <>
+                  {englishProgress && (
+                    <p className="mb-1.5 text-[11px] leading-relaxed text-ink-muted">{englishProgress}</p>
+                  )}
                   <div className="overflow-hidden rounded-lg border border-[#e5e7eb]">
                     {englishPreview.map((item, index) => (
                       <div
@@ -584,7 +594,7 @@ export function GraduationPage() {
                           {item.label}
                         </span>
                         <span className="shrink-0 whitespace-nowrap text-[11px] text-ink">
-                          {item.value}
+                          {item.value || '—'}
                         </span>
                       </div>
                     ))}
@@ -795,6 +805,8 @@ export function GraduationPage() {
         satisfied={englishSatisfied}
         detail={englishCert?.detail}
         primaryRequirement={englishCert?.primaryRequirement}
+        policyType={englishCert?.policyType}
+        status={englishCert?.status}
         requirements={englishRequirements}
       />
       <SWCodingCertModal

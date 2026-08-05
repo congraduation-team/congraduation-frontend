@@ -12,7 +12,16 @@ export function splitCertDetail(detail?: string | null): string[] {
 
   for (const re of patterns) {
     const m = text.match(re)
-    if (m?.[1] && m[2]) return [m[1], m[2]]
+    if (m?.[1] && m?.[2]) return [m[1], m[2]]
+  }
+
+  // API 상세: 문장 단위로 분리
+  if (text.includes('. ')) {
+    return text
+      .split(/\.\s+/u)
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((s, i, arr) => (i < arr.length - 1 && !/[.。!?]$/u.test(s) ? `${s}.` : s))
   }
 
   return [text]
