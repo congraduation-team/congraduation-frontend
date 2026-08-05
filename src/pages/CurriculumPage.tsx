@@ -457,58 +457,108 @@ function generalToMapCourse(
   }
 }
 
+function normalizeCourseName(name: string) {
+  return name.replace(/\s+/g, '').toLowerCase()
+}
+
 /**
  * graduation-progress 기준 기이수 분류 집합.
- * 교양 = 기이수 중 공통교양·학문기초·전공이 아닌 나머지
+ * 교양 = 선택·균형·total 잔여 등 (공통·학문·전공 전용 필드에 없는 기이수)
  */
 function buildProgressCategoryIndex(progress: GraduationProgressResponse) {
   const common = new Set<string>()
   const academic = new Set<string>()
   const major = new Set<string>()
+  const liberal = new Set<string>()
+  const commonNames = new Set<string>()
+  const academicNames = new Set<string>()
+  const majorNames = new Set<string>()
+  const liberalNames = new Set<string>()
 
   const ingest = (
-    courses: Array<Record<string, unknown> | { courseCode?: string }> | undefined,
-    target: Set<string>,
+    courses: Array<Record<string, unknown> | { courseCode?: string; courseName?: string }> | undefined,
+    codes: Set<string>,
+    names: Set<string>,
   ) => {
     for (const raw of courses ?? []) {
       const code = normalizeCourseCode(String(raw.courseCode ?? ''))
-      if (code) target.add(code)
+      const name = normalizeCourseName(String(raw.courseName ?? ''))
+      if (code) codes.add(code)
+      if (name) names.add(name)
     }
   }
 
   ingest(
     progress.commonLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
     common,
+    commonNames,
   )
-  ingest(progress.commonLiberalCourses as Array<{ courseCode?: string }> | undefined, common)
+  ingest(progress.commonLiberalCourses as Array<{ courseCode?: string; courseName?: string }> | undefined, common, commonNames)
 
   ingest(
     progress.academicFoundationCredits?.completedCourses as
       | Array<Record<string, unknown>>
       | undefined,
     academic,
+    academicNames,
   )
 
   ingest(
     progress.majorFoundationCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
     major,
+    majorNames,
   )
   for (const summary of progress.categorySummaries ?? []) {
     const label = summary.category || ''
     if (!label.includes('전공')) continue
-    ingest(summary.courses as Array<{ courseCode?: string }> | undefined, major)
+    ingest(summary.courses as Array<{ courseCode?: string; courseName?: string }> | undefined, major, majorNames)
   }
 
-  return { common, academic, major }
+  ingest(
+    progress.electiveLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+    liberal,
+    liberalNames,
+  )
+  ingest(
+    progress.balancedLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+    liberal,
+    liberalNames,
+  )
+  for (const area of progress.balancedLiberalAreaProgresses ?? []) {
+    ingest(area.courses as Array<{ courseCode?: string; courseName?: string }> | undefined, liberal, liberalNames)
+  }
+  ingest(
+    progress.totalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+    liberal,
+    liberalNames,
+  )
+
+  // total에 섞인 공통·학문·전공은 교양 집합에서 제거
+  for (const code of [...common, ...academic, ...major]) liberal.delete(code)
+  for (const name of [...commonNames, ...academicNames, ...majorNames]) liberalNames.delete(name)
+
+  return {
+    common,
+    academic,
+    major,
+    liberal,
+    commonNames,
+    academicNames,
+    majorNames,
+    liberalNames,
+  }
 }
 
 function mapCategoryFromProgressIndex(
   code: string,
+  name: string,
   index: ReturnType<typeof buildProgressCategoryIndex>,
 ): MapCategory | null {
-  if (index.common.has(code)) return 'common'
-  if (index.academic.has(code)) return 'bsm'
-  if (index.major.has(code)) return 'major-required'
+  const nameKey = normalizeCourseName(name)
+  if (index.common.has(code) || index.commonNames.has(nameKey)) return 'common'
+  if (index.academic.has(code) || index.academicNames.has(nameKey)) return 'bsm'
+  if (index.major.has(code) || index.majorNames.has(nameKey)) return 'major-required'
+  if (index.liberal.has(code) || index.liberalNames.has(nameKey)) return 'liberal'
   return null
 }
 
@@ -600,8 +650,16 @@ function liberalCoursesFromProgress(
     (progress.totalCredits?.completedCourses as Array<Record<string, unknown>> | undefined) ?? []
   ).filter((raw) => {
     const code = normalizeCourseCode(String(raw.courseCode ?? ''))
+    const nameKey = normalizeCourseName(String(raw.courseName ?? ''))
     if (!code || seen.has(code) || excludeCodes.has(code)) return false
     if (index.common.has(code) || index.academic.has(code) || index.major.has(code)) return false
+    if (
+      index.commonNames.has(nameKey) ||
+      index.academicNames.has(nameKey) ||
+      index.majorNames.has(nameKey)
+    ) {
+      return false
+    }
     return true
   })
   pushCompleted(residual, 'liberal')
@@ -609,14 +667,22 @@ function liberalCoursesFromProgress(
   // categorySummaries 잔여(전공 아님) → 교양 (라벨 퍼지로 공통/학문에 넣지 않음)
   for (const summary of progress.categorySummaries ?? []) {
     if ((summary.category || '').includes('전공')) continue
-    const leftover = (summary.courses as unknown as Array<Record<string, unknown>> | undefined)?.filter(
-      (raw) => {
-        const code = normalizeCourseCode(String(raw.courseCode ?? ''))
-        if (!code || seen.has(code)) return false
-        if (index.common.has(code) || index.academic.has(code) || index.major.has(code)) return false
-        return true
-      },
-    )
+    const leftover = (
+      summary.courses as unknown as Array<Record<string, unknown>> | undefined
+    )?.filter((raw) => {
+      const code = normalizeCourseCode(String(raw.courseCode ?? ''))
+      const nameKey = normalizeCourseName(String(raw.courseName ?? ''))
+      if (!code || seen.has(code)) return false
+      if (index.common.has(code) || index.academic.has(code) || index.major.has(code)) return false
+      if (
+        index.commonNames.has(nameKey) ||
+        index.academicNames.has(nameKey) ||
+        index.majorNames.has(nameKey)
+      ) {
+        return false
+      }
+      return true
+    })
     pushCompleted(leftover, 'liberal')
   }
 
@@ -1131,19 +1197,29 @@ export function CurriculumPage() {
         }
       }
     }
-    const majorCodes = new Set(
-      [...byId.values()].filter((c) => c.category.startsWith('major')).map((c) => c.id),
+    const protectedCodes = new Set(
+      [...byId.values()]
+        .filter(
+          (c) =>
+            c.category.startsWith('major') || c.category === 'bsm' || c.category === 'common',
+        )
+        .map((c) => c.id),
     )
     const liberalExtra = liberalCoursesFromProgress(
       graduation,
-      majorCodes,
+      protectedCodes,
       takenTermByCode,
       generalStandingByTaken,
     )
     for (const course of liberalExtra) {
       const existing = byId.get(course.id)
       if (existing) {
-        if (course.category !== existing.category) {
+        // progress 전용 필드(공통/학문/전공)만 덮어씀. 교양 잔여로는 전공·학문기초를 내리지 않음
+        if (course.category === 'liberal') {
+          if (existing.category === 'liberal' || existing.category === 'common') {
+            existing.category = 'liberal'
+          }
+        } else {
           existing.category = course.category
         }
         if (course.completed && course.semester) {
@@ -1155,14 +1231,20 @@ export function CurriculumPage() {
       byId.set(course.id, course)
     }
 
-    // 기이수 최종 분류: graduation-progress 기준
-    // 공통교양·학문기초·전공이 아니면 교양 (K-MOOC 등)
+    // progress에 명시된 분류만 확정. 매칭 실패 시 전공·학문기초는 유지
     if (graduation) {
       const index = buildProgressCategoryIndex(graduation)
       for (const course of byId.values()) {
         if (!course.completed) continue
-        const fromProgress = mapCategoryFromProgressIndex(course.id, index)
-        course.category = fromProgress ?? 'liberal'
+        const hit = mapCategoryFromProgressIndex(course.id, course.name, index)
+        if (hit) {
+          course.category = hit
+          continue
+        }
+        // 공통으로 잘못 들어간 기이수만 교양으로 (전공·학문기초는 건드리지 않음)
+        if (course.category === 'common') {
+          course.category = 'liberal'
+        }
       }
     }
 
