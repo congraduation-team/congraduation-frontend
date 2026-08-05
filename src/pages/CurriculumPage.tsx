@@ -75,9 +75,9 @@ const MAJOR_REQUIRED_INCOMPLETE_CLASS = 'border-sejong bg-white text-sejong'
 const MAJOR_ELECTIVE_INCOMPLETE_CLASS = 'border-transparent bg-sejong-pink text-ink'
 
 const categoryStyle: Record<MapCategory, string> = {
-  liberal: 'border-transparent bg-[#dbe4f0] text-[#334155]',
-  common: 'border-transparent bg-[#475569] text-white',
-  bsm: 'border-transparent bg-[#334155] text-white',
+  liberal: 'border-transparent bg-[#64748b] text-white',
+  common: 'border-transparent bg-[#0369a1] text-white',
+  bsm: 'border-transparent bg-[#0f766e] text-white',
   'major-required': MAJOR_REQUIRED_INCOMPLETE_CLASS,
   'major-elective': MAJOR_ELECTIVE_INCOMPLETE_CLASS,
 }
@@ -111,11 +111,10 @@ function courseBadgeClass(
     return `${base} ${hasCompletionData ? 'opacity-70' : ''}`
   }
 
-  if (course.completed) {
-    return completedCategoryStyle[course.category]
-  }
-
-  return categoryStyle[course.category]
+  const base = course.completed
+    ? completedCategoryStyle[course.category]
+    : categoryStyle[course.category]
+  return `${base} ${!course.completed && hasCompletionData ? 'opacity-70' : ''}`
 }
 
 function completedChipClass(category: MapCategory, rowKey?: string): string {
@@ -1524,13 +1523,13 @@ export function CurriculumPage() {
                 <LegendPill
                   active={filter === 'liberal'}
                   onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-                  className="bg-[#dbe4f0] text-[#334155]"
+                  className="bg-[#64748b] text-white"
                   label="전문교양"
                 />
                 <LegendPill
                   active={filter === 'bsm'}
                   onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-                  className="bg-[#334155] text-white"
+                  className="bg-[#0f766e] text-white"
                   label="BSM(기초수학, 과학)"
                 />
               </>
@@ -1539,19 +1538,19 @@ export function CurriculumPage() {
                 <LegendPill
                   active={filter === 'liberal'}
                   onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-                  className="bg-[#dbe4f0] text-[#334155]"
+                  className="bg-[#64748b] text-white"
                   label="교양"
                 />
                 <LegendPill
                   active={filter === 'common'}
                   onClick={() => setFilter(filter === 'common' ? null : 'common')}
-                  className="bg-[#475569] text-white"
+                  className="bg-[#0369a1] text-white"
                   label="공통교양"
                 />
                 <LegendPill
                   active={filter === 'bsm'}
                   onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-                  className="bg-[#334155] text-white"
+                  className="bg-[#0f766e] text-white"
                   label="학문기초"
                 />
                 <LegendPill
@@ -1583,27 +1582,6 @@ export function CurriculumPage() {
                   label="전공선택"
                 />
               </>
-            )}
-            {hasCompletionData && viewKind === 'general' && (
-              <>
-                <span className="rounded-full bg-sejong px-3.5 py-1.5 text-xs font-semibold text-white">
-                  이수·전공
-                </span>
-                <span className="rounded-full bg-[#0369a1] px-3.5 py-1.5 text-xs font-semibold text-white">
-                  이수·공통교양
-                </span>
-                <span className="rounded-full bg-[#0f766e] px-3.5 py-1.5 text-xs font-semibold text-white">
-                  이수·학문기초
-                </span>
-                <span className="rounded-full bg-[#64748b] px-3.5 py-1.5 text-xs font-semibold text-white">
-                  이수·교양
-                </span>
-              </>
-            )}
-            {hasCompletionData && viewKind === 'abeek' && (
-              <span className="rounded-full bg-sejong px-3.5 py-1.5 text-xs font-semibold text-white">
-                이수 과목
-              </span>
             )}
           </div>
           {viewKind === 'abeek' && (
