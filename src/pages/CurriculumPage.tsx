@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+﻿import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import {
   getAbeekEvaluation,
   getAbeekFullRoadmap,
@@ -75,14 +75,14 @@ const MAJOR_REQUIRED_INCOMPLETE_CLASS = 'border-sejong bg-white text-sejong'
 const MAJOR_ELECTIVE_INCOMPLETE_CLASS = 'border-transparent bg-sejong-pink text-ink'
 
 const categoryStyle: Record<MapCategory, string> = {
-  // 교양·기초필수 구분 / 미이수 전공: 필수=흰, 선택=연한 핑크
+  // 교양·교양필수 구분 / 미이수 전공: 필수=흰, 선택=연한 핑크
   liberal: 'border-transparent bg-[#dbe4f0] text-[#334155]',
   bsm: 'border-transparent bg-[#334155] text-white',
   'major-required': MAJOR_REQUIRED_INCOMPLETE_CLASS,
   'major-elective': MAJOR_ELECTIVE_INCOMPLETE_CLASS,
 }
 
-/** 이수 과목: 교양·기초필수는 구분, 전공은 빨강 */
+/** 이수 과목: 교양·교양필수는 구분, 전공은 빨강 */
 const completedCategoryStyle: Record<MapCategory, string> = {
   liberal: 'border-transparent bg-[#64748b] text-white shadow-[0_0_0_1px_rgba(100,116,139,0.35)]',
   bsm: 'border-transparent bg-[#0f766e] text-white shadow-[0_0_0_1px_rgba(15,118,110,0.35)]',
@@ -125,10 +125,10 @@ function completedChipClass(category: MapCategory, rowKey?: string): string {
   return 'bg-white text-[#c8012e]'
 }
 
-/** 일반(시간표) 로드맵: 교양 → 기초필수 → 전공 */
+/** 일반(시간표) 로드맵: 교양 → 교양필수 → 전공 */
 const generalRowDefs: RowDef[] = [
   { key: 'liberal', label: '교양', categories: ['liberal'], border: 'border-[#94a3b8]' },
-  { key: 'foundation', label: '기초필수', categories: ['bsm'], border: 'border-[#334155]' },
+  { key: 'foundation', label: '교양필수', categories: ['bsm'], border: 'border-[#334155]' },
   {
     key: 'major',
     label: '전공',
@@ -168,7 +168,14 @@ function mapAbeekCategory(course: RoadmapCourse): MapCategory {
 }
 
 /** 일반 로드맵: 공학인증 bucket(BSM/GENERAL) 무시, 시간표 이수구분 기준 */
+function isMajorFoundationLabel(label: string) {
+  const t = label.replace(/\s+/g, '')
+  return t.includes('전공기초') || t === '전기' || t.startsWith('전기(') || t.includes('(전기)')
+}
+
 function isFoundationRequiredLabel(label: string) {
+  // 전공기초는 교양필수가 아님
+  if (isMajorFoundationLabel(label) || label.includes('전공')) return false
   return (
     label.includes('기초필수') ||
     label.includes('교양필수') ||
@@ -184,16 +191,16 @@ function isFoundationRequiredLabel(label: string) {
 
 /** 일반 로드맵: 공학인증 bucket + 시간표 이수구분 */
 function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
+  const label = course.category || ''
+
+  // 전공기초는 전공 행 (BSM/GENERAL bucket보다 우선)
+  if (isMajorFoundationLabel(label)) return 'major-required'
+
   // 공학인증 대상 학과: API가 채운 GENERAL/BSM/MAJOR 우선
   if (course.abeekBucket === 'GENERAL') return 'liberal'
   if (course.abeekBucket === 'BSM') return 'bsm'
 
-  const label = course.category || ''
-
   if (isFoundationRequiredLabel(label)) return 'bsm'
-
-  // 「전공기초」라도 abeekBucket이 MAJOR면 전공 (C프로그래밍 등)
-  // BSM bucket은 위에서 이미 기초필수로 처리됨
 
   if (label.includes('전공')) {
     if (label.includes('선택')) return 'major-elective'
@@ -446,8 +453,9 @@ function generalToMapCourse(
 
 /**
  * 졸업진행 기이수:
- * - 기초필수: 공통교양/기초필수 등
- * - 교양: 전공·기초필수 아닌 이수 과목
+ * - 교양필수: 공통교양 + 학문기초 (같은 행)
+ * - 전공: 전공기초 포함
+ * - 교양: 선택교양·균형교양 등
  * - 수강 학기(takenYear/Semester)가 없으면 배치하지 않음 (가짜 2-1 방지)
  */
 function liberalCoursesFromProgress(
@@ -494,7 +502,7 @@ function liberalCoursesFromProgress(
     }
   }
 
-  // 기초필수 — CompletedCourseDto(takenYear 포함)
+  // 교양필수 행 — 공통교양·학문기초를 분리하지 않고 함께 표시
   pushCompleted(
     progress.commonLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
     'bsm',
@@ -505,9 +513,11 @@ function liberalCoursesFromProgress(
       | undefined,
     'bsm',
   )
+
+  // 전공기초 → 전공 행
   pushCompleted(
     progress.majorFoundationCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
-    'bsm',
+    'major-required',
   )
 
   // 교양 — CompletedCourseDto
@@ -1054,7 +1064,8 @@ export function CurriculumPage() {
     for (const course of liberalExtra) {
       const existing = byId.get(course.id)
       if (existing) {
-        if (existing.category.startsWith('major') && !course.category.startsWith('major')) {
+        // 전공기초 등은 전공 행으로 승격 / 반대로 교양·교양필수로 재분류
+        if (course.category.startsWith('major') !== existing.category.startsWith('major')) {
           existing.category = course.category
         }
         if (course.completed && course.semester) {
@@ -1349,7 +1360,7 @@ export function CurriculumPage() {
                   active={filter === 'bsm'}
                   onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
                   className="bg-[#334155] text-white"
-                  label="기초필수"
+                  label="교양필수"
                 />
                 <LegendPill
                   active={filter === 'major-required'}
@@ -1387,7 +1398,7 @@ export function CurriculumPage() {
                   이수·전공
                 </span>
                 <span className="rounded-full bg-[#0f766e] px-3.5 py-1.5 text-xs font-semibold text-white">
-                  이수·기초필수
+                  이수·교양필수
                 </span>
                 <span className="rounded-full bg-[#64748b] px-3.5 py-1.5 text-xs font-semibold text-white">
                   이수·교양
