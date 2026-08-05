@@ -193,14 +193,14 @@ function isFoundationRequiredLabel(label: string) {
   )
 }
 
-/** 일반 로드맵: 시간표 이수구분 우선 — 공통교양·학문기초는 교양필수(bsm) 한 행 */
+/** 일반 로드맵: 교양필수 / 교양(그 외 비교양·비전공) / 전공 */
 function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
   const label = course.category || ''
 
   // 전공기초 → 전공 행
   if (isMajorFoundationLabel(label)) return 'major-required'
 
-  // 교양필수·공통교양·학문기초 → 교양필수 행 (행 분리하지 않음)
+  // 교양필수·공통교양·학문기초 → 교양필수 행
   if (isFoundationRequiredLabel(label)) return 'bsm'
 
   if (label.includes('전공')) {
@@ -208,26 +208,13 @@ function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
     return 'major-required'
   }
 
-  // 선택·균형 교양만 교양 행
-  if (
-    label.includes('교양선택') ||
-    label.includes('선택교양') ||
-    label.includes('균형') ||
-    label.includes('균필') ||
-    label.includes('일반선택') ||
-    label.includes('통과')
-  ) {
-    return 'liberal'
-  }
-
-  // 이수구분 없을 때 bucket fallback: BSM·GENERAL 모두 교양필수 행에 합침
-  if (course.abeekBucket === 'BSM' || course.abeekBucket === 'GENERAL') return 'bsm'
+  // 학문기초(BSM)만 교양필수 — GENERAL(전문교양 등)은 교양 행
+  if (course.abeekBucket === 'BSM') return 'bsm'
   if (course.abeekBucket === 'MAJOR') {
     return label.includes('필수') ? 'major-required' : 'major-elective'
   }
 
-  if (label.includes('교양')) return 'liberal'
-
+  // 교양필수·전공이 아니면 교양 행 (선택교양·균형·GENERAL·기타)
   return 'liberal'
 }
 
