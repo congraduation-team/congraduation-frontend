@@ -203,9 +203,10 @@ function isCommonLiberalLabel(label: string) {
   )
 }
 
-/** 일반 로드맵: 교양 / 공통교양 / 학문기초 / 전공 */
+/** 일반 로드맵: 교양 / 공통교양 / 학문기초 / 전공
+ * — 공통교양·학문기초·전공이 아니면 모두 교양 */
 function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
-  const label = course.category || ''
+  const label = (course.category || '').trim()
 
   if (isMajorFoundationLabel(label)) return 'major-required'
   if (isAcademicFoundationLabel(label)) return 'bsm'
@@ -216,12 +217,16 @@ function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
     return 'major-required'
   }
 
-  // BSM bucket → 학문기초, MAJOR → 전공, 그 외 비전공 → 교양
-  if (course.abeekBucket === 'BSM') return 'bsm'
-  if (course.abeekBucket === 'MAJOR') {
-    return label.includes('필수') ? 'major-required' : 'major-elective'
+  // 이수구분이 있을 때: 공통·학문·전공이 아니면 교양 (BSM bucket으로 끌어오지 않음)
+  if (label) {
+    return 'liberal'
   }
 
+  // 이수구분 없을 때만 bucket fallback
+  if (course.abeekBucket === 'BSM') return 'bsm'
+  if (course.abeekBucket === 'MAJOR') return 'major-elective'
+
+  // GENERAL·OTHER·미지정 → 교양
   return 'liberal'
 }
 
