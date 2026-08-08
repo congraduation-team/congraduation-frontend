@@ -6,9 +6,15 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import {
+  clearAuthToken,
+  getAuthorizationValue,
+  saveAuthToken,
+} from '../api/authToken'
 import type { StudentLoginResponse } from '../api/types'
 
 const STORAGE_KEY = 'congraduation.student'
+const ACTIVE_MAJOR_TRACK_KEY = 'congraduation.activeMajorTrack'
 
 type AuthContextValue = {
   student: StudentLoginResponse | null
@@ -20,6 +26,10 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 function loadStudent(): StudentLoginResponse | null {
   try {
+    if (!getAuthorizationValue()) {
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
     const raw = localStorage.getItem(STORAGE_KEY)
     return raw ? (JSON.parse(raw) as StudentLoginResponse) : null
   } catch {
@@ -31,9 +41,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [student, setStudentState] = useState<StudentLoginResponse | null>(() => loadStudent())
 
   const setStudent = useCallback((next: StudentLoginResponse | null) => {
-    setStudentState(next)
-    if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
-    else localStorage.removeItem(STORAGE_KEY)
+    if (next) {
+      if (next.accessToken?.trim()) {
+        saveAuthToken({
+          accessToken: next.accessToken,
+          tokenType: next.tokenType,
+          tokenExpiresAt: next.tokenExpiresAt,
+        })
+      }
+
+      const storedStudent = { ...next }
+      delete storedStudent.accessToken
+      delete storedStudent.tokenType
+      delete storedStudent.tokenExpiresAt
+      setStudentState(storedStudent)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(storedStudent))
+      return
+    }
+
+    setStudentState(null)
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(ACTIVE_MAJOR_TRACK_KEY)
+    clearAuthToken()
   }, [])
 
   const logout = useCallback(() => setStudent(null), [setStudent])

@@ -36,6 +36,11 @@ export type StudentLoginResponse = {
   admin?: boolean | number
   /** 로그인 응답의 세종 고전독서 인증 현황 */
   readingStatus?: SejongReadingStatus
+  /** 보호 API 호출에 사용하는 JWT */
+  accessToken?: string
+  tokenType?: string
+  /** JWT 만료 시각(epoch seconds) */
+  tokenExpiresAt?: number
 }
 
 export type SejongReadingAreaStatus = {

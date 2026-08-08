@@ -1,3 +1,5 @@
+import { getAuthorizationValue } from './authToken'
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
 
 export class ApiError extends Error {
@@ -38,13 +40,19 @@ async function parseError(res: Response) {
 }
 
 export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  headers.set('Accept', 'application/json')
+  if (!(init?.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
+  const authorization = getAuthorizationValue()
+  if (authorization) {
+    headers.set('Authorization', authorization)
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      Accept: 'application/json',
-      ...(init?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-      ...init?.headers,
-    },
+    headers,
   })
   if (!res.ok) await parseError(res)
   if (res.status === 204) return undefined as T
@@ -52,9 +60,17 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function apiForm<T>(path: string, formData: FormData, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  headers.set('Accept', 'application/json')
+  const authorization = getAuthorizationValue()
+  if (authorization) {
+    headers.set('Authorization', authorization)
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
     ...init,
+    headers,
     body: formData,
   })
   if (!res.ok) await parseError(res)
