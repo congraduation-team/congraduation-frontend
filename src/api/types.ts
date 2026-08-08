@@ -66,6 +66,16 @@ export type EnglishCertificationProgress = {
   detail?: string
 }
 
+export type ClassicReadingCertificationProgress = {
+  applicable?: boolean
+  satisfied?: boolean
+  status?: string
+  policyType?: string
+  primaryRequirement?: string
+  substituteRequirement?: string
+  detail?: string
+}
+
 export type SwCodingCertificationProgress = {
   applicable?: boolean
   satisfied?: boolean
@@ -260,6 +270,7 @@ export type GraduationProgressResponse = {
     detail?: string
   }
   englishCertification?: EnglishCertificationProgress
+  classicReadingCertification?: ClassicReadingCertificationProgress
   swCodingCertification?: SwCodingCertificationProgress
   /** 일부 배포에서 graduation-progress에 포함될 수 있음 */
   readingStatus?: SejongReadingStatus

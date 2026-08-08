@@ -398,7 +398,17 @@ export function GraduationPage() {
       satisfied: false,
     }))
   }, [readingStatus])
-  const readingCompleted = hasReadingApi && readingStatus?.completed === true
+  const classicReadingCert = progress?.classicReadingCertification
+  const readingCompleted =
+    classicReadingCert != null
+      ? classicReadingCert.satisfied === true
+      : hasReadingApi && readingStatus?.completed === true
+  const readingCompletedBySubstitute =
+    classicReadingCert?.satisfied === true && classicReadingCert.status === 'COMPLETED'
+  const readingExempted =
+    classicReadingCert?.satisfied === true &&
+    (classicReadingCert.status === 'EXEMPTED' ||
+      classicReadingCert.status === 'NOT_APPLICABLE')
 
   const englishCert = progress?.englishCertification
   const swCert = progress?.swCodingCertification
@@ -524,42 +534,58 @@ export function GraduationPage() {
 
         <article className="flex flex-col rounded-[20px] bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
           <h3 className="text-base font-bold text-ink">
-            {readingCompleted
+            {readingExempted
+              ? '고전독서인증 면제'
+              : readingCompleted
               ? readingStatus?.title || '현재 고전독서인증 완료!'
               : readingStatus?.title || '고전독서인증 현황'}
           </h3>
           <p className="mt-0.5 text-xs text-ink-muted">
-            {readingStatus?.subtitle || '고전독서인증 현황'}
-            {!hasReadingApi ? ' · 기준 안내' : ''}
+            {readingCompletedBySubstitute
+              ? classicReadingCert?.substituteRequirement || '고전특강 이수'
+              : readingStatus?.subtitle || '고전독서인증 현황'}
+            {!hasReadingApi && classicReadingCert == null ? ' · 기준 안내' : ''}
           </p>
-          <div className="mt-3 overflow-hidden rounded-lg border border-[#e5e7eb]">
-            <ul>
-              {readingAreas.map((item, index) => (
-                <li
-                  key={item.category}
-                  className={`flex items-center justify-between px-3 py-2 text-[13px] ${
-                    index < readingAreas.length - 1 ? 'border-b border-[#e5e7eb]' : ''
-                  }`}
-                >
-                  <span className="text-ink">{item.category}</span>
-                  <span
-                    className={`font-bold ${
-                      item.current >= item.required ? 'text-sejong' : 'text-ink-muted'
+          {readingCompletedBySubstitute || readingExempted ? (
+            <div className="mt-3 rounded-lg border border-sejong/20 bg-sejong/5 px-3 py-3 text-center">
+              <p className="text-sm font-bold text-sejong">
+                {readingExempted ? '고전독서인증 면제' : '대체과목 이수 완료'}
+              </p>
+            </div>
+          ) : (
+            <div className="mt-3 overflow-hidden rounded-lg border border-[#e5e7eb]">
+              <ul>
+                {readingAreas.map((item, index) => (
+                  <li
+                    key={item.category}
+                    className={`flex items-center justify-between px-3 py-2 text-[13px] ${
+                      index < readingAreas.length - 1 ? 'border-b border-[#e5e7eb]' : ''
                     }`}
                   >
-                    {item.current}/{item.required}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
+                    <span className="text-ink">{item.category}</span>
+                    <span
+                      className={`font-bold ${
+                        item.current >= item.required ? 'text-sejong' : 'text-ink-muted'
+                      }`}
+                    >
+                      {item.current}/{item.required}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {readingCompleted ? (
             <p className="mt-auto pt-3 text-center text-xs font-bold text-sejong">
-              {readingStatus?.message || '고전독서인증을 모두 완료하였습니다.'}
+              {classicReadingCert?.detail ||
+                readingStatus?.message ||
+                '고전독서인증을 모두 완료하였습니다.'}
             </p>
           ) : (
             <p className="mt-auto pt-3 text-center text-xs font-semibold text-ink-muted">
-              {readingStatus?.message || '영역별 필요 권수를 충족하면 인증이 완료됩니다.'}
+              {classicReadingCert?.detail ||
+                readingStatus?.message ||
+                '영역별 필요 권수를 충족하면 인증이 완료됩니다.'}
             </p>
           )}
         </article>
