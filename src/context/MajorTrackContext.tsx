@@ -4,11 +4,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import { getStudentMajorTracks } from '../api/endpoints'
-import type { MajorTrackProgress } from '../api/types'
+import type { MajorTrackProgress, StudentLoginResponse } from '../api/types'
 import { useAuth } from './AuthContext'
 import { buildTrackOptions, type TrackOption } from '../utils/majorTrack'
 
@@ -20,7 +21,7 @@ type MajorTrackContextValue = {
   setActiveKey: (key: string) => void
   majorTracksProgress: MajorTrackProgress[]
   setMajorTracksProgress: (tracks: MajorTrackProgress[]) => void
-  refreshTracks: () => Promise<void>
+  refreshTracks: (override?: StudentLoginResponse) => Promise<void>
 }
 
 const MajorTrackContext = createContext<MajorTrackContextValue | null>(null)
@@ -55,21 +56,32 @@ export function MajorTrackProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const refreshTracks = useCallback(async () => {
-    if (!student) return
+  const studentRef = useRef(student)
+  studentRef.current = student
+
+  const refreshTracks = useCallback(async (override?: StudentLoginResponse) => {
+    const current = override ?? studentRef.current
+    if (!current) return
     try {
-      const data = await getStudentMajorTracks(student.id)
+      const data = await getStudentMajorTracks(current.id)
+      const majorType =
+        current.majorType === 'SINGLE' ? 'SINGLE' : (data.majorType ?? current.majorType)
+      const isPrimaryOnly = !majorType || majorType === 'SINGLE'
       setStudent({
-        ...student,
-        major: data.primaryMajor ?? student.major,
-        majorType: data.majorType ?? student.majorType,
-        secondaryMajor: data.secondaryMajor ?? student.secondaryMajor,
-        tracks: data.tracks ?? student.tracks,
+        ...current,
+        major: data.primaryMajor ?? current.major,
+        majorType,
+        secondaryMajor: isPrimaryOnly ? undefined : data.secondaryMajor || undefined,
+        tracks: isPrimaryOnly ? [] : (data.tracks ?? current.tracks),
       })
+      if (isPrimaryOnly) {
+        setMajorTracksProgress([])
+        if (current.major) setActiveKey(`primary:${current.major}`)
+      }
     } catch {
       // keep existing student
     }
-  }, [student, setStudent])
+  }, [setStudent, setActiveKey])
 
   useEffect(() => {
     if (!student) return

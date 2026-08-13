@@ -91,22 +91,32 @@ export function buildTrackOptions(
     push(student.major, 'SINGLE', true)
   }
 
-  if (student.secondaryMajor) {
+  const majorType = student.majorType === 'DOUBLE_MAJOR' ? 'DOUBLE' : student.majorType
+  const allowSecondary = Boolean(majorType && majorType !== 'SINGLE')
+
+  if (allowSecondary && student.secondaryMajor) {
     const secondaryType =
       student.majorType && student.majorType !== 'SINGLE' ? student.majorType : 'DOUBLE_MAJOR'
     push(student.secondaryMajor, secondaryType, false)
   }
 
-  for (const track of student.tracks ?? []) {
-    if (!track.departmentCode) continue
-    const isPrimary = track.departmentCode === student.major || track.trackType === 'SINGLE'
-    push(track.departmentCode, track.trackType, Boolean(isPrimary && track.departmentCode === student.major))
-  }
+  if (allowSecondary) {
+    for (const track of student.tracks ?? []) {
+      if (!track.departmentCode || track.trackType === 'SINGLE') continue
+      if (track.departmentCode === student.major) continue
+      push(track.departmentCode, track.trackType, false)
+    }
 
-  for (const track of extraTracks ?? []) {
-    if (!track.department) continue
-    const isPrimary = track.department === student.major
-    push(track.department, track.trackType ?? 'DOUBLE_MAJOR', isPrimary)
+    for (const track of extraTracks ?? []) {
+      if (!track.department || track.department === student.major) continue
+      const configured =
+        track.department === student.secondaryMajor ||
+        (student.tracks ?? []).some(
+          (item) => item.departmentCode === track.department && item.trackType !== 'SINGLE',
+        )
+      if (!configured) continue
+      push(track.department, track.trackType ?? 'DOUBLE_MAJOR', false)
+    }
   }
 
   return options
