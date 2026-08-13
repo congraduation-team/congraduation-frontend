@@ -26,6 +26,8 @@ export type StudentLoginResponse = {
   secondaryMajor?: string
   tracks?: StudentMajorTrack[]
   gradeLevel?: number
+  /** classic 포털 이수 학기 수. 남은 학기/standing은 이 값(또는 계획학기 API)을 우선 */
+  completedSemesterCount?: number
   admissionYear?: number
   status?: string
   /** 백엔드가 내려주는 역할. ADMIN / ROLE_ADMIN 이면 관리자 */
@@ -169,9 +171,10 @@ export function isAdminUser(student: StudentLoginResponse | null | undefined): b
 }
 
 export type CategoryCourse = {
-  courseCode: string
+  /** 지정필수 안내형 항목은 빈 문자열일 수 있음 */
+  courseCode?: string
   courseName: string
-  credit: string
+  credit?: string
 }
 
 /** 남은 공통교양 필수 (동등 이수 정보 포함) */
@@ -355,7 +358,9 @@ export type PlannedCoursesResponse = {
   studentId?: number
   /** 기이수 순번 (예: 4-1). 초과학년 판단에 캘린더 연도 쓰지 말 것 */
   lastCompletedSemester?: string
-  /** 실제 수강 연도 (예: 2026) */
+  /** classic 포털 이수 학기 수. lastCompletedSemester가 없을 때 standing 보정 */
+  completedSemesterCount?: number
+  /** 실제 수강 연도 (예: 2026) — 표시 참고용, standing 재계산에 쓰지 말 것 */
   lastCompletedTakenYear?: number | string | null
   /** 실제 수강 학기 (예: 1학기) */
   lastCompletedTakenSemester?: number | string | null
@@ -402,6 +407,14 @@ export type MajorTrackRequiredCourseProgress = {
   missingCourses?: CategoryCourse[]
 }
 
+export type DoubleMajorGraduationRequirement = {
+  required?: boolean
+  satisfied?: boolean
+  /** COMPLETED | IN_PROGRESS | GUIDANCE | NOT_REQUIRED */
+  status?: string
+  detail?: string
+}
+
 export type MajorTrackProgress = {
   trackType?: MajorType
   department?: string
@@ -409,8 +422,10 @@ export type MajorTrackProgress = {
   requiredCredits?: CreditProgress
   electiveCredits?: CreditProgress
   requiredCourseProgress?: MajorTrackRequiredCourseProgress
+  graduationRequirement?: DoubleMajorGraduationRequirement
   categoryBasis?: string
   status?: string
+  detail?: string
 }
 
 export type StudentMajorTracksResponse = {

@@ -392,7 +392,7 @@ export function EngineeringPage() {
 
   const genElecEarned =
     toNumber(certElectiveCat?.earnedCredits ?? evaluation?.certElective?.earnedCredits) ||
-    certElectiveCompleted.reduce((s, c) => s + c.credits, 0)
+    certElectiveCompleted.reduce((s, c) => s + (c.credits ?? 0), 0)
   const genElecRequired =
     toNumber(certElectiveCat?.requiredCredits ?? evaluation?.certElective?.requiredCredits) ||
     generalElectiveAll.reduce((s, c) => s + toNumber(c.credits), 0)
@@ -416,7 +416,7 @@ export function EngineeringPage() {
 
   const designEarned =
     roadmap?.summary?.completedDesignCredits ??
-    designLists.completed.reduce((s, c) => s + c.credits, 0)
+    designLists.completed.reduce((s, c) => s + (c.credits ?? 0), 0)
   const designRequired =
     toNumber(evaluation?.design?.requiredCredits) ||
     toNumber(roadmap?.summary?.totalDesignCredits)

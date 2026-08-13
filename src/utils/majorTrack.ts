@@ -8,6 +8,44 @@ export type TrackOption = {
   isPrimary: boolean
 }
 
+export function trackStatusLabel(status?: string | null): string {
+  switch ((status || '').toUpperCase()) {
+    case 'COMPLETED':
+      return '충족'
+    case 'IN_PROGRESS':
+      return '진행중'
+    case 'GUIDANCE':
+      return '안내'
+    case 'NOT_REQUIRED':
+      return '해당 없음'
+    case 'MANUAL_CHECK_REQUIRED':
+      return '확인 필요'
+    default:
+      return status?.trim() || ''
+  }
+}
+
+export function trackStatusClass(status?: string | null): string {
+  switch ((status || '').toUpperCase()) {
+    case 'COMPLETED':
+      return 'bg-emerald-50 text-emerald-700'
+    case 'IN_PROGRESS':
+      return 'bg-[#fde8ec] text-sejong'
+    case 'GUIDANCE':
+    case 'MANUAL_CHECK_REQUIRED':
+      return 'bg-amber-50 text-amber-800'
+    case 'NOT_REQUIRED':
+      return 'bg-panel text-ink-muted'
+    default:
+      return 'bg-panel text-ink-muted'
+  }
+}
+
+export function isGuidanceStatus(status?: string | null): boolean {
+  const value = (status || '').toUpperCase()
+  return value === 'GUIDANCE' || value === 'MANUAL_CHECK_REQUIRED'
+}
+
 export function trackTypeLabel(type?: MajorType | string | null): string {
   switch (type) {
     case 'SINGLE':

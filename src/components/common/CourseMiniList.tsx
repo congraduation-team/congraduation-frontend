@@ -60,19 +60,19 @@ export function CourseMiniList({
         </div>
       )}
       <ul className="space-y-2.5 pr-0.5">
-        {visible.map((course) => (
+        {visible.map((course, index) => (
           <li
-            key={`${course.code}-${course.name}`}
+            key={`${course.code || 'label'}-${course.name}-${index}`}
             className="flex items-start justify-between gap-3 text-sm"
           >
             <span className="min-w-0 flex-1 break-keep leading-snug text-ink">{course.name}</span>
             {showSemester && course.semester ? (
               <span className="shrink-0 font-semibold text-sejong">{course.semester}학기</span>
-            ) : (
+            ) : course.credits != null && course.credits > 0 ? (
               <span className="w-7 shrink-0 pt-px text-right font-medium text-ink">
                 {course.credits}
               </span>
-            )}
+            ) : null}
           </li>
         ))}
         {courses.length === 0 && (

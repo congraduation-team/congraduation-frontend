@@ -26,6 +26,13 @@ import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
 import { trackTypeLabel } from '../utils/majorTrack'
 import { formatPercentLabel, toNumber } from '../utils/number'
+import {
+  formatStandingLabel,
+  isPastMaxPlannableTerm,
+  isSemesterAfterLast,
+  parseTermKey,
+  resolveLastStanding,
+} from '../utils/standing'
 
 const GRADES = ['A+', 'A0', 'B+', 'B0', 'C+', 'C0', 'D+', 'D0', 'F', 'P', 'NP'] as const
 type Grade = (typeof GRADES)[number]
@@ -90,12 +97,15 @@ function classifyByCategory(
 
   // 전필 우선 (백엔드: 전필+전기 성격 → 전필로 응답)
   if (
+    c.includes('복필') ||
+    c.includes('복수전필') ||
+    c.includes('복전필') ||
     c.includes('전필') ||
     (c.includes('전공') && c.includes('필수') && !c.includes('기초')) ||
     upper.includes('MAJOR_REQ') ||
     (upper.includes('REQUIRED') && !upper.includes('FOUND') && !upper.includes('BASIC'))
   ) {
-    return { kind: 'required', label: '전필' }
+    return { kind: 'required', label: c.includes('복') ? '복필' : '전필' }
   }
   if (
     c.includes('필수') &&
@@ -135,17 +145,27 @@ function classifyByCategory(
   }
 
   if (
+    c.includes('복선') ||
+    c.includes('복수전선') ||
+    c.includes('복전선') ||
     c.includes('전선') ||
     (c.includes('전공') && c.includes('선택')) ||
     upper.includes('MAJOR_ELE')
   ) {
-    return { kind: 'elective', label: '전선' }
+    return { kind: 'elective', label: c.includes('복') ? '복선' : '전선' }
   }
-  if (c.includes('선택') && !c.includes('교직') && !c.includes('일반선택')) {
+  if (
+    c.includes('선택') &&
+    !c.includes('교직') &&
+    !c.includes('일반선택') &&
+    !c.includes('교양') &&
+    !c.includes('교선')
+  ) {
     return { kind: 'elective', label: '전선' }
   }
 
   if (
+    c.includes('교선') ||
     c.includes('교양') ||
     c.includes('균형') ||
     c.includes('공통') ||
@@ -200,7 +220,11 @@ function dedupeCatalogItems(items: CatalogItem[]): CatalogItem[] {
 }
 
 function semesterLabel(sem: PlannedSemester, admissionYear?: number) {
-  return formatGradeTerm(sem.gradeYear, sem.semester, admissionYear)
+  if (sem.gradeYear >= 1 && sem.gradeYear <= 4) return `${sem.gradeYear}-${sem.semester}학기`
+  if (admissionYear && sem.gradeYear > 0) {
+    return `${admissionYear + sem.gradeYear - 1}-${sem.semester}학기`
+  }
+  return `${sem.gradeYear}년차 ${sem.semester}학기`
 }
 
 /** "2026-1" / "2025-2" → "1학기" / "2학기" */
@@ -213,110 +237,6 @@ function formatOfferedSemester(term?: string) {
   return term
 }
 
-function parseTermKey(value?: string | null): { gradeYear: number; semester: number } | null {
-  if (!value) return null
-  const m = String(value).trim().match(/^(\d+)\s*[-_/]\s*([12])/)
-  if (!m) return null
-  return { gradeYear: Number(m[1]), semester: Number(m[2]) }
-}
-
-/** 입학년 기준 상대학년 → 표시 라벨 (5학년+는 연도-학기) */
-function formatGradeTerm(gradeYear: number, semester: number, admissionYear?: number) {
-  if (gradeYear >= 1 && gradeYear <= 4) return `${gradeYear}-${semester}학기`
-  if (admissionYear && gradeYear > 0) {
-    return `${admissionYear + gradeYear - 1}-${semester}학기`
-  }
-  return `${gradeYear}년차 ${semester}학기`
-}
-
-/** overStanding이 true일 때만 초과학년. 순번 문자열로 추론하지 않음 */
-function resolveOverStanding(planned?: PlannedCoursesResponse | null): boolean {
-  return planned?.overStanding === true
-}
-
-/**
- * 서버 lastCompletedSemester가 달력 상대학년(5학년+)으로 온 경우.
- * 구 API는 overStanding/taken 필드 없이 6-1 같은 값을 내려 next 생성을 막는다.
- */
-function isCalendarMislabelledStanding(planned?: PlannedCoursesResponse | null): boolean {
-  if (!planned || resolveOverStanding(planned)) return false
-  const parsed = parseTermKey(planned.lastCompletedSemester)
-  return !!parsed && parsed.gradeYear > 4
-}
-
-/**
- * 계획/필터에 쓸 이수 순번.
- * - 정상: lastCompletedSemester (예: 4-1)
- * - 서버가 캘린더 환산(6-1)을 넣은 경우: overStanding이 아니면 표시용으로만 4학년 클램프
- *   (실제 next 생성은 서버가 막으면 FE에서 만들 수 없음)
- */
-function resolveEffectiveLastStanding(
-  planned?: PlannedCoursesResponse | null,
-): string | null {
-  const raw = planned?.lastCompletedSemester?.trim() || null
-  const parsed = parseTermKey(raw)
-  if (!parsed) return raw
-
-  if (isCalendarMislabelledStanding(planned)) {
-    const sem = parsed.semester >= 2 ? 2 : 1
-    return `4-${sem}`
-  }
-
-  return `${parsed.gradeYear}-${parsed.semester}`
-}
-
-/**
- * 마지막 이수 표시
- * - 순번(lastCompletedSemester) 우선: 4-1학기
- * - 실제 수강 연도가 있으면 병기: 4-1학기 (2026-1)
- */
-function formatLastCompletedLabel(
-  planned?: PlannedCoursesResponse | null,
-  admissionYear?: number,
-): string | null {
-  if (!planned) return null
-
-  const standingKey = resolveEffectiveLastStanding(planned)
-  const standingParsed = parseTermKey(standingKey)
-  const takenYear = toNumber(planned.lastCompletedTakenYear)
-  const takenSem = toNumber(planned.lastCompletedTakenSemester)
-
-  let label: string | null = null
-  if (standingParsed) {
-    label = formatGradeTerm(standingParsed.gradeYear, standingParsed.semester, admissionYear)
-  } else if (standingKey) {
-    label = standingKey
-  }
-
-  if (takenYear > 0 && (takenSem === 1 || takenSem === 2)) {
-    const takenLabel = `${takenYear}-${takenSem}`
-    label = label ? `${label} (${takenLabel})` : `${takenLabel}학기`
-  }
-
-  if (!label) return null
-  if (resolveOverStanding(planned)) return `${label} · 초과학년`
-  return label
-}
-
-/** 계획 학기 한도: 8학년 2학기까지 (그 이후면 다음 학기 생성 불가) */
-function isPastMaxPlannableTerm(lastCompleted?: string | null) {
-  const parsed = parseTermKey(lastCompleted)
-  if (!parsed) return false
-  return parsed.gradeYear > 8 || (parsed.gradeYear === 8 && parsed.semester >= 2)
-}
-
-function isSemesterAfterLast(
-  gradeYear: number | string | null | undefined,
-  semester: number | string | null | undefined,
-  lastCompleted?: string | null,
-) {
-  const last = parseTermKey(lastCompleted)
-  if (!last) return true
-  const gy = toNumber(gradeYear)
-  const sem = toNumber(semester)
-  return gy > last.gradeYear || (gy === last.gradeYear && sem > last.semester)
-}
-
 function normalizeGrade(value?: string | null): Grade {
   if (value && (GRADES as readonly string[]).includes(value)) return value as Grade
   return 'A0'
@@ -327,14 +247,14 @@ function normalizeGrade(value?: string | null): Grade {
  * BE(#74)가 한 번에 채워 주면 1회 next로 충분하고,
  * 구버전이면 4-2까지 순차 추가한다.
  */
-async function ensurePlannedSemesters(studentId: number): Promise<PlannedCoursesResponse> {
+async function ensurePlannedSemesters(
+  studentId: number,
+  completedSemesterCount?: number | null,
+): Promise<PlannedCoursesResponse> {
   let planned = await getPlannedCourses(studentId)
 
-  // 달력 오표기(6-1 등)면 서버 next도 같은 기준으로 거절 → 무의미한 재시도 방지
-  if (isCalendarMislabelledStanding(planned)) return planned
-
   for (let i = 0; i < 16; i++) {
-    const lastKey = resolveEffectiveLastStanding(planned)
+    const lastKey = resolveLastStanding(planned, completedSemesterCount)
     if (isPastMaxPlannableTerm(lastKey)) return planned
 
     const semesters = planned.semesters ?? []
@@ -411,7 +331,7 @@ export function SimulationPage() {
   const refreshAll = useCallback(async () => {
     if (!student) return
     const abeekId = student.studentNo || String(student.id)
-    const plannedData = await ensurePlannedSemesters(student.id)
+    const plannedData = await ensurePlannedSemesters(student.id, student.completedSemesterCount)
     const [prog, evalData] = await Promise.all([
       getGraduationProgress(student.id),
       getAbeekEvaluation(abeekId).catch(() => null),
@@ -530,10 +450,9 @@ export function SimulationPage() {
 
   const semesters = useMemo(() => {
     const all = planned?.semesters ?? []
-    const lastKey = resolveEffectiveLastStanding(planned)
-    // 마지막 이수 순번 이후 학기만 표시 (캘린더 6-1 오표기로 4-2가 숨겨지지 않게)
+    const lastKey = resolveLastStanding(planned, student?.completedSemesterCount)
     return all.filter((s) => isSemesterAfterLast(s.gradeYear, s.semester, lastKey))
-  }, [planned])
+  }, [planned, student?.completedSemesterCount])
   const plannedCourses = useMemo(
     () => semesters.flatMap((s) => s.courses ?? []),
     [semesters],
@@ -543,6 +462,17 @@ export function SimulationPage() {
     [plannedCourses],
   )
 
+  const activeTrack = useMemo(() => {
+    const tracks = progress?.majorTracks ?? []
+    if (!active || tracks.length === 0) return null
+    return (
+      tracks.find((t) => t.department === active.department) ??
+      tracks.find((t) => t.trackType === active.trackType) ??
+      null
+    )
+  }, [progress?.majorTracks, active])
+  const isSecondaryTrack = Boolean(active && !active.isPrimary && activeTrack)
+
   const earnedTotal = toNumber(progress?.totalCredits?.earnedCredits)
   const requiredTotal =
     toNumber(
@@ -550,14 +480,17 @@ export function SimulationPage() {
         progress?.totalCredits?.requiredCredits,
     ) || 130
   const earnedMajor = toNumber(
-    progress?.majorCredits?.earnedMajorCredits ?? evaluation?.major?.earnedCredits,
+    isSecondaryTrack
+      ? activeTrack?.totalCredits?.earnedCredits
+      : (progress?.majorCredits?.earnedMajorCredits ?? evaluation?.major?.earnedCredits),
   )
-  const requiredMajor =
-    toNumber(
-      progress?.simulation?.majorCredits?.requiredMajorCredits ??
-        progress?.majorCredits?.requiredMajorCredits ??
-        evaluation?.major?.requiredCredits,
-    ) || 45
+  const requiredMajor = toNumber(
+    isSecondaryTrack
+      ? activeTrack?.totalCredits?.requiredCredits
+      : (progress?.simulation?.majorCredits?.requiredMajorCredits ??
+          progress?.majorCredits?.requiredMajorCredits ??
+          evaluation?.major?.requiredCredits),
+  )
 
   const plannedCredits =
     toNumber(planned?.totalPlannedCredits) ||
@@ -596,25 +529,33 @@ export function SimulationPage() {
   const projectedTotal = sim?.totalCredits
     ? toNumber(sim.totalCredits.earnedCredits)
     : earnedTotal + plannedCredits
-  const projectedMajor = simMajor
-    ? toNumber(simMajor.earnedMajorCredits)
-    : earnedMajor + plannedMajorCredits
-  const projectedMajorRequired = simMajor
-    ? toNumber(simMajor.earnedMajorRequiredCredits)
-    : toNumber(progress?.majorCredits?.earnedMajorRequiredCredits) + plannedRequiredMajorCredits
-  const requiredMajorRequired =
-    toNumber(
-      simMajor?.requiredMajorRequiredCredits ??
-        progress?.majorCredits?.requiredMajorRequiredCredits,
-    ) || 0
-  const projectedMajorElective = simMajor
-    ? toNumber(simMajor.earnedMajorElectiveCredits)
-    : toNumber(progress?.majorCredits?.earnedMajorElectiveCredits) + plannedElectiveMajorCredits
-  const requiredMajorElective =
-    toNumber(
-      simMajor?.requiredMajorElectiveCredits ??
-        progress?.majorCredits?.requiredMajorElectiveCredits,
-    ) || 0
+  const projectedMajor = isSecondaryTrack
+    ? earnedMajor + plannedMajorCredits
+    : simMajor
+      ? toNumber(simMajor.earnedMajorCredits)
+      : earnedMajor + plannedMajorCredits
+  const projectedMajorRequired = isSecondaryTrack
+    ? toNumber(activeTrack?.requiredCredits?.earnedCredits) + plannedRequiredMajorCredits
+    : simMajor
+      ? toNumber(simMajor.earnedMajorRequiredCredits)
+      : toNumber(progress?.majorCredits?.earnedMajorRequiredCredits) + plannedRequiredMajorCredits
+  const requiredMajorRequired = toNumber(
+    isSecondaryTrack
+      ? activeTrack?.requiredCredits?.requiredCredits
+      : (simMajor?.requiredMajorRequiredCredits ??
+          progress?.majorCredits?.requiredMajorRequiredCredits),
+  )
+  const projectedMajorElective = isSecondaryTrack
+    ? toNumber(activeTrack?.electiveCredits?.earnedCredits) + plannedElectiveMajorCredits
+    : simMajor
+      ? toNumber(simMajor.earnedMajorElectiveCredits)
+      : toNumber(progress?.majorCredits?.earnedMajorElectiveCredits) + plannedElectiveMajorCredits
+  const requiredMajorElective = toNumber(
+    isSecondaryTrack
+      ? activeTrack?.electiveCredits?.requiredCredits
+      : (simMajor?.requiredMajorElectiveCredits ??
+          progress?.majorCredits?.requiredMajorElectiveCredits),
+  )
   const totalPct =
     requiredTotal > 0 ? Math.min(100, Math.round((projectedTotal / requiredTotal) * 100)) : 0
   const majorRequiredPct =
@@ -755,7 +696,7 @@ export function SimulationPage() {
       for (const sem of current.semesters ?? []) {
         await deletePlannedSemester(student.id, sem.plannedSemesterId)
       }
-      await ensurePlannedSemesters(student.id)
+      await ensurePlannedSemesters(student.id, student.completedSemesterCount)
     })
   }
 
@@ -766,14 +707,11 @@ export function SimulationPage() {
   const displayName = student?.name || '학생'
   const majorLabel = active?.label || student?.major || ''
   const admissionYear = student?.admissionYear ?? progress?.admissionYear
-  const lastCompletedLabel = formatLastCompletedLabel(planned, admissionYear)
-  const effectiveLastStanding = resolveEffectiveLastStanding(planned)
-  const rawLastStanding = planned?.lastCompletedSemester?.trim() || null
-  const calendarMislabelled = isCalendarMislabelledStanding(planned)
+  const lastCompletedLabel = formatStandingLabel(planned, student?.completedSemesterCount)
+  const effectiveLastStanding = resolveLastStanding(planned, student?.completedSemesterCount)
   const pastPlannable = isPastMaxPlannableTerm(effectiveLastStanding)
   const effectiveParsed = parseTermKey(effectiveLastStanding)
   const lastStandingAtCap =
-    !calendarMislabelled &&
     !!effectiveParsed &&
     effectiveParsed.gradeYear === 4 &&
     effectiveParsed.semester >= 2
@@ -853,20 +791,7 @@ export function SimulationPage() {
             <h2 className="mb-4 text-base font-bold text-ink">남은 학기 로드맵</h2>
             {semesters.length === 0 ? (
               <div className="space-y-3 py-10 text-center text-sm leading-relaxed text-ink-muted">
-                {calendarMislabelled ? (
-                  <>
-                    <p>
-                      서버가 마지막 이수를 순번이 아니라 달력 학년(
-                      <span className="font-semibold text-ink">{rawLastStanding}</span>
-                      )으로 보고 있어 다음 학기(4-2)를 만들 수 없습니다.
-                    </p>
-                    <p className="text-xs text-ink-faint">
-                      백엔드 `PlannedCourseService`의 기이수 순번(
-                      TranscriptStandingMapper) 배포가 필요합니다. FE만으로는 4-2
-                      학기 카드를 생성할 수 없습니다.
-                    </p>
-                  </>
-                ) : pastPlannable || lastStandingAtCap ? (
+                {pastPlannable || lastStandingAtCap ? (
                   <p>
                     이수 순번이{' '}
                     <span className="font-semibold text-ink">

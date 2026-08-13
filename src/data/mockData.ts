@@ -1,7 +1,7 @@
 export type Course = {
   name: string
-  credits: number
-  code: string
+  credits?: number
+  code?: string
   semester?: string
 }
 

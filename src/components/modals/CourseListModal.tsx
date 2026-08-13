@@ -19,14 +19,20 @@ type CourseListModalProps = {
 
 function CourseRow({ course }: { course: Course }) {
   const code = displayCourseCode(course.code)
+  const hasCredits = course.credits != null && course.credits > 0
+  if (!code && !hasCredits) {
+    return (
+      <li className="break-keep text-[15px] font-medium leading-snug text-ink">{course.name}</li>
+    )
+  }
   return (
     <li className="grid grid-cols-[minmax(0,1fr)_auto_minmax(5rem,auto)] items-center gap-3">
       <span className="truncate text-[15px] font-medium text-ink">{course.name}</span>
       <span className="w-14 shrink-0 text-right text-[15px] font-semibold text-ink">
-        {course.credits}학점
+        {hasCredits ? `${course.credits}학점` : ''}
       </span>
       <span className="truncate text-right text-sm text-ink-faint" title={code || undefined}>
-        {code || '—'}
+        {code || ''}
       </span>
     </li>
   )
@@ -54,9 +60,9 @@ export function CourseListModal({
                   <p className="text-sm text-ink-muted">추천 과목 정보가 없습니다.</p>
                 ) : (
                   <ul className="space-y-3">
-                    {group.courses.map((course) => (
+                    {group.courses.map((course, index) => (
                       <CourseRow
-                        key={`${group.title}-${course.code}-${course.name}`}
+                        key={`${group.title}-${course.code || 'label'}-${course.name}-${index}`}
                         course={course}
                       />
                     ))}
@@ -69,8 +75,8 @@ export function CourseListModal({
           <p className="py-6 text-center text-sm text-ink-muted">표시할 과목이 없습니다.</p>
         ) : (
           <ul className="space-y-3.5">
-            {courses.map((course) => (
-              <CourseRow key={`${course.code}-${course.name}`} course={course} />
+            {courses.map((course, index) => (
+              <CourseRow key={`${course.code || 'label'}-${course.name}-${index}`} course={course} />
             ))}
           </ul>
         )}

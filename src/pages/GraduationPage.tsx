@@ -11,7 +11,12 @@ import { SWCodingCertModal } from '../components/modals/SWCodingCertModal'
 import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
 import { classicReading } from '../data/mockData'
-import { trackTypeLabel } from '../utils/majorTrack'
+import {
+  isGuidanceStatus,
+  trackStatusClass,
+  trackStatusLabel,
+  trackTypeLabel,
+} from '../utils/majorTrack'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 import { CertDetailText } from '../utils/certDetail'
 import {
@@ -25,29 +30,50 @@ import {
   normalizeCourseNameKey,
 } from '../utils/courseCode'
 
+function isElectiveLiberalCategory(category?: string) {
+  const c = category || ''
+  return c.includes('교선') || c.includes('교양선택') || c.includes('선택교양')
+}
+
+function isDoubleMajorRequiredCategory(category?: string) {
+  const c = category || ''
+  return c.includes('복필') || c.includes('복수전필') || c.includes('복전필')
+}
+
+function isDoubleMajorElectiveCategory(category?: string) {
+  const c = category || ''
+  return c.includes('복선') || c.includes('복수전선') || c.includes('복전선')
+}
+
 function toUiCourses(
   courses?: CategoryCourse[] | Array<Record<string, unknown>>,
   codeByName?: Map<string, string>,
 ) {
-  return (courses ?? []).map((c) => {
-    const row = c as Record<string, unknown>
-    const name = String(row.courseName ?? row.name ?? '')
-    let code = String(row.courseCode ?? row.code ?? '')
-    if (!isAcademicCourseCode(code) && codeByName && name) {
-      code = lookupAcademicCodeByName(name, codeByName) || ''
-    } else if (!isAcademicCourseCode(code)) {
-      code = ''
-    }
-    const base: { name: string; credits: number; code: string; semester?: string } = {
-      name,
-      credits: toNumber((row.credit ?? row.credits) as string | number | undefined),
-      code,
-    }
-    if (row.recommendedTerm != null && String(row.recommendedTerm) !== '') {
-      base.semester = String(row.recommendedTerm)
-    }
-    return base
-  })
+  return (courses ?? [])
+    .map((c) => {
+      const row = c as Record<string, unknown>
+      const name = String(row.courseName ?? row.name ?? '').trim()
+      const rawCode = String(row.courseCode ?? row.code ?? '').trim()
+      let code = ''
+      if (isAcademicCourseCode(rawCode)) {
+        code = rawCode
+      } else if (rawCode && codeByName && name) {
+        code = lookupAcademicCodeByName(name, codeByName) || ''
+      }
+      const creditRaw = row.credit ?? row.credits
+      const hasCredit = creditRaw != null && String(creditRaw).trim() !== ''
+      const credits = hasCredit ? toNumber(creditRaw as string | number) : undefined
+      const base: { name: string; credits?: number; code: string; semester?: string } = {
+        name,
+        code,
+      }
+      if (credits != null && credits > 0) base.credits = credits
+      if (row.recommendedTerm != null && String(row.recommendedTerm) !== '') {
+        base.semester = String(row.recommendedTerm)
+      }
+      return base
+    })
+    .filter((c) => c.name)
 }
 
 export function GraduationPage() {
@@ -153,34 +179,48 @@ export function GraduationPage() {
     )
   }, [progress?.majorTracks, active])
 
+  const isSecondaryTrack = Boolean(active && !active.isPrimary && activeTrack)
+
   const majorRequired = useMemo(() => {
+    if (isSecondaryTrack) {
+      const summary = progress?.categorySummaries?.find((c) =>
+        isDoubleMajorRequiredCategory(c.category),
+      )
+      return {
+        category: summary?.category ?? '복필',
+        courses: summary?.courses ?? [],
+        remaining: summary?.remainingCourses ?? summary?.missingCourses ?? [],
+      }
+    }
+
     const summary = progress?.categorySummaries?.find(
       (c) => c.category.includes('전공필수') || c.category === '전필',
     )
     const remainingFromApi =
       progress?.remainingMajorRequiredCourses ??
-      activeTrack?.requiredCourseProgress?.missingCourses ??
       summary?.remainingCourses ??
       summary?.missingCourses ??
       []
-
-    if (activeTrack?.requiredCourseProgress) {
-      return {
-        category: '전공필수',
-        courses:
-          activeTrack.requiredCourseProgress.completedCourses ?? summary?.courses ?? [],
-        remaining: remainingFromApi,
-      }
-    }
 
     return {
       category: summary?.category ?? '전공필수',
       courses: summary?.courses ?? [],
       remaining: remainingFromApi,
     }
-  }, [progress, activeTrack])
+  }, [progress, isSecondaryTrack])
 
   const majorElective = useMemo(() => {
+    if (isSecondaryTrack) {
+      const summary = progress?.categorySummaries?.find((c) =>
+        isDoubleMajorElectiveCategory(c.category),
+      )
+      return {
+        category: summary?.category ?? '복선',
+        courses: summary?.courses ?? [],
+        remaining: summary?.remainingCourses ?? summary?.missingCourses ?? [],
+      }
+    }
+
     const found = progress?.categorySummaries?.find(
       (c) => c.category.includes('전공선택') || c.category === '전선',
     )
@@ -195,7 +235,7 @@ export function GraduationPage() {
       courses: found?.courses ?? [],
       remaining: remainingFromApi,
     }
-  }, [progress])
+  }, [progress, isSecondaryTrack])
 
   const liberalRequired = useMemo(() => {
     const fromCredits = progress?.commonLiberalCredits
@@ -231,11 +271,8 @@ export function GraduationPage() {
 
   const liberalElective = useMemo(() => {
     const fromCredits = progress?.electiveLiberalCredits
-    const fromSummary = progress?.categorySummaries?.find(
-      (c) =>
-        c.category.includes('교양선택') ||
-        c.category.includes('선택교양') ||
-        c.category === '교선',
+    const fromSummary = progress?.categorySummaries?.find((c) =>
+      isElectiveLiberalCategory(c.category),
     )
     return {
       earned: toNumber(fromCredits?.earnedCredits ?? fromSummary?.earnedCredits),
@@ -465,12 +502,46 @@ export function GraduationPage() {
     return `${year}- ${semester}학기 기준 분석 현황`
   })()
 
+  const requiredCourseProgress = isSecondaryTrack ? activeTrack?.requiredCourseProgress : undefined
+  const graduationRequirement = isSecondaryTrack ? activeTrack?.graduationRequirement : undefined
+  const trackDetail = activeTrack?.detail || graduationRequirement?.detail
+  const showGraduationRequirement =
+    Boolean(graduationRequirement) &&
+    (graduationRequirement?.status || '').toUpperCase() !== 'NOT_REQUIRED'
+
   return (
     <div className="space-y-5 pt-1">
       <div>
         <h2 className="text-[22px] font-bold leading-tight text-ink">{displayName}님 졸업요건 현황</h2>
         <p className="mt-1.5 text-sm text-ink-muted">{analysisTermLabel}</p>
       </div>
+
+      {isSecondaryTrack && (
+        <section className="rounded-[20px] bg-white px-5 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+          <div className="flex flex-wrap items-center gap-2">
+            {activeTrack?.status && (
+              <span
+                className={`rounded-full px-2.5 py-1 text-xs font-bold ${trackStatusClass(activeTrack.status)}`}
+              >
+                {trackStatusLabel(activeTrack.status)}
+              </span>
+            )}
+            <h3 className="text-base font-bold text-ink">{majorTitle} 진행 현황</h3>
+          </div>
+          {trackDetail && (
+            <p
+              className={`mt-2 text-sm leading-relaxed ${
+                isGuidanceStatus(activeTrack?.status) ||
+                isGuidanceStatus(graduationRequirement?.status)
+                  ? 'text-amber-800'
+                  : 'text-ink-muted'
+              }`}
+            >
+              {trackDetail}
+            </p>
+          )}
+        </section>
+      )}
 
       <section>
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
@@ -736,6 +807,83 @@ export function GraduationPage() {
               })
             }
           />
+          {isSecondaryTrack && requiredCourseProgress && (
+            requiredCourseProgress.policyApplied === false ? (
+              <article className="flex h-full flex-col rounded-2xl bg-white px-5 pb-5 pt-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <h3 className="mb-3 text-base font-bold leading-snug text-ink">지정 필수과목</h3>
+                <p className="text-sm text-ink-muted">해당 학과는 지정 필수과목 요건이 없습니다.</p>
+              </article>
+            ) : (
+              <DetailCreditCard
+                title={`${displayName}님 ${majorTitle} 지정 필수`}
+                remainingTitle="미이수 지정 필수"
+                percent={
+                  (requiredCourseProgress.requiredCourseCount ?? 0) > 0
+                    ? Math.min(
+                        100,
+                        Math.round(
+                          ((requiredCourseProgress.completedCourseCount ?? 0) /
+                            (requiredCourseProgress.requiredCourseCount ?? 1)) *
+                            100,
+                        ),
+                      )
+                    : requiredCourseProgress.satisfied
+                      ? 100
+                      : 0
+                }
+                earned={requiredCourseProgress.completedCourseCount ?? 0}
+                required={requiredCourseProgress.requiredCourseCount ?? 0}
+                completed={mapCourses(requiredCourseProgress.completedCourses)}
+                remaining={mapCourses(requiredCourseProgress.missingCourses)}
+                areaHint={
+                  requiredCourseProgress.requiredCourseCount != null
+                    ? `${requiredCourseProgress.completedCourseCount ?? 0}/${requiredCourseProgress.requiredCourseCount}과목`
+                    : undefined
+                }
+                countUnit="과목"
+                onOpenCompleted={() =>
+                  setListModal({
+                    title: `${majorTitle} 지정 필수 이수`,
+                    subtitle: `${requiredCourseProgress.completedCourseCount ?? 0}과목 이수`,
+                    courses: mapCourses(requiredCourseProgress.completedCourses),
+                  })
+                }
+                onOpenRemaining={() =>
+                  setListModal({
+                    title: `${majorTitle} 미이수 지정 필수`,
+                    subtitle: `${(requiredCourseProgress.missingCourses ?? []).length}항목`,
+                    courses: mapCourses(requiredCourseProgress.missingCourses),
+                  })
+                }
+              />
+            )
+          )}
+          {isSecondaryTrack && showGraduationRequirement && (
+            <article className="flex h-full flex-col rounded-2xl bg-white px-5 pb-5 pt-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                {graduationRequirement?.status && (
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-bold ${trackStatusClass(graduationRequirement.status)}`}
+                  >
+                    {trackStatusLabel(graduationRequirement.status)}
+                  </span>
+                )}
+                <h3 className="text-base font-bold leading-snug text-ink">추가 요건</h3>
+              </div>
+              <p
+                className={`text-sm leading-relaxed ${
+                  isGuidanceStatus(graduationRequirement?.status)
+                    ? 'text-amber-800'
+                    : 'text-ink-muted'
+                }`}
+              >
+                {graduationRequirement?.detail ||
+                  (graduationRequirement?.satisfied
+                    ? '추가 요건을 충족했습니다.'
+                    : '추가 요건을 확인하세요.')}
+              </p>
+            </article>
+          )}
           <DetailCreditCard
             title={`${displayName}님 교양 필수 현황`}
             remainingTitle="남은 필수 과목"
@@ -858,9 +1006,11 @@ export function GraduationPage() {
 function CreditStatusSummary({
   earned,
   required,
+  unit = '학점',
 }: {
   earned: number
   required?: number
+  unit?: string
 }) {
   const need = required && required > 0 ? required : 0
   const hasRequirement = need > 0
@@ -874,7 +1024,7 @@ function CreditStatusSummary({
           <span className="text-[11px] font-semibold text-ink-muted">이수</span>
           <span className="text-[15px] font-extrabold tracking-tight text-ink">
             {earned}
-            <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
+            <span className="ml-0.5 text-[10px] font-bold text-ink-muted">{unit}</span>
           </span>
         </div>
         <div className="flex items-baseline justify-between gap-2.5">
@@ -882,7 +1032,7 @@ function CreditStatusSummary({
           <span className="text-[15px] font-extrabold tracking-tight text-ink">
             {hasRequirement ? need : '-'}
             {hasRequirement && (
-              <span className="ml-0.5 text-[10px] font-bold text-ink-muted">학점</span>
+              <span className="ml-0.5 text-[10px] font-bold text-ink-muted">{unit}</span>
             )}
           </span>
         </div>
@@ -895,7 +1045,7 @@ function CreditStatusSummary({
               : 'bg-[#fde8ec] text-sejong'
           }`}
         >
-          {satisfied ? '요건 충족' : `${shortfall}학점 부족`}
+          {satisfied ? '요건 충족' : `${shortfall}${unit} 부족`}
         </p>
       )}
     </div>
@@ -994,6 +1144,7 @@ function DetailCreditCard({
   onOpenRemaining,
   earnedOnly = false,
   hideRemaining = false,
+  countUnit = '학점',
 }: {
   title: string
   remainingTitle: string
@@ -1007,6 +1158,7 @@ function DetailCreditCard({
   onOpenRemaining: () => void
   earnedOnly?: boolean
   hideRemaining?: boolean
+  countUnit?: string
 }) {
   return (
     <article className="flex h-full flex-col rounded-2xl bg-white px-5 pb-5 pt-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
@@ -1021,7 +1173,7 @@ function DetailCreditCard({
           <div className="flex items-baseline gap-2 border-b border-[#eee] pb-2.5">
             <span className="text-sm font-semibold text-ink-muted">취득 학점</span>
             <span className="text-2xl font-extrabold tracking-tight text-ink">{earned}</span>
-            <span className="text-sm font-semibold text-ink-muted">학점</span>
+            <span className="text-sm font-semibold text-ink-muted">{countUnit}</span>
           </div>
           <CourseMiniList
             title="이수한 과목"
@@ -1042,7 +1194,7 @@ function DetailCreditCard({
               stroke={11}
               label={formatPercentLabel(percent)}
             />
-            <CreditStatusSummary earned={earned} required={required} />
+            <CreditStatusSummary earned={earned} required={required} unit={countUnit} />
           </div>
 
           <div
