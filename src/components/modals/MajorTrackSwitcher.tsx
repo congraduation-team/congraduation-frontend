@@ -260,7 +260,7 @@ function MajorTrackSettingsModal({
             disabled={saving || (mode === 'additional' && !secondaryMajor)}
             className="rounded-full bg-sejong px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            {saving ? '저장 중...' : mode === 'primary' ? '주전공만 저장' : '저장'}
+            {saving ? '저장 중...' : '저장'}
           </button>
         </div>
       </div>
