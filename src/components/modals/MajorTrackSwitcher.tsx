@@ -199,10 +199,12 @@ function MajorTrackSettingsModal({
         </div>
 
         {mode === 'primary' && currentSecondaryLabel && (
-          <p className="rounded-xl bg-sejong-light px-4 py-3 text-sm leading-relaxed text-sejong">
-            현재 <span className="font-bold">{currentSecondaryLabel}</span>이 설정되어 있습니다.
-            저장하면 주전공만 사용하도록 해제됩니다.
-          </p>
+          <div className="rounded-xl bg-sejong-light px-4 py-3 text-sm leading-relaxed text-sejong">
+            <p>
+              현재 <span className="font-bold">{currentSecondaryLabel}</span>이 설정되어 있습니다.
+            </p>
+            <p className="mt-1.5">저장하면 {trackTypeLabel(student.majorType)}이 해제됩니다.</p>
+          </div>
         )}
 
         {mode === 'additional' && (
