@@ -9,12 +9,16 @@ import { Modal } from './Modal'
 const MAJOR_TYPES: MajorType[] = [
   'SINGLE',
   'DOUBLE',
-  'DOUBLE_MAJOR',
   'MINOR',
   'SECOND_MAJOR',
   'LINKED_FUSION',
   'SELF_DESIGNED',
 ]
+
+function normalizeMajorType(type?: MajorType | null): MajorType {
+  if (!type) return 'SINGLE'
+  return type === 'DOUBLE_MAJOR' ? 'DOUBLE' : type
+}
 
 export function MajorTrackSwitcher() {
   const { student, setStudent } = useAuth()
@@ -92,7 +96,7 @@ function MajorTrackSettingsModal({
 
   useEffect(() => {
     if (!open || !student) return
-    setMajorType(student.majorType || 'SINGLE')
+    setMajorType(normalizeMajorType(student.majorType))
     setSecondaryMajor(student.secondaryMajor || '')
     setError(null)
     ;(async () => {
