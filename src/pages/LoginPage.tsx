@@ -44,9 +44,11 @@ export function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-28">
-        <AppLogo size={104} />
-        <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-ink">SJU GRADUATION</h1>
+      <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-16 md:pt-28">
+        <div className="origin-top scale-90 md:scale-100">
+          <AppLogo size={104} />
+        </div>
+        <h1 className="mt-6 text-center text-3xl font-extrabold tracking-tight text-ink md:text-4xl">SJU GRADUATION</h1>
         <p className="mt-2 text-sm text-ink-muted">세종대학교 졸업인증 분석</p>
 
         <form onSubmit={handleSubmit} className="mt-10 w-full space-y-5">

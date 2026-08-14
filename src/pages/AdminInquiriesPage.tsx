@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError } from '../api/client'
 import { getAdminFeedbacks, updateAdminFeedback } from '../api/endpoints'
 import type { FeedbackItem, FeedbackStatus, FeedbackType } from '../api/types'
-import { Sidebar } from '../components/layout/Sidebar'
+import { AppShell } from '../components/layout/AppShell'
 import { useAuth } from '../context/AuthContext'
 
 const statusLabel: Record<FeedbackStatus, string> = {
@@ -104,9 +104,8 @@ export function AdminInquiriesPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-surface">
-      <Sidebar />
-      <main className="flex min-w-0 flex-1 flex-col px-8 py-8">
+    <AppShell>
+      <main className="flex min-w-0 flex-1 flex-col px-4 py-5 md:px-8 md:py-8">
         <header className="mb-8">
           <p className="text-xs font-semibold tracking-wide text-sejong">ADMIN</p>
           <h1 className="mt-1 text-2xl font-extrabold text-ink">문의 · 오류 신고</h1>
@@ -302,6 +301,6 @@ export function AdminInquiriesPage() {
           </div>
         )}
       </main>
-    </div>
+    </AppShell>
   )
 }

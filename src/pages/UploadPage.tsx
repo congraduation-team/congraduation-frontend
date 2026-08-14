@@ -90,8 +90,10 @@ export function UploadPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-20">
-        <AppLogo size={104} />
+      <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-16 md:pt-20">
+        <div className="origin-top scale-90 md:scale-100">
+          <AppLogo size={104} />
+        </div>
         <h1 className="mt-6 text-center text-3xl font-extrabold tracking-tight text-ink">
           {isUpdate ? '기이수성적 업데이트' : '기이수성적조회 엑셀 파일 업로드'}
         </h1>

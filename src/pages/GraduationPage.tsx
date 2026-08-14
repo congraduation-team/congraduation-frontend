@@ -512,7 +512,7 @@ export function GraduationPage() {
   return (
     <div className="space-y-5 pt-1">
       <div>
-        <h2 className="text-[22px] font-bold leading-tight text-ink">{displayName}님 졸업요건 현황</h2>
+        <h2 className="text-xl font-bold leading-tight text-ink md:text-[22px]">{displayName}님 졸업요건 현황</h2>
         <p className="mt-1.5 text-sm text-ink-muted">{analysisTermLabel}</p>
       </div>
 
@@ -561,7 +561,7 @@ export function GraduationPage() {
             현재 {totalEarned}/{totalRequired || '-'}학점 이수 완료!
           </h3>
 
-          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] items-center gap-1.5 sm:gap-2">
+          <div className="grid grid-cols-2 items-center gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:gap-2">
             <SummaryGauge
               title="전체 학점"
               percent={totalPct}
@@ -580,7 +580,7 @@ export function GraduationPage() {
               stroke={18}
               fill
             />
-            <div className="flex flex-col items-center gap-2.5 pl-0.5">
+            <div className="col-span-2 flex justify-center gap-8 md:col-span-1 md:flex-col md:items-center md:gap-2.5 md:pl-0.5">
               <SummaryGauge
                 title="전공 필수"
                 percent={majorReqPct}

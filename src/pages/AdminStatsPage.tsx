@@ -4,7 +4,7 @@ import { getSiteStatsSummary } from '../api/endpoints'
 import type { SiteStatsSummary } from '../api/types'
 import { ShareDonut } from '../components/charts/ShareDonut'
 import { StatBarChart } from '../components/charts/StatBarChart'
-import { Sidebar } from '../components/layout/Sidebar'
+import { AppShell } from '../components/layout/AppShell'
 import { useAuth } from '../context/AuthContext'
 
 function formatCount(n: number) {
@@ -73,9 +73,8 @@ export function AdminStatsPage() {
     : '0%'
 
   return (
-    <div className="flex min-h-screen bg-surface">
-      <Sidebar />
-      <main className="flex min-w-0 flex-1 flex-col px-8 py-8">
+    <AppShell>
+      <main className="flex min-w-0 flex-1 flex-col px-4 py-5 md:px-8 md:py-8">
         <header className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs font-semibold tracking-wide text-sejong">ADMIN</p>
@@ -182,6 +181,6 @@ export function AdminStatsPage() {
           </>
         ) : null}
       </main>
-    </div>
+    </AppShell>
   )
 }

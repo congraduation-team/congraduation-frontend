@@ -99,7 +99,13 @@ const adminItems = [
   },
 ]
 
-export function Sidebar() {
+export function Sidebar({
+  open = false,
+  onClose,
+}: {
+  open?: boolean
+  onClose?: () => void
+}) {
   const navigate = useNavigate()
   const location = useLocation()
   const { student } = useAuth()
@@ -131,10 +137,17 @@ export function Sidebar() {
   }, [showAdmin, student?.id, location.pathname])
 
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col border-r border-[#eee] bg-white px-5 py-6">
+    <aside
+      className={`fixed inset-y-0 left-0 z-50 flex w-[220px] shrink-0 flex-col overflow-y-auto border-r border-[#eee] bg-white px-5 py-6 transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
+        open ? 'translate-x-0' : '-translate-x-full'
+      }`}
+    >
       <button
         type="button"
-        onClick={() => navigate('/dashboard')}
+        onClick={() => {
+          onClose?.()
+          navigate('/dashboard')
+        }}
         className="mb-10 flex cursor-pointer items-center gap-3 rounded-lg text-left outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sejong"
         aria-label="홈으로 이동"
       >
@@ -151,6 +164,7 @@ export function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={() => onClose?.()}
             className={({ isActive }) =>
               `flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
                 isActive ? 'bg-sejong-light text-sejong' : 'text-ink hover:bg-surface'
@@ -172,6 +186,7 @@ export function Sidebar() {
                 key={item.to}
                 to={item.to}
                 end={item.to === '/admin'}
+                onClick={() => onClose?.()}
                 className={({ isActive }) =>
                   `flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold transition ${
                     isActive ? 'bg-sejong-light text-sejong' : 'text-ink hover:bg-surface'

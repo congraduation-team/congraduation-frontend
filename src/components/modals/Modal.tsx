@@ -21,7 +21,7 @@ export function Modal({ open, onClose, title, subtitle, children, wide }: ModalP
         onClick={onClose}
       />
       <div
-        className={`relative z-10 w-full rounded-2xl bg-white p-7 shadow-xl ${
+        className={`relative z-10 max-h-[90dvh] w-full overflow-y-auto rounded-2xl bg-white p-5 shadow-xl md:p-7 ${
           wide ? 'max-w-xl' : 'max-w-md'
         }`}
         role="dialog"

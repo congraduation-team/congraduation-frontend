@@ -20,7 +20,7 @@ import {
   type PlannedSemester,
 } from '../api/types'
 import { DonutChart } from '../components/charts/DonutChart'
-import { Sidebar } from '../components/layout/Sidebar'
+import { AppShell } from '../components/layout/AppShell'
 import { MajorTrackSwitcher } from '../components/modals/MajorTrackSwitcher'
 import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
@@ -718,33 +718,30 @@ export function SimulationPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-surface">
-        <Sidebar />
-        <main className="flex-1 px-8 py-7">
+      <AppShell>
+        <main className="flex-1 px-4 py-5 md:px-8 md:py-7">
           <p className="py-20 text-center text-sm text-ink-muted">시뮬레이션을 준비하는 중...</p>
         </main>
-      </div>
+      </AppShell>
     )
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen bg-surface">
-        <Sidebar />
-        <main className="flex-1 px-8 py-7">
+      <AppShell>
+        <main className="flex-1 px-4 py-5 md:px-8 md:py-7">
           <p className="rounded-2xl bg-white p-8 text-center text-sm text-sejong">{error}</p>
         </main>
-      </div>
+      </AppShell>
     )
   }
 
   return (
-    <div className="flex min-h-screen bg-surface">
-      <Sidebar />
-      <main className="flex-1 overflow-auto px-8 py-7">
+    <AppShell>
+      <main className="flex-1 overflow-auto px-4 py-5 md:px-8 md:py-7">
         <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold text-ink">{displayName}님 미래 학기 계획</h1>
+            <h1 className="text-2xl font-bold text-ink md:text-3xl">{displayName}님 미래 학기 계획</h1>
             <div className="mt-3 flex flex-wrap gap-2">
               {student?.admissionYear && (
                 <span className="rounded-full bg-panel px-3 py-1 text-xs font-semibold text-ink-muted">
@@ -1218,6 +1215,6 @@ export function SimulationPage() {
           </div>
         </div>
       </main>
-    </div>
+    </AppShell>
   )
 }

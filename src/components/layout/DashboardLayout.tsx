@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { MajorTrackSwitcher } from '../modals/MajorTrackSwitcher'
-import { Sidebar } from './Sidebar'
+import { AppShell } from './AppShell'
 
 const tabs = [
   { to: '/dashboard', label: '졸업요건', end: true },
@@ -10,21 +10,20 @@ const tabs = [
 
 export function DashboardLayout() {
   return (
-    <div className="flex min-h-screen bg-surface">
-      <Sidebar />
-      <main className="flex-1 overflow-auto px-6 pb-12 pt-9 sm:px-8">
+    <AppShell>
+      <main className="flex-1 overflow-auto px-4 pb-10 pt-5 md:px-8 md:pb-12 md:pt-9">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h1 className="text-3xl font-bold text-ink">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-ink md:text-3xl">Dashboard</h1>
           <MajorTrackSwitcher />
         </div>
-        <div className="mt-5 flex gap-8 border-b border-[#e5e5ea]">
+        <div className="mt-5 flex gap-6 overflow-x-auto border-b border-[#e5e5ea] md:gap-8">
           {tabs.map((tab) => (
             <NavLink
               key={tab.to}
               to={tab.to}
               end={tab.end}
               className={({ isActive }) =>
-                `pb-3 text-[15px] font-semibold transition ${
+                `shrink-0 pb-3 text-[15px] font-semibold transition ${
                   isActive
                     ? 'border-b-[3px] border-sejong text-sejong'
                     : 'border-b-[3px] border-transparent text-ink-muted hover:text-ink'
@@ -35,10 +34,10 @@ export function DashboardLayout() {
             </NavLink>
           ))}
         </div>
-        <div className="mt-9">
+        <div className="mt-7 md:mt-9">
           <Outlet />
         </div>
       </main>
-    </div>
+    </AppShell>
   )
 }

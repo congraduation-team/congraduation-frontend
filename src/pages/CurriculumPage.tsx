@@ -1,4 +1,4 @@
-﻿import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import {
   getAbeekEvaluation,
   getAbeekFullRoadmap,
@@ -17,7 +17,7 @@ import type {
   StudentRoadmapResponse,
 } from '../api/types'
 import { flattenRoadmapCourses, isAdminUser } from '../api/types'
-import { Sidebar } from '../components/layout/Sidebar'
+import { AppShell } from '../components/layout/AppShell'
 import { MajorTrackSwitcher } from '../components/modals/MajorTrackSwitcher'
 import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
@@ -1443,12 +1443,11 @@ export function CurriculumPage() {
       : `${departmentName || '학과'} 로드맵`
 
   return (
-    <div className="flex min-h-screen bg-surface">
-      <Sidebar />
-      <main className="flex-1 overflow-auto px-8 py-7">
+    <AppShell>
+      <main className="flex-1 overflow-auto px-4 py-5 md:px-8 md:py-7">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-4">
-            <h1 className="text-3xl font-bold text-ink">이수체계도</h1>
+            <h1 className="text-2xl font-bold text-ink md:text-3xl">이수체계도</h1>
             <MajorTrackSwitcher />
             <div className="flex overflow-hidden rounded-full border border-[#ddd] text-sm font-semibold">
               <button
@@ -1650,7 +1649,7 @@ export function CurriculumPage() {
                 onPointerUp={endPan}
                 onPointerCancel={endPan}
                 onDragStart={(e) => e.preventDefault()}
-                className={`relative h-[min(72vh,760px)] touch-none select-none overflow-auto overscroll-none ${
+                className={`relative h-[min(62vh,760px)] touch-none select-none overflow-auto overscroll-none md:h-[min(72vh,760px)] ${
                   panning ? 'cursor-grabbing' : 'cursor-grab'
                 }`}
               >
@@ -1821,7 +1820,7 @@ export function CurriculumPage() {
           )}
         </div>
       </main>
-    </div>
+    </AppShell>
   )
 }
 
