@@ -175,6 +175,7 @@ export function EngineeringPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [majorOpen, setMajorOpen] = useState(false)
+  const [viewAbeekAnyway, setViewAbeekAnyway] = useState(false)
   const [listModal, setListModal] = useState<{
     title: string
     subtitle?: string
@@ -184,11 +185,6 @@ export function EngineeringPage() {
 
   useEffect(() => {
     if (!student) return
-    if (isDoubleMajorStudent(student)) {
-      setLoading(false)
-      setError(null)
-      return
-    }
     let cancelled = false
 
     ;(async () => {
@@ -442,20 +438,30 @@ export function EngineeringPage() {
       ? '인증필수'
       : '전문교양'
 
-  if (isDoubleMajorStudent(student)) {
+  if (isDoubleMajorStudent(student) && !viewAbeekAnyway) {
     return (
-      <div className="rounded-2xl bg-white p-8 text-center shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-        <p className="text-base font-bold text-ink">공학인증 해당 없음</p>
-        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-          복수전공을 설정한 경우 공학인증(ABEEK) 요건은 적용되지 않습니다.
+      <div className="rounded-2xl bg-white px-6 py-10 text-center shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+        <p className="text-lg font-bold text-ink">복수전공 이수 시 공학인증은 필수가 아닙니다</p>
+        <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-ink-muted">
+          복수전공을 진행하면 공학인증(ABEEK) 요건을 채우지 않아도 졸업할 수 있습니다.
+          다만 공학인증을 따로 받고 싶다면 현황을 확인할 수 있습니다.
         </p>
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard')}
-          className="mt-5 rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white"
-        >
-          졸업요건으로 이동
-        </button>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="rounded-full border border-[#e5e7eb] bg-white px-5 py-2 text-sm font-semibold text-ink hover:bg-panel"
+          >
+            졸업요건으로 이동
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewAbeekAnyway(true)}
+            className="rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white hover:bg-sejong-dark"
+          >
+            공학인증 현황 보기
+          </button>
+        </div>
       </div>
     )
   }

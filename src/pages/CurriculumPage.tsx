@@ -21,7 +21,6 @@ import { AppShell } from '../components/layout/AppShell'
 import { MajorTrackSwitcher } from '../components/modals/MajorTrackSwitcher'
 import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
-import { isDoubleMajorStudent } from '../utils/majorTrack'
 import { toNumber } from '../utils/number'
 
 function normalizeAlertKey(value?: string | null) {
@@ -806,7 +805,7 @@ export function CurriculumPage() {
   const dragRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
   zoomRef.current = zoom
 
-  const abeekTarget = generalRoadmap?.abeekTarget === true && !isDoubleMajorStudent(student)
+  const abeekTarget = generalRoadmap?.abeekTarget === true
   const abeekDepartmentCode =
     generalRoadmap?.abeekDepartmentCode ||
     student?.tracks?.find((t) => t.departmentCode === active?.department)?.departmentCode ||

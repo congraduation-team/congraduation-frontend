@@ -1,20 +1,14 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { MajorTrackSwitcher } from '../modals/MajorTrackSwitcher'
-import { useAuth } from '../../context/AuthContext'
-import { isDoubleMajorStudent } from '../../utils/majorTrack'
 import { AppShell } from './AppShell'
 
-const allTabs = [
+const tabs = [
   { to: '/dashboard', label: '졸업요건', end: true },
   { to: '/dashboard/engineering', label: '공학인증' },
   { to: '/dashboard/courses', label: '내 이수과목' },
 ]
 
 export function DashboardLayout() {
-  const { student } = useAuth()
-  const hideAbeek = isDoubleMajorStudent(student)
-  const tabs = hideAbeek ? allTabs.filter((tab) => tab.to !== '/dashboard/engineering') : allTabs
-
   return (
     <AppShell>
       <main className="flex-1 overflow-auto px-4 pb-10 pt-5 md:px-8 md:pb-12 md:pt-9">
