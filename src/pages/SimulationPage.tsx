@@ -753,11 +753,6 @@ export function SimulationPage() {
                   {active ? `${trackTypeLabel(active.trackType)} · ${majorLabel}` : majorLabel}
                 </span>
               )}
-              {lastCompletedLabel && (
-                <span className="rounded-full bg-panel px-3 py-1 text-xs font-semibold text-ink-muted">
-                  마지막 이수 {lastCompletedLabel}
-                </span>
-              )}
               <span className="rounded-full bg-sejong px-3 py-1 text-xs font-semibold text-white">
                 졸업 시뮬레이션
               </span>

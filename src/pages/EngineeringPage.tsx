@@ -22,6 +22,7 @@ import { CourseMiniList } from '../components/common/CourseMiniList'
 import { CourseListModal } from '../components/modals/CourseListModal'
 import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
+import { isDoubleMajorStudent } from '../utils/majorTrack'
 import type { Course } from '../data/mockData'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
 
@@ -183,6 +184,11 @@ export function EngineeringPage() {
 
   useEffect(() => {
     if (!student) return
+    if (isDoubleMajorStudent(student)) {
+      setLoading(false)
+      setError(null)
+      return
+    }
     let cancelled = false
 
     ;(async () => {
@@ -435,6 +441,24 @@ export function EngineeringPage() {
     (evaluation?.entranceYear ?? student?.admissionYear ?? 9999) >= 2022
       ? '인증필수'
       : '전문교양'
+
+  if (isDoubleMajorStudent(student)) {
+    return (
+      <div className="rounded-2xl bg-white p-8 text-center shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+        <p className="text-base font-bold text-ink">공학인증 해당 없음</p>
+        <p className="mt-2 text-sm leading-relaxed text-ink-muted">
+          복수전공을 설정한 경우 공학인증(ABEEK) 요건은 적용되지 않습니다.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard')}
+          className="mt-5 rounded-full bg-sejong px-5 py-2 text-sm font-semibold text-white"
+        >
+          졸업요건으로 이동
+        </button>
+      </div>
+    )
+  }
 
   if (loading) {
     return <div className="py-20 text-center text-sm text-ink-muted">공학인증을 불러오는 중...</div>

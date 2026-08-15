@@ -46,6 +46,19 @@ export function isGuidanceStatus(status?: string | null): boolean {
   return value === 'GUIDANCE' || value === 'MANUAL_CHECK_REQUIRED'
 }
 
+export function isDoubleMajorType(type?: MajorType | string | null): boolean {
+  return type === 'DOUBLE' || type === 'DOUBLE_MAJOR'
+}
+
+/** 복수전공 설정 학생은 공학인증 대상이 아님 */
+export function isDoubleMajorStudent(
+  student: Pick<StudentLoginResponse, 'majorType' | 'secondaryMajor' | 'tracks'> | null | undefined,
+): boolean {
+  if (!student) return false
+  if (isDoubleMajorType(student.majorType)) return true
+  return (student.tracks ?? []).some((track) => isDoubleMajorType(track.trackType))
+}
+
 export function trackTypeLabel(type?: MajorType | string | null): string {
   switch (type) {
     case 'SINGLE':
