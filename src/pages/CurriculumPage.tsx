@@ -760,12 +760,51 @@ function remainingRequiredSlotsFromProgress(
   return result
 }
 
+function normalizeDepartmentName(name?: string | null) {
+  return (name || '').replace(/\s+/g, '').toLowerCase()
+}
+
+function collectOwnDepartmentNames(
+  student?: {
+    major?: string | null
+    secondaryMajor?: string | null
+    tracks?: Array<{ departmentCode?: string }>
+  } | null,
+  extraDepartments?: Array<string | null | undefined>,
+) {
+  const names: string[] = []
+  const push = (name?: string | null) => {
+    const normalized = normalizeDepartmentName(name)
+    if (normalized && !names.includes(normalized)) names.push(normalized)
+  }
+  push(student?.major)
+  push(student?.secondaryMajor)
+  for (const track of student?.tracks ?? []) {
+    push(track.departmentCode)
+  }
+  for (const name of extraDepartments ?? []) {
+    push(name)
+  }
+  return names
+}
+
+function isOwnDepartmentRoadmap(
+  selectedDepartment?: string | null,
+  ownDepartments: string[] = [],
+) {
+  const selected = normalizeDepartmentName(selectedDepartment)
+  if (!selected) return ownDepartments.length > 0
+  return ownDepartments.includes(selected)
+}
+
 function flattenStudentRoadmapCourses(
   roadmap: StudentRoadmapResponse | null | undefined,
+  options?: { ignoreCompleted?: boolean },
 ): Array<{ course: StudentRoadmapCourse; termKey: string }> {
   if (!roadmap) return []
   const list: Array<{ course: StudentRoadmapCourse; termKey: string }> = []
   const seen = new Set<string>()
+  const ignoreCompleted = options?.ignoreCompleted === true
 
   for (const term of roadmap.terms ?? []) {
     const calendarTermKey = (term.termKey || '').trim()
@@ -778,13 +817,25 @@ function flattenStudentRoadmapCourses(
 
     for (const course of merged) {
       if (!course?.courseCode) continue
-      const termKey =
-        course.completed === true ? completedTermKey : calendarTermKey
+      const completed = !ignoreCompleted && course.completed === true
+      const termKey = completed ? completedTermKey : calendarTermKey
       if (!termKey) continue
       const key = `${termKey}:${course.courseCode}`
       if (seen.has(key)) continue
       seen.add(key)
-      list.push({ course, termKey })
+      list.push({
+        course: completed
+          ? course
+          : {
+              ...course,
+              completed: false,
+              takenYear: undefined,
+              takenSemester: undefined,
+              standingTermKey: undefined,
+              completedTermKey: undefined,
+            },
+        termKey,
+      })
     }
   }
   return list
@@ -849,7 +900,7 @@ function collectProgressTakenItems(
 
 export function CurriculumPage() {
   const { student } = useAuth()
-  const { active } = useMajorTrack()
+  const { active, majorTracksProgress } = useMajorTrack()
 
   const [viewKind, setViewKind] = useState<ViewKind>('general')
   const [departmentName, setDepartmentName] = useState(student?.major || '')
@@ -869,6 +920,16 @@ export function CurriculumPage() {
   const [zoom, setZoom] = useState(1)
   const [panning, setPanning] = useState(false)
   const [boardSize, setBoardSize] = useState({ w: BOARD_MIN_WIDTH, h: 600 })
+
+  const ownDepartments = useMemo(
+    () =>
+      collectOwnDepartmentNames(student, [
+        active?.department,
+        ...majorTracksProgress.map((track) => track.department),
+      ]),
+    [student, active?.department, majorTracksProgress],
+  )
+  const isOwnDepartment = isOwnDepartmentRoadmap(departmentName, ownDepartments)
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
@@ -1028,15 +1089,20 @@ export function CurriculumPage() {
       setError(null)
       try {
         let data: StudentRoadmapResponse
-        if (student?.id && (!departmentName || departmentName === student.major)) {
+        if (student?.id && isOwnDepartment) {
           try {
-            data = await getStudentRoadmapByStudent(student.id)
+            if (!departmentName || departmentName === student.major) {
+              data = await getStudentRoadmapByStudent(student.id)
+            } else {
+              data = await getStudentRoadmap(departmentName, student.id)
+            }
           } catch {
             if (!departmentName) throw new Error('학과 정보를 확인할 수 없습니다.')
             data = await getStudentRoadmap(departmentName, student.id)
           }
         } else if (departmentName) {
-          data = await getStudentRoadmap(departmentName, student?.id)
+          // 타학과: 본인 이수(공통교양·학문기초·전공)를 붙이지 않음
+          data = await getStudentRoadmap(departmentName)
         } else {
           throw new Error('학과를 선택해 주세요.')
         }
@@ -1064,7 +1130,7 @@ export function CurriculumPage() {
     return () => {
       cancelled = true
     }
-  }, [departmentName, student?.id, student?.major])
+  }, [departmentName, isOwnDepartment, student?.id, student?.major])
 
   // 공학인증 로드맵 (버튼으로 전환 시에만)
   useEffect(() => {
@@ -1119,7 +1185,10 @@ export function CurriculumPage() {
   const loading = viewKind === 'abeek' ? abeekLoading : generalLoading
 
   const abeekRawCourses = useMemo(() => flattenRoadmapCourses(abeekRoadmap), [abeekRoadmap])
-  const generalFlat = useMemo(() => flattenStudentRoadmapCourses(generalRoadmap), [generalRoadmap])
+  const generalFlat = useMemo(
+    () => flattenStudentRoadmapCourses(generalRoadmap, { ignoreCompleted: !isOwnDepartment }),
+    [generalRoadmap, isOwnDepartment],
+  )
 
   const edges = useMemo(
     () => [] as MapEdge[],
@@ -1127,8 +1196,10 @@ export function CurriculumPage() {
   )
 
   const allCourses = useMemo(() => {
-    const admissionYear = graduation?.admissionYear ?? student?.admissionYear
-    const progressTaken = collectProgressTakenItems(graduation)
+    const applyOwnProgress = isOwnDepartment
+    const progress = applyOwnProgress ? graduation : null
+    const admissionYear = progress?.admissionYear ?? student?.admissionYear
+    const progressTaken = collectProgressTakenItems(progress)
 
     const generalStandingByTaken = buildStandingByTakenOrder([
       ...generalFlat.map(({ course }) => ({
@@ -1167,7 +1238,7 @@ export function CurriculumPage() {
 
     const standingByTaken =
       viewKind === 'abeek' ? abeekStandingByTaken : generalStandingByTaken
-    const takenTermByCode = buildTakenTermMap(graduation, standingByTaken)
+    const takenTermByCode = buildTakenTermMap(progress, standingByTaken)
 
     // ABEEK 뷰용: 이수 과목 taken → 순번 보강
     for (const { course, termKey } of abeekTermItems) {
@@ -1277,7 +1348,7 @@ export function CurriculumPage() {
         .map((c) => c.id),
     )
     const liberalExtra = liberalCoursesFromProgress(
-      graduation,
+      progress,
       protectedCodes,
       takenTermByCode,
       generalStandingByTaken,
@@ -1302,13 +1373,13 @@ export function CurriculumPage() {
       byId.set(course.id, course)
     }
 
-    for (const course of remainingRequiredSlotsFromProgress(graduation, byId)) {
+    for (const course of remainingRequiredSlotsFromProgress(progress, byId)) {
       byId.set(course.id, course)
     }
 
     // progress에 명시된 분류만 확정. 매칭 실패 시 전공·학문기초는 유지
-    if (graduation) {
-      const index = buildProgressCategoryIndex(graduation)
+    if (progress) {
+      const index = buildProgressCategoryIndex(progress)
       for (const course of byId.values()) {
         if (!course.completed) continue
         const hit = mapCategoryFromProgressIndex(course.id, course.name, index)
@@ -1337,7 +1408,15 @@ export function CurriculumPage() {
       }
     }
     return [...byNameSem.values()]
-  }, [viewKind, abeekRawCourses, abeekRoadmap, generalFlat, graduation, student?.admissionYear])
+  }, [
+    viewKind,
+    abeekRawCourses,
+    abeekRoadmap,
+    generalFlat,
+    isOwnDepartment,
+    graduation,
+    student?.admissionYear,
+  ])
 
   const courseAlertIndex = useMemo(() => {
     const designCodes = new Set<string>()
@@ -1386,6 +1465,35 @@ export function CurriculumPage() {
   }, [allCourses, courseAlertIndex, viewKind])
 
   const activeRowDefs = viewKind === 'abeek' ? abeekRowDefs : generalRowDefs
+  const presentCategories = useMemo(() => {
+    const set = new Set<MapCategory>()
+    for (const course of allCoursesWithAlerts) {
+      if (!isSemesterKey(course.semester)) continue
+      set.add(course.category)
+    }
+    return set
+  }, [allCoursesWithAlerts])
+  const visibleRowDefs = useMemo(
+    () =>
+      activeRowDefs.filter((row) =>
+        row.categories.some((category) => presentCategories.has(category)),
+      ),
+    [activeRowDefs, presentCategories],
+  )
+
+  useEffect(() => {
+    if (!filter) return
+    if (filter === 'major') {
+      if (
+        !presentCategories.has('major-required') &&
+        !presentCategories.has('major-elective')
+      ) {
+        setFilter(null)
+      }
+      return
+    }
+    if (!presentCategories.has(filter as MapCategory)) setFilter(null)
+  }, [filter, presentCategories])
 
   const hasCompletionData = useMemo(
     () => allCoursesWithAlerts.some((c) => c.completed === true),
@@ -1481,7 +1589,7 @@ export function CurriculumPage() {
     const observer = new ResizeObserver(update)
     observer.observe(board)
     return () => observer.disconnect()
-  }, [loading, error, allCourses.length, courses, mode, filter, viewKind, departmentName])
+  }, [loading, error, allCourses.length, visibleRowDefs.length, courses, mode, filter, viewKind, departmentName])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -1595,67 +1703,85 @@ export function CurriculumPage() {
           <div className="flex flex-wrap items-center gap-2">
             {viewKind === 'abeek' ? (
               <>
-                <LegendPill
-                  active={filter === 'liberal'}
-                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-                  className="bg-[#64748b] text-white"
-                  label="전문교양"
-                />
-                <LegendPill
-                  active={filter === 'bsm'}
-                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-                  className="bg-[#0f766e] text-white"
-                  label="BSM(기초수학, 과학)"
-                />
+                {presentCategories.has('liberal') && (
+                  <LegendPill
+                    active={filter === 'liberal'}
+                    onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
+                    className="bg-[#64748b] text-white"
+                    label="전문교양"
+                  />
+                )}
+                {presentCategories.has('bsm') && (
+                  <LegendPill
+                    active={filter === 'bsm'}
+                    onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
+                    className="bg-[#0f766e] text-white"
+                    label="BSM(기초수학, 과학)"
+                  />
+                )}
               </>
             ) : (
               <>
-                <LegendPill
-                  active={filter === 'liberal'}
-                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-                  className="bg-[#64748b] text-white"
-                  label="교양"
-                />
-                <LegendPill
-                  active={filter === 'common'}
-                  onClick={() => setFilter(filter === 'common' ? null : 'common')}
-                  className="bg-[#0369a1] text-white"
-                  label="공통교양"
-                />
-                <LegendPill
-                  active={filter === 'bsm'}
-                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-                  className="bg-[#0f766e] text-white"
-                  label="학문기초"
-                />
-                <LegendPill
-                  active={filter === 'major-required'}
-                  onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
-                  className="border-2 border-sejong bg-white text-sejong"
-                  label="전공필수"
-                />
-                <LegendPill
-                  active={filter === 'major-elective'}
-                  onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
-                  className="bg-sejong-pink text-ink"
-                  label="전공선택"
-                />
+                {presentCategories.has('liberal') && (
+                  <LegendPill
+                    active={filter === 'liberal'}
+                    onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
+                    className="bg-[#64748b] text-white"
+                    label="교양"
+                  />
+                )}
+                {presentCategories.has('common') && (
+                  <LegendPill
+                    active={filter === 'common'}
+                    onClick={() => setFilter(filter === 'common' ? null : 'common')}
+                    className="bg-[#0369a1] text-white"
+                    label="공통교양"
+                  />
+                )}
+                {presentCategories.has('bsm') && (
+                  <LegendPill
+                    active={filter === 'bsm'}
+                    onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
+                    className="bg-[#0f766e] text-white"
+                    label="학문기초"
+                  />
+                )}
+                {presentCategories.has('major-required') && (
+                  <LegendPill
+                    active={filter === 'major-required'}
+                    onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
+                    className="border-2 border-sejong bg-white text-sejong"
+                    label="전공필수"
+                  />
+                )}
+                {presentCategories.has('major-elective') && (
+                  <LegendPill
+                    active={filter === 'major-elective'}
+                    onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
+                    className="bg-sejong-pink text-ink"
+                    label="전공선택"
+                  />
+                )}
               </>
             )}
             {viewKind === 'abeek' && (
               <>
-                <LegendPill
-                  active={filter === 'major-required'}
-                  onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
-                  className="border-2 border-sejong bg-white text-sejong"
-                  label="전공필수"
-                />
-                <LegendPill
-                  active={filter === 'major-elective'}
-                  onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
-                  className="bg-sejong-pink text-ink"
-                  label="전공선택"
-                />
+                {presentCategories.has('major-required') && (
+                  <LegendPill
+                    active={filter === 'major-required'}
+                    onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
+                    className="border-2 border-sejong bg-white text-sejong"
+                    label="전공필수"
+                  />
+                )}
+                {presentCategories.has('major-elective') && (
+                  <LegendPill
+                    active={filter === 'major-elective'}
+                    onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
+                    className="bg-sejong-pink text-ink"
+                    label="전공선택"
+                  />
+                )}
               </>
             )}
           </div>
@@ -1796,7 +1922,7 @@ export function CurriculumPage() {
                     ))}
                   </div>
 
-                  {activeRowDefs.map((row) => (
+                  {visibleRowDefs.map((row) => (
                     <div key={row.key} className={`relative z-10 mb-4 ${ROADMAP_GRID}`}>
                       <div className="flex w-[5.5rem] items-start justify-center pt-1">
                         <span
