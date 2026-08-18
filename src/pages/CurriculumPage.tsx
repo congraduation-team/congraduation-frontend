@@ -760,6 +760,50 @@ function remainingRequiredSlotsFromProgress(
   return result
 }
 
+function normalizeDepartmentName(name?: string | null) {
+  return (name || '').replace(/\s+/g, '').toLowerCase()
+}
+
+function collectOwnDepartmentNames(
+  student?: {
+    major?: string | null
+    secondaryMajor?: string | null
+    tracks?: Array<{ departmentCode?: string }>
+  } | null,
+  extraDepartments?: Array<string | null | undefined>,
+) {
+  const names: string[] = []
+  const push = (name?: string | null) => {
+    const normalized = normalizeDepartmentName(name)
+    if (normalized && !names.includes(normalized)) names.push(normalized)
+  }
+  push(student?.major)
+  push(student?.secondaryMajor)
+  for (const track of student?.tracks ?? []) {
+    push(track.departmentCode)
+  }
+  for (const name of extraDepartments ?? []) {
+    push(name)
+  }
+  return names
+}
+
+function isOwnDepartmentRoadmap(
+  selectedDepartment?: string | null,
+  ownDepartments: string[] = [],
+  roadmapDepartment?: string | null,
+) {
+  const selected = normalizeDepartmentName(selectedDepartment)
+  const roadmap = normalizeDepartmentName(roadmapDepartment)
+  const same = (a: string, b: string) => a === b || a.includes(b) || b.includes(a)
+  const matchesOwn = (name: string) => ownDepartments.some((own) => same(name, own))
+  if (ownDepartments.length === 0) return true
+  // 학과를 직접 고른 경우 그 선택만 본다. 이전 로드맵 학과명으로 본인 학과로 오인하지 않음
+  if (selected) return matchesOwn(selected)
+  if (roadmap) return matchesOwn(roadmap)
+  return true
+}
+
 function flattenStudentRoadmapCourses(
   roadmap: StudentRoadmapResponse | null | undefined,
 ): Array<{ course: StudentRoadmapCourse; termKey: string }> {
@@ -849,7 +893,7 @@ function collectProgressTakenItems(
 
 export function CurriculumPage() {
   const { student } = useAuth()
-  const { active } = useMajorTrack()
+  const { active, majorTracksProgress } = useMajorTrack()
 
   const [viewKind, setViewKind] = useState<ViewKind>('general')
   const [departmentName, setDepartmentName] = useState(student?.major || '')
@@ -1127,8 +1171,18 @@ export function CurriculumPage() {
   )
 
   const allCourses = useMemo(() => {
-    const admissionYear = graduation?.admissionYear ?? student?.admissionYear
-    const progressTaken = collectProgressTakenItems(graduation)
+    const ownDepartments = collectOwnDepartmentNames(student, [
+      active?.department,
+      ...majorTracksProgress.map((track) => track.department),
+    ])
+    const applyOwnProgress = isOwnDepartmentRoadmap(
+      departmentName,
+      ownDepartments,
+      generalRoadmap?.departmentName,
+    )
+    const progress = applyOwnProgress ? graduation : null
+    const admissionYear = progress?.admissionYear ?? student?.admissionYear
+    const progressTaken = collectProgressTakenItems(progress)
 
     const generalStandingByTaken = buildStandingByTakenOrder([
       ...generalFlat.map(({ course }) => ({
@@ -1167,7 +1221,7 @@ export function CurriculumPage() {
 
     const standingByTaken =
       viewKind === 'abeek' ? abeekStandingByTaken : generalStandingByTaken
-    const takenTermByCode = buildTakenTermMap(graduation, standingByTaken)
+    const takenTermByCode = buildTakenTermMap(progress, standingByTaken)
 
     // ABEEK 뷰용: 이수 과목 taken → 순번 보강
     for (const { course, termKey } of abeekTermItems) {
@@ -1277,7 +1331,7 @@ export function CurriculumPage() {
         .map((c) => c.id),
     )
     const liberalExtra = liberalCoursesFromProgress(
-      graduation,
+      progress,
       protectedCodes,
       takenTermByCode,
       generalStandingByTaken,
@@ -1302,13 +1356,13 @@ export function CurriculumPage() {
       byId.set(course.id, course)
     }
 
-    for (const course of remainingRequiredSlotsFromProgress(graduation, byId)) {
+    for (const course of remainingRequiredSlotsFromProgress(progress, byId)) {
       byId.set(course.id, course)
     }
 
     // progress에 명시된 분류만 확정. 매칭 실패 시 전공·학문기초는 유지
-    if (graduation) {
-      const index = buildProgressCategoryIndex(graduation)
+    if (progress) {
+      const index = buildProgressCategoryIndex(progress)
       for (const course of byId.values()) {
         if (!course.completed) continue
         const hit = mapCategoryFromProgressIndex(course.id, course.name, index)
@@ -1337,7 +1391,21 @@ export function CurriculumPage() {
       }
     }
     return [...byNameSem.values()]
-  }, [viewKind, abeekRawCourses, abeekRoadmap, generalFlat, graduation, student?.admissionYear])
+  }, [
+    viewKind,
+    abeekRawCourses,
+    abeekRoadmap,
+    generalFlat,
+    generalRoadmap?.departmentName,
+    graduation,
+    student?.admissionYear,
+    student?.major,
+    student?.secondaryMajor,
+    student?.tracks,
+    active?.department,
+    majorTracksProgress,
+    departmentName,
+  ])
 
   const courseAlertIndex = useMemo(() => {
     const designCodes = new Set<string>()
