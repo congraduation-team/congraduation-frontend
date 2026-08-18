@@ -102,7 +102,7 @@ export function AdminStatsPage() {
             <p className="text-xs font-semibold tracking-wide text-sejong">ADMIN</p>
             <h1 className="mt-1 text-2xl font-extrabold text-ink">사이트 통계</h1>
             <p className="mt-2 text-sm text-ink-muted">
-              {student?.name}님 · 로그인 방문자와 기이수 실사용자를 확인합니다.
+              {student?.name}님 · 로그인 방문자를 확인합니다.
             </p>
           </div>
           <button
@@ -127,7 +127,7 @@ export function AdminStatsPage() {
           </div>
         ) : stats ? (
           <>
-            <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <MetricCard
                 label="오늘 로그인 방문자"
                 value={stats.todayVisitors}
@@ -143,14 +143,8 @@ export function AdminStatsPage() {
               <MetricCard
                 label="누적 로그인 방문자"
                 value={stats.totalVisitors}
-                hint={`타임존 ${stats.timezone}`}
+                hint="출시일 기준"
                 accent="bg-ink"
-              />
-              <MetricCard
-                label="기이수 실사용자"
-                value={stats.transcriptUsers}
-                hint="성적표를 업로드한 서로 다른 학생"
-                accent="bg-bsm"
               />
             </div>
 
