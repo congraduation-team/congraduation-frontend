@@ -35,10 +35,10 @@ export function login(userId: string, password: string) {
   })
 }
 
-export function logout(init?: RequestInit) {
+/** POST /api/auth/logout — 204 성공, 이미 무효화된 토큰도 204 */
+export function logout() {
   return apiJson<void>('/api/auth/logout', {
     method: 'POST',
-    ...init,
   })
 }
 

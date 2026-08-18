@@ -20,7 +20,7 @@ const ACTIVE_MAJOR_TRACK_KEY = 'congraduation.activeMajorTrack'
 type AuthContextValue = {
   student: StudentLoginResponse | null
   setStudent: (student: StudentLoginResponse | null) => void
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -66,16 +66,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAuthToken()
   }, [])
 
-  const logout = useCallback(() => {
-    const authorization = getAuthorizationValue()
-    setStudent(null)
-    if (!authorization) return
-
-    void logoutRequest({
-      headers: { Authorization: authorization },
-    }).catch(() => {
-      // 서버 무효화 실패와 관계없이 로컬 세션은 종료한다.
-    })
+  const logout = useCallback(async () => {
+    try {
+      if (getAuthorizationValue()) {
+        await logoutRequest()
+      }
+    } catch {
+      /* 서버 무효화 실패와 관계없이 로컬 세션은 종료한다. */
+    } finally {
+      setStudent(null)
+    }
   }, [setStudent])
 
   const value = useMemo(() => ({ student, setStudent, logout }), [student, setStudent, logout])
