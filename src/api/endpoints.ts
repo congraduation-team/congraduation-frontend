@@ -371,7 +371,7 @@ export function getSiteStatsSummary() {
   return apiJson<SiteStatsSummary>('/api/stats/summary')
 }
 
-/** 페이지 진입 방문 기록 (visitorKey 또는 studentId) */
+/** 로그인 후 방문 기록 (studentId 필수) */
 export function recordSiteVisit(body: RecordVisitRequest) {
   return apiJson<RecordVisitResponse>('/api/stats/visit', {
     method: 'POST',

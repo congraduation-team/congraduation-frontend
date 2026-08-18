@@ -2,18 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError } from '../api/client'
 import { getSiteStatsSummary } from '../api/endpoints'
 import type { SiteStatsSummary } from '../api/types'
-import { ShareDonut } from '../components/charts/ShareDonut'
 import { StatBarChart } from '../components/charts/StatBarChart'
+import { StatColumnChart } from '../components/charts/StatColumnChart'
 import { AppShell } from '../components/layout/AppShell'
 import { useAuth } from '../context/AuthContext'
 
 function formatCount(n: number) {
   return n.toLocaleString('ko-KR')
-}
-
-function formatPercent(value: number, total: number) {
-  if (total <= 0) return '0%'
-  return `${((value / total) * 100).toFixed(1)}%`
 }
 
 type MetricCardProps = {
@@ -68,9 +63,14 @@ export function AdminStatsPage() {
     ]
   }, [stats])
 
-  const uploadShare = stats
-    ? formatPercent(stats.transcriptUsers, stats.totalVisitors)
-    : '0%'
+  const visitorColumnItems = useMemo(() => {
+    if (!stats) return []
+    return [
+      { label: '오늘', value: stats.todayVisitors, color: '#c8012e' },
+      { label: '이번 달', value: stats.monthlyVisitors, color: '#e35a74' },
+      { label: '누적', value: stats.totalVisitors, color: '#1a2b3c' },
+    ]
+  }, [stats])
 
   return (
     <AppShell>
@@ -80,7 +80,7 @@ export function AdminStatsPage() {
             <p className="text-xs font-semibold tracking-wide text-sejong">ADMIN</p>
             <h1 className="mt-1 text-2xl font-extrabold text-ink">사이트 통계</h1>
             <p className="mt-2 text-sm text-ink-muted">
-              {student?.name}님 · 순 방문자와 기이수 실사용자를 확인합니다.
+              {student?.name}님 · 로그인 방문자와 기이수 실사용자를 확인합니다.
             </p>
           </div>
           <button
@@ -107,19 +107,19 @@ export function AdminStatsPage() {
           <>
             <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard
-                label="오늘 순 방문자"
+                label="오늘 로그인 방문자"
                 value={stats.todayVisitors}
                 hint={`기준일 ${stats.today}`}
                 accent="bg-sejong"
               />
               <MetricCard
-                label="이번 달 순 방문자"
+                label="이번 달 로그인 방문자"
                 value={stats.monthlyVisitors}
                 hint={`${stats.monthStart} ~ ${stats.today}`}
                 accent="bg-[#e35a74]"
               />
               <MetricCard
-                label="누적 순 방문자"
+                label="누적 로그인 방문자"
                 value={stats.totalVisitors}
                 hint={`타임존 ${stats.timezone}`}
                 accent="bg-ink"
@@ -136,7 +136,7 @@ export function AdminStatsPage() {
               <section className="rounded-2xl bg-white p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <h2 className="text-base font-bold text-ink">지표 비교</h2>
                 <p className="mt-1 text-sm text-ink-muted">
-                  당일 · 월간 · 누적 방문자와 기이수 실사용자 규모
+                  로그인 방문자(당일 · 월간 · 누적)와 기이수 실사용자 규모
                 </p>
                 <div className="mt-6">
                   <StatBarChart items={barItems} />
@@ -144,29 +144,24 @@ export function AdminStatsPage() {
               </section>
 
               <section className="rounded-2xl bg-white p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <h2 className="text-base font-bold text-ink">기이수 전환율</h2>
+                <h2 className="text-base font-bold text-ink">로그인 방문자</h2>
                 <p className="mt-1 text-sm text-ink-muted">
-                  누적 방문자 대비 기이수 업로드 학생 비율
+                  이번 달 {formatCount(stats.monthlyVisitors)}명 · {stats.monthStart} ~ {stats.today}
                 </p>
-                <div className="mt-8 flex flex-col items-center">
-                  <ShareDonut
-                    value={stats.transcriptUsers}
-                    total={stats.totalVisitors}
-                    centerLabel={uploadShare}
-                    centerSub="전환율"
-                  />
-                  <dl className="mt-8 w-full space-y-3 text-sm">
-                    <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-2.5">
-                      <dt className="text-ink-muted">누적 방문자</dt>
-                      <dd className="font-bold text-ink">{formatCount(stats.totalVisitors)}</dd>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-2.5">
-                      <dt className="text-ink-muted">기이수 실사용자</dt>
-                      <dd className="font-bold text-ink">{formatCount(stats.transcriptUsers)}</dd>
-                    </div>
+                <div className="mt-6 flex flex-col items-center">
+                  <StatColumnChart items={visitorColumnItems} />
+                  <dl className="mt-6 w-full space-y-3 text-sm">
                     <div className="flex items-center justify-between rounded-lg bg-sejong-light px-3 py-2.5">
-                      <dt className="text-sejong">오늘 방문자</dt>
-                      <dd className="font-bold text-sejong">{formatCount(stats.todayVisitors)}</dd>
+                      <dt className="text-sejong">이번 달 로그인 방문자</dt>
+                      <dd className="font-bold text-sejong">{formatCount(stats.monthlyVisitors)}</dd>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-2.5">
+                      <dt className="text-ink-muted">오늘 로그인 방문자</dt>
+                      <dd className="font-bold text-ink">{formatCount(stats.todayVisitors)}</dd>
+                    </div>
+                    <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-2.5">
+                      <dt className="text-ink-muted">누적 로그인 방문자</dt>
+                      <dd className="font-bold text-ink">{formatCount(stats.totalVisitors)}</dd>
                     </div>
                   </dl>
                 </div>
@@ -174,9 +169,9 @@ export function AdminStatsPage() {
             </div>
 
             <p className="mt-6 text-xs text-ink-faint">
-              방문은 visitorKey(브라우저) 또는 studentId 기준이며, 같은 키는 하루 1회만 순
-              방문으로 집계됩니다. 배포 직후 방문 테이블이 비어 있으면 방문자 수는 0부터
-              쌓입니다.
+              로그인한 학생(studentId)만 방문으로 집계됩니다. 같은 학생은 하루 1회만 순 방문으로
+              기록되며, 로그인 API에서도 자동으로 기록됩니다. 익명 방문은 통계에 포함되지
+              않습니다.
             </p>
           </>
         ) : null}
