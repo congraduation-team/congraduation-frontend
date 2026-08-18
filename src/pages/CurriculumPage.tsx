@@ -1465,6 +1465,32 @@ export function CurriculumPage() {
   }, [allCourses, courseAlertIndex, viewKind])
 
   const activeRowDefs = viewKind === 'abeek' ? abeekRowDefs : generalRowDefs
+  const presentCategories = useMemo(() => {
+    const set = new Set<MapCategory>()
+    for (const course of allCoursesWithAlerts) set.add(course.category)
+    return set
+  }, [allCoursesWithAlerts])
+  const visibleRowDefs = useMemo(
+    () =>
+      activeRowDefs.filter((row) =>
+        row.categories.some((category) => presentCategories.has(category)),
+      ),
+    [activeRowDefs, presentCategories],
+  )
+
+  useEffect(() => {
+    if (!filter) return
+    if (filter === 'major') {
+      if (
+        !presentCategories.has('major-required') &&
+        !presentCategories.has('major-elective')
+      ) {
+        setFilter(null)
+      }
+      return
+    }
+    if (!presentCategories.has(filter as MapCategory)) setFilter(null)
+  }, [filter, presentCategories])
 
   const hasCompletionData = useMemo(
     () => allCoursesWithAlerts.some((c) => c.completed === true),
@@ -1560,7 +1586,7 @@ export function CurriculumPage() {
     const observer = new ResizeObserver(update)
     observer.observe(board)
     return () => observer.disconnect()
-  }, [loading, error, allCourses.length, courses, mode, filter, viewKind, departmentName])
+  }, [loading, error, allCourses.length, visibleRowDefs.length, courses, mode, filter, viewKind, departmentName])
 
   useEffect(() => {
     const viewport = viewportRef.current
@@ -1674,67 +1700,85 @@ export function CurriculumPage() {
           <div className="flex flex-wrap items-center gap-2">
             {viewKind === 'abeek' ? (
               <>
-                <LegendPill
-                  active={filter === 'liberal'}
-                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-                  className="bg-[#64748b] text-white"
-                  label="전문교양"
-                />
-                <LegendPill
-                  active={filter === 'bsm'}
-                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-                  className="bg-[#0f766e] text-white"
-                  label="BSM(기초수학, 과학)"
-                />
+                {presentCategories.has('liberal') && (
+                  <LegendPill
+                    active={filter === 'liberal'}
+                    onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
+                    className="bg-[#64748b] text-white"
+                    label="전문교양"
+                  />
+                )}
+                {presentCategories.has('bsm') && (
+                  <LegendPill
+                    active={filter === 'bsm'}
+                    onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
+                    className="bg-[#0f766e] text-white"
+                    label="BSM(기초수학, 과학)"
+                  />
+                )}
               </>
             ) : (
               <>
-                <LegendPill
-                  active={filter === 'liberal'}
-                  onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
-                  className="bg-[#64748b] text-white"
-                  label="교양"
-                />
-                <LegendPill
-                  active={filter === 'common'}
-                  onClick={() => setFilter(filter === 'common' ? null : 'common')}
-                  className="bg-[#0369a1] text-white"
-                  label="공통교양"
-                />
-                <LegendPill
-                  active={filter === 'bsm'}
-                  onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
-                  className="bg-[#0f766e] text-white"
-                  label="학문기초"
-                />
-                <LegendPill
-                  active={filter === 'major-required'}
-                  onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
-                  className="border-2 border-sejong bg-white text-sejong"
-                  label="전공필수"
-                />
-                <LegendPill
-                  active={filter === 'major-elective'}
-                  onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
-                  className="bg-sejong-pink text-ink"
-                  label="전공선택"
-                />
+                {presentCategories.has('liberal') && (
+                  <LegendPill
+                    active={filter === 'liberal'}
+                    onClick={() => setFilter(filter === 'liberal' ? null : 'liberal')}
+                    className="bg-[#64748b] text-white"
+                    label="교양"
+                  />
+                )}
+                {presentCategories.has('common') && (
+                  <LegendPill
+                    active={filter === 'common'}
+                    onClick={() => setFilter(filter === 'common' ? null : 'common')}
+                    className="bg-[#0369a1] text-white"
+                    label="공통교양"
+                  />
+                )}
+                {presentCategories.has('bsm') && (
+                  <LegendPill
+                    active={filter === 'bsm'}
+                    onClick={() => setFilter(filter === 'bsm' ? null : 'bsm')}
+                    className="bg-[#0f766e] text-white"
+                    label="학문기초"
+                  />
+                )}
+                {presentCategories.has('major-required') && (
+                  <LegendPill
+                    active={filter === 'major-required'}
+                    onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
+                    className="border-2 border-sejong bg-white text-sejong"
+                    label="전공필수"
+                  />
+                )}
+                {presentCategories.has('major-elective') && (
+                  <LegendPill
+                    active={filter === 'major-elective'}
+                    onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
+                    className="bg-sejong-pink text-ink"
+                    label="전공선택"
+                  />
+                )}
               </>
             )}
             {viewKind === 'abeek' && (
               <>
-                <LegendPill
-                  active={filter === 'major-required'}
-                  onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
-                  className="border-2 border-sejong bg-white text-sejong"
-                  label="전공필수"
-                />
-                <LegendPill
-                  active={filter === 'major-elective'}
-                  onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
-                  className="bg-sejong-pink text-ink"
-                  label="전공선택"
-                />
+                {presentCategories.has('major-required') && (
+                  <LegendPill
+                    active={filter === 'major-required'}
+                    onClick={() => setFilter(filter === 'major-required' ? null : 'major-required')}
+                    className="border-2 border-sejong bg-white text-sejong"
+                    label="전공필수"
+                  />
+                )}
+                {presentCategories.has('major-elective') && (
+                  <LegendPill
+                    active={filter === 'major-elective'}
+                    onClick={() => setFilter(filter === 'major-elective' ? null : 'major-elective')}
+                    className="bg-sejong-pink text-ink"
+                    label="전공선택"
+                  />
+                )}
               </>
             )}
           </div>
@@ -1875,7 +1919,7 @@ export function CurriculumPage() {
                     ))}
                   </div>
 
-                  {activeRowDefs.map((row) => (
+                  {visibleRowDefs.map((row) => (
                     <div key={row.key} className={`relative z-10 mb-4 ${ROADMAP_GRID}`}>
                       <div className="flex w-[5.5rem] items-start justify-center pt-1">
                         <span
