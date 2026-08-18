@@ -155,7 +155,7 @@ export function AdminStatsPage() {
               />
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+            <div className="flex flex-col gap-4">
               <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <h2 className="text-base font-bold text-ink">월별 로그인 방문자</h2>
                 <p className="mt-1 text-sm text-ink-muted">
@@ -171,11 +171,11 @@ export function AdminStatsPage() {
                 )}
               </section>
 
-              <section className="rounded-2xl bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <h2 className="text-sm font-bold text-ink">지표 비교</h2>
-                <p className="mt-1 text-xs text-ink-muted">당일 · 월 · 누적 · 기이수</p>
-                <div className="mt-3">
-                  <StatBarChart items={barItems} height={148} />
+              <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <h2 className="text-base font-bold text-ink">지표 비교</h2>
+                <p className="mt-1 text-sm text-ink-muted">당일 · 월 · 누적 · 기이수</p>
+                <div className="mt-4">
+                  <StatBarChart items={barItems} height={220} orientation="vertical" />
                 </div>
               </section>
             </div>
