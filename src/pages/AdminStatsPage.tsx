@@ -155,7 +155,7 @@ export function AdminStatsPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
               <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <h2 className="text-base font-bold text-ink">월별 로그인 방문자</h2>
                 <p className="mt-1 text-sm text-ink-muted">
