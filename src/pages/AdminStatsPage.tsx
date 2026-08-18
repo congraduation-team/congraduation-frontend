@@ -154,13 +154,13 @@ export function AdminStatsPage() {
               />
             </div>
 
-            <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
-              <section className="flex min-h-[380px] flex-col rounded-2xl bg-white px-5 pb-3 pt-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.85fr)]">
+              <section className="rounded-2xl bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <h2 className="text-lg font-bold text-ink">월별 로그인 방문자</h2>
-                <p className="mt-1 text-sm text-ink-muted">
+                <p className="mt-0.5 text-sm text-ink-muted">
                   최근 6개월 · 이번 달 {formatCount(stats.monthlyVisitors)}명
                 </p>
-                <div className="mt-3 min-h-0 flex-1">
+                <div className="mt-2">
                   <StatLineChart items={monthlyLineItems} />
                 </div>
                 {!hasMonthlySeries && (
@@ -170,10 +170,10 @@ export function AdminStatsPage() {
                 )}
               </section>
 
-              <section className="flex min-h-[380px] flex-col rounded-2xl bg-white px-5 pb-3 pt-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+              <section className="rounded-2xl bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <h2 className="text-lg font-bold text-ink">지표 비교</h2>
-                <p className="mt-1 text-sm text-ink-muted">오늘 · 이번 달 · 누적 로그인 방문자</p>
-                <div className="mt-3 min-h-0 flex-1">
+                <p className="mt-0.5 text-sm text-ink-muted">오늘 · 이번 달 · 누적 로그인 방문자</p>
+                <div className="mt-2">
                   <StatBarChart items={barItems} orientation="vertical" />
                 </div>
               </section>

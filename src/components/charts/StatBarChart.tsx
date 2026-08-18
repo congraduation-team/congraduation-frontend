@@ -18,7 +18,7 @@ function formatCount(n: number) {
 /** 막대 비교 차트 (의존성 없이 SVG) */
 export function StatBarChart({
   items,
-  height = 360,
+  height = 220,
   orientation = 'horizontal',
   className = '',
 }: StatBarChartProps) {
@@ -91,7 +91,7 @@ function VerticalBars({
   className: string
 }) {
   const max = Math.max(...items.map((i) => i.value), 1)
-  const pad = { top: 36, right: 12, bottom: 28, left: 52 }
+  const pad = { top: 24, right: 8, bottom: 24, left: 44 }
   const width = 640
   const innerW = width - pad.left - pad.right
   const innerH = height - pad.top - pad.bottom
@@ -104,8 +104,7 @@ function VerticalBars({
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="xMidYMax meet"
-      className={`h-full w-full ${className}`.trim()}
+      className={`h-auto w-full ${className}`.trim()}
       role="img"
       aria-label="로그인 방문자 지표 비교 막대 차트"
     >

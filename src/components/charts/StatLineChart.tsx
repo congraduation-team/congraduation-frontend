@@ -14,9 +14,9 @@ function formatCount(n: number) {
 }
 
 /** 기간별 방문자 꺾은선 (의존성 없이 SVG) */
-export function StatLineChart({ items, height = 360, className = '' }: StatLineChartProps) {
+export function StatLineChart({ items, height = 220, className = '' }: StatLineChartProps) {
   const max = Math.max(...items.map((i) => i.value), 1)
-  const pad = { top: 36, right: 12, bottom: 28, left: 52 }
+  const pad = { top: 24, right: 8, bottom: 24, left: 44 }
   const width = 640
   const innerW = width - pad.left - pad.right
   const innerH = height - pad.top - pad.bottom
@@ -44,8 +44,7 @@ export function StatLineChart({ items, height = 360, className = '' }: StatLineC
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      preserveAspectRatio="xMidYMax meet"
-      className={`h-full w-full ${className}`.trim()}
+      className={`h-auto w-full ${className}`.trim()}
       role="img"
       aria-label="최근 6개월 로그인 방문자 꺾은선 차트"
     >
