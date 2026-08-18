@@ -148,8 +148,8 @@ export function AdminStatsPage() {
               />
             </div>
 
-            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.85fr)]">
-              <section className="rounded-2xl bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+            <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(280px,0.85fr)]">
+              <section className="flex h-full flex-col rounded-2xl bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <h2 className="text-lg font-bold text-ink">월별 로그인 방문자</h2>
                 <p className="mt-0.5 text-sm text-ink-muted">
                   최근 6개월 · 이번 달 {formatCount(stats.monthlyVisitors)}명
@@ -157,21 +157,25 @@ export function AdminStatsPage() {
                 <div className="mt-2">
                   <StatLineChart items={monthlyLineItems} />
                 </div>
-                {!hasMonthlySeries && (
-                  <p className="mt-1 text-[11px] leading-snug text-ink-faint">
-                    월별 시계열이 없으면 이번 달만 표시되고, 이전 달은 0으로 둡니다.
-                  </p>
-                )}
               </section>
 
-              <section className="rounded-2xl bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+              <section className="flex h-full flex-col rounded-2xl bg-white px-4 py-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <h2 className="text-lg font-bold text-ink">지표 비교</h2>
                 <p className="mt-0.5 text-sm text-ink-muted">오늘 · 이번 달 · 누적 로그인 방문자</p>
-                <div className="mt-2">
-                  <StatBarChart items={barItems} orientation="vertical" />
+                <div className="relative mt-2 min-h-[200px] flex-1">
+                  <StatBarChart
+                    className="absolute inset-0 h-full w-full"
+                    items={barItems}
+                    orientation="vertical"
+                  />
                 </div>
               </section>
             </div>
+            {!hasMonthlySeries && (
+              <p className="mt-2 text-[11px] leading-snug text-ink-faint">
+                월별 시계열이 없으면 이번 달만 표시되고, 이전 달은 0으로 둡니다.
+              </p>
+            )}
 
             <p className="mt-6 text-xs text-ink-faint">
               로그인한 학생(studentId)만 방문으로 집계됩니다. 같은 학생은 하루 1회만 순 방문으로

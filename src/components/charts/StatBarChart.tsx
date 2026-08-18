@@ -104,7 +104,8 @@ function VerticalBars({
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className={`h-auto w-full ${className}`.trim()}
+      preserveAspectRatio="none"
+      className={`h-full w-full ${className}`.trim()}
       role="img"
       aria-label="로그인 방문자 지표 비교 막대 차트"
     >
