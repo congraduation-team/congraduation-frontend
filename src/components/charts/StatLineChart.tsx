@@ -6,6 +6,7 @@ type LinePoint = {
 type StatLineChartProps = {
   items: LinePoint[]
   height?: number
+  className?: string
 }
 
 function formatCount(n: number) {
@@ -13,9 +14,9 @@ function formatCount(n: number) {
 }
 
 /** 기간별 방문자 꺾은선 (의존성 없이 SVG) */
-export function StatLineChart({ items, height = 260 }: StatLineChartProps) {
+export function StatLineChart({ items, height = 360, className = '' }: StatLineChartProps) {
   const max = Math.max(...items.map((i) => i.value), 1)
-  const pad = { top: 28, right: 16, bottom: 36, left: 44 }
+  const pad = { top: 36, right: 12, bottom: 28, left: 52 }
   const width = 640
   const innerW = width - pad.left - pad.right
   const innerH = height - pad.top - pad.bottom
@@ -43,7 +44,8 @@ export function StatLineChart({ items, height = 260 }: StatLineChartProps) {
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="h-auto w-full"
+      preserveAspectRatio="xMidYMax meet"
+      className={`h-full w-full ${className}`.trim()}
       role="img"
       aria-label="최근 6개월 로그인 방문자 꺾은선 차트"
     >
@@ -62,11 +64,11 @@ export function StatLineChart({ items, height = 260 }: StatLineChartProps) {
               strokeWidth={1}
             />
             <text
-              x={pad.left - 8}
+              x={pad.left - 10}
               y={y}
               textAnchor="end"
               dominantBaseline="middle"
-              className="fill-ink-faint text-[10px]"
+              className="fill-ink-faint text-[13px] font-medium"
             >
               {formatCount(tick)}
             </text>
@@ -86,21 +88,21 @@ export function StatLineChart({ items, height = 260 }: StatLineChartProps) {
       )}
       {points.map((p) => (
         <g key={p.label}>
-          <circle cx={p.x} cy={p.y} r={4.5} fill="#c8012e" />
-          <circle cx={p.x} cy={p.y} r={2} fill="white" />
+          <circle cx={p.x} cy={p.y} r={5} fill="#c8012e" />
+          <circle cx={p.x} cy={p.y} r={2.2} fill="white" />
           <text
             x={p.x}
-            y={p.y - 12}
+            y={p.y - 14}
             textAnchor="middle"
-            className="fill-ink text-[11px] font-bold"
+            className="fill-ink text-[14px] font-bold"
           >
             {formatCount(p.value)}
           </text>
           <text
             x={p.x}
-            y={height - 12}
+            y={height - 6}
             textAnchor="middle"
-            className="fill-ink-muted text-[12px] font-semibold"
+            className="fill-ink-muted text-[14px] font-semibold"
           >
             {p.label}
           </text>

@@ -8,6 +8,7 @@ type StatBarChartProps = {
   items: BarItem[]
   height?: number
   orientation?: 'horizontal' | 'vertical'
+  className?: string
 }
 
 function formatCount(n: number) {
@@ -17,11 +18,12 @@ function formatCount(n: number) {
 /** 막대 비교 차트 (의존성 없이 SVG) */
 export function StatBarChart({
   items,
-  height = 200,
+  height = 360,
   orientation = 'horizontal',
+  className = '',
 }: StatBarChartProps) {
   if (orientation === 'vertical') {
-    return <VerticalBars items={items} height={height} />
+    return <VerticalBars items={items} height={height} className={className} />
   }
   return <HorizontalBars items={items} height={height} />
 }
@@ -79,22 +81,31 @@ function HorizontalBars({ items, height }: { items: BarItem[]; height: number })
   )
 }
 
-function VerticalBars({ items, height }: { items: BarItem[]; height: number }) {
+function VerticalBars({
+  items,
+  height,
+  className,
+}: {
+  items: BarItem[]
+  height: number
+  className: string
+}) {
   const max = Math.max(...items.map((i) => i.value), 1)
-  const pad = { top: 28, right: 16, bottom: 36, left: 44 }
+  const pad = { top: 36, right: 12, bottom: 28, left: 52 }
   const width = 640
   const innerW = width - pad.left - pad.right
   const innerH = height - pad.top - pad.bottom
   const yTicks = 4
-  const colGap = 40
-  const colW = Math.min(48, Math.max(28, (innerW - colGap * (items.length - 1)) / items.length))
+  const colGap = 36
+  const colW = Math.min(56, Math.max(36, (innerW - colGap * (items.length - 1)) / items.length))
   const groupW = items.length * colW + Math.max(0, items.length - 1) * colGap
   const startX = pad.left + (innerW - groupW) / 2
 
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="h-auto w-full"
+      preserveAspectRatio="xMidYMax meet"
+      className={`h-full w-full ${className}`.trim()}
       role="img"
       aria-label="로그인 방문자 지표 비교 막대 차트"
     >
@@ -113,11 +124,11 @@ function VerticalBars({ items, height }: { items: BarItem[]; height: number }) {
               strokeWidth={1}
             />
             <text
-              x={pad.left - 8}
+              x={pad.left - 10}
               y={y}
               textAnchor="end"
               dominantBaseline="middle"
-              className="fill-ink-faint text-[10px]"
+              className="fill-ink-faint text-[13px] font-medium"
             >
               {formatCount(tick)}
             </text>
@@ -132,9 +143,9 @@ function VerticalBars({ items, height }: { items: BarItem[]; height: number }) {
           <g key={item.label}>
             <text
               x={x + colW / 2}
-              y={y - 10}
+              y={y - 12}
               textAnchor="middle"
-              className="fill-ink text-[11px] font-bold"
+              className="fill-ink text-[14px] font-bold"
             >
               {formatCount(item.value)}
             </text>
@@ -148,9 +159,9 @@ function VerticalBars({ items, height }: { items: BarItem[]; height: number }) {
             />
             <text
               x={x + colW / 2}
-              y={height - 12}
+              y={height - 6}
               textAnchor="middle"
-              className="fill-ink-muted text-[12px] font-semibold"
+              className="fill-ink-muted text-[14px] font-semibold"
             >
               {item.label}
             </text>

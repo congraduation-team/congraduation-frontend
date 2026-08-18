@@ -154,27 +154,27 @@ export function AdminStatsPage() {
               />
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
-              <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <h2 className="text-base font-bold text-ink">월별 로그인 방문자</h2>
+            <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(320px,1fr)]">
+              <section className="flex min-h-[380px] flex-col rounded-2xl bg-white px-5 pb-3 pt-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <h2 className="text-lg font-bold text-ink">월별 로그인 방문자</h2>
                 <p className="mt-1 text-sm text-ink-muted">
                   최근 6개월 · 이번 달 {formatCount(stats.monthlyVisitors)}명
                 </p>
-                <div className="mt-4">
+                <div className="mt-3 min-h-0 flex-1">
                   <StatLineChart items={monthlyLineItems} />
                 </div>
                 {!hasMonthlySeries && (
-                  <p className="mt-3 text-xs text-ink-faint">
+                  <p className="mt-1 text-[11px] leading-snug text-ink-faint">
                     월별 시계열이 없으면 이번 달만 표시되고, 이전 달은 0으로 둡니다.
                   </p>
                 )}
               </section>
 
-              <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <h2 className="text-base font-bold text-ink">지표 비교</h2>
+              <section className="flex min-h-[380px] flex-col rounded-2xl bg-white px-5 pb-3 pt-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <h2 className="text-lg font-bold text-ink">지표 비교</h2>
                 <p className="mt-1 text-sm text-ink-muted">오늘 · 이번 달 · 누적 로그인 방문자</p>
-                <div className="mt-4">
-                  <StatBarChart items={barItems} height={260} orientation="vertical" />
+                <div className="mt-3 min-h-0 flex-1">
+                  <StatBarChart items={barItems} orientation="vertical" />
                 </div>
               </section>
             </div>
