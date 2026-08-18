@@ -254,6 +254,8 @@ export type GraduationProgressResponse = {
   electiveLiberalCredits?: CreditProgress
   balancedLiberalCredits?: CreditProgress
   academicFoundationCredits?: CreditProgress
+  /** 남은 학문기초 필수 과목 */
+  remainingAcademicFoundationRequiredCourses?: RequirementCourse[]
   majorFoundationCredits?: CreditProgress
   averageGradePoint?: string
   majorGradePoint?: string

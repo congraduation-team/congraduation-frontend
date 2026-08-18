@@ -688,6 +688,78 @@ function liberalCoursesFromProgress(
   return result
 }
 
+function recommendedCommonLiberalTerm(courseCode?: string) {
+  switch ((courseCode || '').trim()) {
+    case 'GEN_SEMINAR_B':
+    case 'GEN_MAJOR_EXPLORATION':
+    case 'GEN_PHILOSOPHY':
+    case 'GEN_UNIVERSE':
+    case 'GEN_UNI_ENG_READING_2021':
+    case 'GEN_WORLD_HISTORY_LEGACY':
+      return '1-2'
+    case 'GEN_STARTUP1':
+      return '2-1'
+    case 'GEN_CAREER_JOB':
+      return '3-1'
+    default:
+      return '1-1'
+  }
+}
+
+function remainingRequiredSlotsFromProgress(
+  progress: GraduationProgressResponse | null | undefined,
+  existing: Map<string, MapCourse>,
+): MapCourse[] {
+  if (!progress) return []
+  const existingNames = new Set(
+    [...existing.values()].map((course) => normalizeCourseName(course.name)),
+  )
+  const existingIds = new Set(existing.keys())
+  const result: MapCourse[] = []
+
+  const push = (
+    code: string | undefined,
+    name: string | undefined,
+    credit: string | number | undefined,
+    category: MapCategory,
+    term: string | undefined,
+  ) => {
+    const trimmedName = (name || '').trim()
+    if (!trimmedName) return
+    const nameKey = normalizeCourseName(trimmedName)
+    if (existingNames.has(nameKey)) return
+    const id = normalizeCourseCode(code || '') || `REQ-${category}-${nameKey}`
+    if (!id || existingIds.has(id)) return
+    const semester = isSemesterKey(term) ? term.trim() : '1-1'
+    existingNames.add(nameKey)
+    existingIds.add(id)
+    result.push({
+      id,
+      name: trimmedName,
+      hours: `${toNumber(credit)}학점`,
+      category,
+      semester,
+      completed: false,
+    })
+  }
+
+  for (const item of progress.remainingCommonLiberalRequiredCourses ?? []) {
+    const course = item.course
+    push(
+      course?.courseCode,
+      course?.courseName,
+      course?.credit,
+      'common',
+      recommendedCommonLiberalTerm(course?.courseCode),
+    )
+  }
+  for (const course of progress.remainingAcademicFoundationRequiredCourses ?? []) {
+    push(course.courseCode, course.courseName, course.credit, 'bsm', course.recommendedTerm)
+  }
+
+  return result
+}
+
 function flattenStudentRoadmapCourses(
   roadmap: StudentRoadmapResponse | null | undefined,
 ): Array<{ course: StudentRoadmapCourse; termKey: string }> {
@@ -1227,6 +1299,10 @@ export function CurriculumPage() {
         }
         continue
       }
+      byId.set(course.id, course)
+    }
+
+    for (const course of remainingRequiredSlotsFromProgress(graduation, byId)) {
       byId.set(course.id, course)
     }
 
