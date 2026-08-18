@@ -138,7 +138,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-[220px] shrink-0 flex-col overflow-y-auto border-r border-[#eee] bg-white px-5 py-6 transition-transform duration-200 md:sticky md:top-0 md:z-auto md:h-svh md:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-50 flex w-[220px] shrink-0 flex-col overflow-y-auto border-r border-[#eee] bg-white px-5 py-6 transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
@@ -177,6 +177,24 @@ export function Sidebar({
         ))}
       </nav>
 
+      <button
+        type="button"
+        onClick={() => {
+          onClose?.()
+          void logout().finally(() => {
+            navigate('/', { replace: true })
+          })
+        }}
+        className="mt-1 flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-ink transition hover:bg-surface"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+          <path d="M16 17l5-5-5-5" />
+          <path d="M21 12H9" />
+        </svg>
+        로그아웃
+      </button>
+
       {showAdmin && (
         <>
           <p className="mb-3 mt-8 text-xs font-medium text-ink-muted">Admin</p>
@@ -209,29 +227,6 @@ export function Sidebar({
           </nav>
         </>
       )}
-
-      <div className="mt-auto shrink-0 border-t border-[#eee] pt-4">
-        {student?.name && (
-          <p className="mb-2 truncate px-3 text-xs text-ink-muted">{student.name}님</p>
-        )}
-        <button
-          type="button"
-          onClick={() => {
-            onClose?.()
-            void logout().finally(() => {
-              navigate('/', { replace: true })
-            })
-          }}
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold text-ink-muted transition hover:bg-surface hover:text-ink"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <path d="M16 17l5-5-5-5" />
-            <path d="M21 12H9" />
-          </svg>
-          로그아웃
-        </button>
-      </div>
     </aside>
   )
 }
