@@ -571,12 +571,14 @@ function liberalCoursesFromProgress(
   excludeCodes: Set<string>,
   takenTermByCode: Map<string, string>,
   standingByTaken?: Map<string, string>,
+  options?: { includeRequiredOverlay?: boolean },
 ): MapCourse[] {
   if (!progress) return []
   const admissionYear = progress.admissionYear
   const result: MapCourse[] = []
   const seen = new Set<string>()
   const index = buildProgressCategoryIndex(progress)
+  const includeRequiredOverlay = options?.includeRequiredOverlay === true
 
   const pushCompleted = (
     courses: Array<Record<string, unknown>> | undefined,
@@ -612,27 +614,29 @@ function liberalCoursesFromProgress(
     }
   }
 
-  // 전용 필드 → 공통교양 / 학문기초 / 전공
-  pushCompleted(
-    progress.commonLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
-    'common',
-  )
-  pushCompleted(
-    progress.academicFoundationCredits?.completedCourses as
-      | Array<Record<string, unknown>>
-      | undefined,
-    'bsm',
-  )
-  pushCompleted(
-    progress.majorFoundationCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
-    'major-required',
-  )
-  for (const summary of progress.categorySummaries ?? []) {
-    if (!(summary.category || '').includes('전공')) continue
-    pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, 'major-required')
+  // 전용 필드 → 공통교양 / 학문기초 / 전공 (본인 학과만)
+  if (includeRequiredOverlay) {
+    pushCompleted(
+      progress.commonLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+      'common',
+    )
+    pushCompleted(
+      progress.academicFoundationCredits?.completedCourses as
+        | Array<Record<string, unknown>>
+        | undefined,
+      'bsm',
+    )
+    pushCompleted(
+      progress.majorFoundationCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
+      'major-required',
+    )
+    for (const summary of progress.categorySummaries ?? []) {
+      if (!(summary.category || '').includes('전공')) continue
+      pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, 'major-required')
+    }
   }
 
-  // 교양: 선택·균형 + totalCredits 잔여(공통·학문·전공 제외)
+  // 교양: 기이수 중 전공·학문기초·공통교양이 아닌 나머지 (교양선택은 로드맵에서 넣지 않음)
   pushCompleted(
     progress.electiveLiberalCredits?.completedCourses as Array<Record<string, unknown>> | undefined,
     'liberal',
@@ -1197,9 +1201,9 @@ export function CurriculumPage() {
 
   const allCourses = useMemo(() => {
     const applyOwnProgress = isOwnDepartment
-    const progress = applyOwnProgress ? graduation : null
-    const admissionYear = progress?.admissionYear ?? student?.admissionYear
-    const progressTaken = collectProgressTakenItems(progress)
+    const overlayProgress = applyOwnProgress ? graduation : null
+    const admissionYear = graduation?.admissionYear ?? student?.admissionYear
+    const progressTaken = collectProgressTakenItems(graduation)
 
     const generalStandingByTaken = buildStandingByTakenOrder([
       ...generalFlat.map(({ course }) => ({
@@ -1238,7 +1242,7 @@ export function CurriculumPage() {
 
     const standingByTaken =
       viewKind === 'abeek' ? abeekStandingByTaken : generalStandingByTaken
-    const takenTermByCode = buildTakenTermMap(progress, standingByTaken)
+    const takenTermByCode = buildTakenTermMap(graduation, standingByTaken)
 
     // ABEEK 뷰용: 이수 과목 taken → 순번 보강
     for (const { course, termKey } of abeekTermItems) {
@@ -1290,6 +1294,9 @@ export function CurriculumPage() {
     const fromTimetable: MapCourse[] = []
     for (const [, instances] of grouped) {
       const completedInst = instances.find((i) => i.course.completed === true)
+      const representative = completedInst ?? instances[0]
+      // 교양선택 등 로드맵 교양은 넣지 않음. 교양 행은 기이수 잔여만
+      if (representative && mapGeneralCategory(representative.course) === 'liberal') continue
       if (completedInst) {
         const termKeys = instances.map((i) => i.termKey)
         const semester = pickCompletedDisplayTerm({
@@ -1348,10 +1355,11 @@ export function CurriculumPage() {
         .map((c) => c.id),
     )
     const liberalExtra = liberalCoursesFromProgress(
-      progress,
+      graduation,
       protectedCodes,
       takenTermByCode,
       generalStandingByTaken,
+      { includeRequiredOverlay: applyOwnProgress },
     )
     for (const course of liberalExtra) {
       const existing = byId.get(course.id)
@@ -1373,13 +1381,13 @@ export function CurriculumPage() {
       byId.set(course.id, course)
     }
 
-    for (const course of remainingRequiredSlotsFromProgress(progress, byId)) {
+    for (const course of remainingRequiredSlotsFromProgress(overlayProgress, byId)) {
       byId.set(course.id, course)
     }
 
     // progress에 명시된 분류만 확정. 매칭 실패 시 전공·학문기초는 유지
-    if (progress) {
-      const index = buildProgressCategoryIndex(progress)
+    if (overlayProgress) {
+      const index = buildProgressCategoryIndex(overlayProgress)
       for (const course of byId.values()) {
         if (!course.completed) continue
         const hit = mapCategoryFromProgressIndex(course.id, course.name, index)
