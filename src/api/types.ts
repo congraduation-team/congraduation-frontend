@@ -140,7 +140,12 @@ export type UpdateFeedbackRequest = {
   adminNote?: string | null
 }
 
-/** GET /api/stats/summary */
+/** GET /api/stats/summary — 월별 시계열이 있으면 최근 6개월 차트에 사용 */
+export type MonthlyVisitorPoint = {
+  month: string
+  visitors: number
+}
+
 export type SiteStatsSummary = {
   todayVisitors: number
   monthlyVisitors: number
@@ -149,6 +154,7 @@ export type SiteStatsSummary = {
   timezone: string
   today: string
   monthStart: string
+  monthlySeries?: MonthlyVisitorPoint[]
 }
 
 /** POST /api/stats/visit */

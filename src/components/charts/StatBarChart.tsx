@@ -14,13 +14,13 @@ function formatCount(n: number) {
 }
 
 /** 가로 막대 비교 차트 (의존성 없이 SVG) */
-export function StatBarChart({ items, height = 220 }: StatBarChartProps) {
+export function StatBarChart({ items, height = 160 }: StatBarChartProps) {
   const max = Math.max(...items.map((i) => i.value), 1)
-  const pad = { top: 12, right: 56, bottom: 28, left: 88 }
-  const width = 560
+  const pad = { top: 4, right: 48, bottom: 4, left: 52 }
+  const width = 280
   const innerH = height - pad.top - pad.bottom
-  const barGap = 14
-  const barH = Math.max(18, (innerH - barGap * (items.length - 1)) / items.length)
+  const barGap = 10
+  const barH = Math.max(14, (innerH - barGap * (items.length - 1)) / items.length)
 
   return (
     <svg

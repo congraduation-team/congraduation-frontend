@@ -3,12 +3,41 @@ import { ApiError } from '../api/client'
 import { getSiteStatsSummary } from '../api/endpoints'
 import type { SiteStatsSummary } from '../api/types'
 import { StatBarChart } from '../components/charts/StatBarChart'
-import { StatColumnChart } from '../components/charts/StatColumnChart'
+import { StatLineChart } from '../components/charts/StatLineChart'
 import { AppShell } from '../components/layout/AppShell'
 import { useAuth } from '../context/AuthContext'
 
 function formatCount(n: number) {
   return n.toLocaleString('ko-KR')
+}
+
+function parseIsoDate(iso: string) {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, (m ?? 1) - 1, d ?? 1)
+}
+
+function monthKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** API 월별 시계열이 있으면 사용하고, 없으면 최근 6개월 축 + 이번 달 값만 채움 */
+function buildSixMonthSeries(stats: SiteStatsSummary) {
+  const today = parseIsoDate(stats.today)
+  const byMonth = new Map<string, number>()
+  for (const row of stats.monthlySeries ?? []) {
+    byMonth.set(row.month, row.visitors)
+  }
+
+  return Array.from({ length: 6 }, (_, i) => {
+    const offset = 5 - i
+    const date = new Date(today.getFullYear(), today.getMonth() - offset, 1)
+    const key = monthKey(date)
+    const isCurrent = offset === 0
+    return {
+      label: `${date.getMonth() + 1}월`,
+      value: byMonth.get(key) ?? (isCurrent ? stats.monthlyVisitors : 0),
+    }
+  })
 }
 
 type MetricCardProps = {
@@ -63,14 +92,8 @@ export function AdminStatsPage() {
     ]
   }, [stats])
 
-  const visitorColumnItems = useMemo(() => {
-    if (!stats) return []
-    return [
-      { label: '오늘', value: stats.todayVisitors, color: '#c8012e' },
-      { label: '이번 달', value: stats.monthlyVisitors, color: '#e35a74' },
-      { label: '누적', value: stats.totalVisitors, color: '#1a2b3c' },
-    ]
-  }, [stats])
+  const monthlyLineItems = useMemo(() => (stats ? buildSixMonthSeries(stats) : []), [stats])
+  const hasMonthlySeries = Boolean(stats?.monthlySeries?.length)
 
   return (
     <AppShell>
@@ -132,38 +155,27 @@ export function AdminStatsPage() {
               />
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-              <section className="rounded-2xl bg-white p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <h2 className="text-base font-bold text-ink">지표 비교</h2>
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+              <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <h2 className="text-base font-bold text-ink">월별 로그인 방문자</h2>
                 <p className="mt-1 text-sm text-ink-muted">
-                  로그인 방문자(당일 · 월간 · 누적)와 기이수 실사용자 규모
+                  최근 6개월 · 이번 달 {formatCount(stats.monthlyVisitors)}명
                 </p>
-                <div className="mt-6">
-                  <StatBarChart items={barItems} />
+                <div className="mt-4">
+                  <StatLineChart items={monthlyLineItems} />
                 </div>
+                {!hasMonthlySeries && (
+                  <p className="mt-3 text-xs text-ink-faint">
+                    월별 시계열이 없으면 이번 달만 표시되고, 이전 달은 0으로 둡니다.
+                  </p>
+                )}
               </section>
 
-              <section className="rounded-2xl bg-white p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
-                <h2 className="text-base font-bold text-ink">로그인 방문자</h2>
-                <p className="mt-1 text-sm text-ink-muted">
-                  이번 달 {formatCount(stats.monthlyVisitors)}명 · {stats.monthStart} ~ {stats.today}
-                </p>
-                <div className="mt-6 flex flex-col items-center">
-                  <StatColumnChart items={visitorColumnItems} />
-                  <dl className="mt-6 w-full space-y-3 text-sm">
-                    <div className="flex items-center justify-between rounded-lg bg-sejong-light px-3 py-2.5">
-                      <dt className="text-sejong">이번 달 로그인 방문자</dt>
-                      <dd className="font-bold text-sejong">{formatCount(stats.monthlyVisitors)}</dd>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-2.5">
-                      <dt className="text-ink-muted">오늘 로그인 방문자</dt>
-                      <dd className="font-bold text-ink">{formatCount(stats.todayVisitors)}</dd>
-                    </div>
-                    <div className="flex items-center justify-between rounded-lg bg-surface px-3 py-2.5">
-                      <dt className="text-ink-muted">누적 로그인 방문자</dt>
-                      <dd className="font-bold text-ink">{formatCount(stats.totalVisitors)}</dd>
-                    </div>
-                  </dl>
+              <section className="rounded-2xl bg-white p-4 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+                <h2 className="text-sm font-bold text-ink">지표 비교</h2>
+                <p className="mt-1 text-xs text-ink-muted">당일 · 월 · 누적 · 기이수</p>
+                <div className="mt-3">
+                  <StatBarChart items={barItems} height={148} />
                 </div>
               </section>
             </div>
