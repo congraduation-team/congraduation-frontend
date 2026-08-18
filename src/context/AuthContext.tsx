@@ -11,6 +11,7 @@ import {
   getAuthorizationValue,
   saveAuthToken,
 } from '../api/authToken'
+import { logout as logoutRequest } from '../api/endpoints'
 import type { StudentLoginResponse } from '../api/types'
 
 const STORAGE_KEY = 'congraduation.student'
@@ -65,7 +66,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearAuthToken()
   }, [])
 
-  const logout = useCallback(() => setStudent(null), [setStudent])
+  const logout = useCallback(() => {
+    const authorization = getAuthorizationValue()
+    setStudent(null)
+    if (!authorization) return
+
+    void logoutRequest({
+      headers: { Authorization: authorization },
+    }).catch(() => {
+      // 서버 무효화 실패와 관계없이 로컬 세션은 종료한다.
+    })
+  }, [setStudent])
 
   const value = useMemo(() => ({ student, setStudent, logout }), [student, setStudent, logout])
 

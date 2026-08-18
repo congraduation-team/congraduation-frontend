@@ -35,6 +35,13 @@ export function login(userId: string, password: string) {
   })
 }
 
+export function logout(init?: RequestInit) {
+  return apiJson<void>('/api/auth/logout', {
+    method: 'POST',
+    ...init,
+  })
+}
+
 export function getTranscriptStatus(studentId: number) {
   return apiJson<TranscriptStatusResponse>(`/api/transcripts/status/${studentId}`)
 }
