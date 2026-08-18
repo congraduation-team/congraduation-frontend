@@ -81,31 +81,60 @@ function HorizontalBars({ items, height }: { items: BarItem[]; height: number })
 
 function VerticalBars({ items, height }: { items: BarItem[]; height: number }) {
   const max = Math.max(...items.map((i) => i.value), 1)
-  const pad = { top: 28, right: 20, bottom: 36, left: 20 }
-  const width = 560
+  const pad = { top: 28, right: 16, bottom: 36, left: 44 }
+  const width = 640
   const innerW = width - pad.left - pad.right
   const innerH = height - pad.top - pad.bottom
-  const colGap = 28
-  const colW = Math.max(36, (innerW - colGap * (items.length - 1)) / items.length)
+  const yTicks = 4
+  const colGap = 40
+  const colW = Math.min(48, Math.max(28, (innerW - colGap * (items.length - 1)) / items.length))
+  const groupW = items.length * colW + Math.max(0, items.length - 1) * colGap
+  const startX = pad.left + (innerW - groupW) / 2
 
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
       className="h-auto w-full"
       role="img"
-      aria-label="방문자 비교 세로 막대 차트"
+      aria-label="로그인 방문자 지표 비교 막대 차트"
     >
+      {Array.from({ length: yTicks + 1 }, (_, i) => {
+        const ratio = i / yTicks
+        const y = pad.top + innerH * (1 - ratio)
+        const tick = Math.round(max * ratio)
+        return (
+          <g key={i}>
+            <line
+              x1={pad.left}
+              y1={y}
+              x2={width - pad.right}
+              y2={y}
+              stroke="#eef0f3"
+              strokeWidth={1}
+            />
+            <text
+              x={pad.left - 8}
+              y={y}
+              textAnchor="end"
+              dominantBaseline="middle"
+              className="fill-ink-faint text-[10px]"
+            >
+              {formatCount(tick)}
+            </text>
+          </g>
+        )
+      })}
       {items.map((item, index) => {
-        const x = pad.left + index * (colW + colGap)
+        const x = startX + index * (colW + colGap)
         const barH = (innerH * item.value) / max
         const y = pad.top + innerH - barH
         return (
           <g key={item.label}>
             <text
               x={x + colW / 2}
-              y={pad.top - 10}
+              y={y - 10}
               textAnchor="middle"
-              className="fill-ink-muted text-[12px] font-bold"
+              className="fill-ink text-[11px] font-bold"
             >
               {formatCount(item.value)}
             </text>
@@ -114,15 +143,14 @@ function VerticalBars({ items, height }: { items: BarItem[]; height: number }) {
               y={y}
               width={colW}
               height={Math.max(barH, item.value > 0 ? 4 : 0)}
-              rx={8}
+              rx={6}
               fill={item.color}
-              className="transition-all duration-700"
             />
             <text
               x={x + colW / 2}
               y={height - 12}
               textAnchor="middle"
-              className="fill-ink text-[12px] font-semibold"
+              className="fill-ink-muted text-[12px] font-semibold"
             >
               {item.label}
             </text>

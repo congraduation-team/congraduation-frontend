@@ -87,8 +87,7 @@ export function AdminStatsPage() {
     return [
       { label: '오늘', value: stats.todayVisitors, color: '#c8012e' },
       { label: '이번 달', value: stats.monthlyVisitors, color: '#e35a74' },
-      { label: '누적', value: stats.totalVisitors, color: '#1a2b3c' },
-      { label: '기이수', value: stats.transcriptUsers, color: '#4a5568' },
+      { label: '누적', value: stats.totalVisitors, color: '#f0a3b1' },
     ]
   }, [stats])
 
@@ -173,9 +172,9 @@ export function AdminStatsPage() {
 
               <section className="rounded-2xl bg-white p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
                 <h2 className="text-base font-bold text-ink">지표 비교</h2>
-                <p className="mt-1 text-sm text-ink-muted">당일 · 월 · 누적 · 기이수</p>
+                <p className="mt-1 text-sm text-ink-muted">오늘 · 이번 달 · 누적 로그인 방문자</p>
                 <div className="mt-4">
-                  <StatBarChart items={barItems} height={220} orientation="vertical" />
+                  <StatBarChart items={barItems} height={260} orientation="vertical" />
                 </div>
               </section>
             </div>
