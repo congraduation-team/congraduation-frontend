@@ -1,18 +1,4 @@
 {
-  "redirects": [
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.sju-graduation.kr" }],
-      "destination": "https://sju-graduation.kr/:path*",
-      "permanent": true
-    },
-    {
-      "source": "/:path*",
-      "has": [{ "type": "host", "value": "congraduation-frontend.vercel.app" }],
-      "destination": "https://sju-graduation.kr/:path*",
-      "permanent": true
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/:path*",
