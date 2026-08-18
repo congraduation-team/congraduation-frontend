@@ -791,25 +791,20 @@ function collectOwnDepartmentNames(
 function isOwnDepartmentRoadmap(
   selectedDepartment?: string | null,
   ownDepartments: string[] = [],
-  roadmapDepartment?: string | null,
 ) {
   const selected = normalizeDepartmentName(selectedDepartment)
-  const roadmap = normalizeDepartmentName(roadmapDepartment)
-  const same = (a: string, b: string) => a === b || a.includes(b) || b.includes(a)
-  const matchesOwn = (name: string) => ownDepartments.some((own) => same(name, own))
-  if (ownDepartments.length === 0) return true
-  // 학과를 직접 고른 경우 그 선택만 본다. 이전 로드맵 학과명으로 본인 학과로 오인하지 않음
-  if (selected) return matchesOwn(selected)
-  if (roadmap) return matchesOwn(roadmap)
-  return true
+  if (!selected) return ownDepartments.length > 0
+  return ownDepartments.includes(selected)
 }
 
 function flattenStudentRoadmapCourses(
   roadmap: StudentRoadmapResponse | null | undefined,
+  options?: { ignoreCompleted?: boolean },
 ): Array<{ course: StudentRoadmapCourse; termKey: string }> {
   if (!roadmap) return []
   const list: Array<{ course: StudentRoadmapCourse; termKey: string }> = []
   const seen = new Set<string>()
+  const ignoreCompleted = options?.ignoreCompleted === true
 
   for (const term of roadmap.terms ?? []) {
     const calendarTermKey = (term.termKey || '').trim()
@@ -822,13 +817,25 @@ function flattenStudentRoadmapCourses(
 
     for (const course of merged) {
       if (!course?.courseCode) continue
-      const termKey =
-        course.completed === true ? completedTermKey : calendarTermKey
+      const completed = !ignoreCompleted && course.completed === true
+      const termKey = completed ? completedTermKey : calendarTermKey
       if (!termKey) continue
       const key = `${termKey}:${course.courseCode}`
       if (seen.has(key)) continue
       seen.add(key)
-      list.push({ course, termKey })
+      list.push({
+        course: completed
+          ? course
+          : {
+              ...course,
+              completed: false,
+              takenYear: undefined,
+              takenSemester: undefined,
+              standingTermKey: undefined,
+              completedTermKey: undefined,
+            },
+        termKey,
+      })
     }
   }
   return list
@@ -913,6 +920,16 @@ export function CurriculumPage() {
   const [zoom, setZoom] = useState(1)
   const [panning, setPanning] = useState(false)
   const [boardSize, setBoardSize] = useState({ w: BOARD_MIN_WIDTH, h: 600 })
+
+  const ownDepartments = useMemo(
+    () =>
+      collectOwnDepartmentNames(student, [
+        active?.department,
+        ...majorTracksProgress.map((track) => track.department),
+      ]),
+    [student, active?.department, majorTracksProgress],
+  )
+  const isOwnDepartment = isOwnDepartmentRoadmap(departmentName, ownDepartments)
 
   const viewportRef = useRef<HTMLDivElement>(null)
   const boardRef = useRef<HTMLDivElement>(null)
@@ -1072,15 +1089,20 @@ export function CurriculumPage() {
       setError(null)
       try {
         let data: StudentRoadmapResponse
-        if (student?.id && (!departmentName || departmentName === student.major)) {
+        if (student?.id && isOwnDepartment) {
           try {
-            data = await getStudentRoadmapByStudent(student.id)
+            if (!departmentName || departmentName === student.major) {
+              data = await getStudentRoadmapByStudent(student.id)
+            } else {
+              data = await getStudentRoadmap(departmentName, student.id)
+            }
           } catch {
             if (!departmentName) throw new Error('학과 정보를 확인할 수 없습니다.')
             data = await getStudentRoadmap(departmentName, student.id)
           }
         } else if (departmentName) {
-          data = await getStudentRoadmap(departmentName, student?.id)
+          // 타학과: 본인 이수(공통교양·학문기초·전공)를 붙이지 않음
+          data = await getStudentRoadmap(departmentName)
         } else {
           throw new Error('학과를 선택해 주세요.')
         }
@@ -1108,7 +1130,7 @@ export function CurriculumPage() {
     return () => {
       cancelled = true
     }
-  }, [departmentName, student?.id, student?.major])
+  }, [departmentName, isOwnDepartment, student?.id, student?.major])
 
   // 공학인증 로드맵 (버튼으로 전환 시에만)
   useEffect(() => {
@@ -1163,7 +1185,10 @@ export function CurriculumPage() {
   const loading = viewKind === 'abeek' ? abeekLoading : generalLoading
 
   const abeekRawCourses = useMemo(() => flattenRoadmapCourses(abeekRoadmap), [abeekRoadmap])
-  const generalFlat = useMemo(() => flattenStudentRoadmapCourses(generalRoadmap), [generalRoadmap])
+  const generalFlat = useMemo(
+    () => flattenStudentRoadmapCourses(generalRoadmap, { ignoreCompleted: !isOwnDepartment }),
+    [generalRoadmap, isOwnDepartment],
+  )
 
   const edges = useMemo(
     () => [] as MapEdge[],
@@ -1171,15 +1196,7 @@ export function CurriculumPage() {
   )
 
   const allCourses = useMemo(() => {
-    const ownDepartments = collectOwnDepartmentNames(student, [
-      active?.department,
-      ...majorTracksProgress.map((track) => track.department),
-    ])
-    const applyOwnProgress = isOwnDepartmentRoadmap(
-      departmentName,
-      ownDepartments,
-      generalRoadmap?.departmentName,
-    )
+    const applyOwnProgress = isOwnDepartment
     const progress = applyOwnProgress ? graduation : null
     const admissionYear = progress?.admissionYear ?? student?.admissionYear
     const progressTaken = collectProgressTakenItems(progress)
@@ -1396,15 +1413,9 @@ export function CurriculumPage() {
     abeekRawCourses,
     abeekRoadmap,
     generalFlat,
-    generalRoadmap?.departmentName,
+    isOwnDepartment,
     graduation,
     student?.admissionYear,
-    student?.major,
-    student?.secondaryMajor,
-    student?.tracks,
-    active?.department,
-    majorTracksProgress,
-    departmentName,
   ])
 
   const courseAlertIndex = useMemo(() => {
