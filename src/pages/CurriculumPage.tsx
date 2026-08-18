@@ -1467,7 +1467,10 @@ export function CurriculumPage() {
   const activeRowDefs = viewKind === 'abeek' ? abeekRowDefs : generalRowDefs
   const presentCategories = useMemo(() => {
     const set = new Set<MapCategory>()
-    for (const course of allCoursesWithAlerts) set.add(course.category)
+    for (const course of allCoursesWithAlerts) {
+      if (!isSemesterKey(course.semester)) continue
+      set.add(course.category)
+    }
     return set
   }, [allCoursesWithAlerts])
   const visibleRowDefs = useMemo(
