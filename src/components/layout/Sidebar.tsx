@@ -138,7 +138,7 @@ export function Sidebar({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 flex w-[220px] shrink-0 flex-col overflow-y-auto border-r border-[#eee] bg-white px-5 py-6 transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${
+      className={`fixed inset-y-0 left-0 z-50 flex h-dvh w-[220px] shrink-0 flex-col overflow-y-auto border-r border-[#eee] bg-white px-5 py-6 transition-transform duration-200 md:sticky md:top-0 md:z-auto md:h-svh md:translate-x-0 ${
         open ? 'translate-x-0' : '-translate-x-full'
       }`}
     >
@@ -210,7 +210,7 @@ export function Sidebar({
         </>
       )}
 
-      <div className="mt-auto pt-8">
+      <div className="mt-auto shrink-0 border-t border-[#eee] pt-4">
         {student?.name && (
           <p className="mb-2 truncate px-3 text-xs text-ink-muted">{student.name}님</p>
         )}

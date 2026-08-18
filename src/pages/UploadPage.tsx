@@ -8,7 +8,7 @@ export function UploadPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const isUpdate = searchParams.get('update') === '1'
-  const { student, logout } = useAuth()
+  const { student } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -89,18 +89,7 @@ export function UploadPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-white">
-      <button
-        type="button"
-        onClick={() => {
-          void logout().finally(() => {
-            navigate('/', { replace: true })
-          })
-        }}
-        className="absolute right-4 top-4 text-sm font-semibold text-ink-muted hover:text-ink"
-      >
-        로그아웃
-      </button>
+    <div className="min-h-screen bg-white">
       <div className="mx-auto flex max-w-md flex-col items-center px-6 pb-16 pt-16 md:pt-20">
         <div className="origin-top scale-90 md:scale-100">
           <AppLogo size={104} />
