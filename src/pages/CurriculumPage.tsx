@@ -1294,8 +1294,15 @@ export function CurriculumPage() {
     for (const [, instances] of grouped) {
       const completedInst = instances.find((i) => i.course.completed === true)
       const representative = completedInst ?? instances[0]
-      // 교양선택 등 로드맵 교양은 넣지 않음. 교양 행은 기이수 잔여만
-      if (representative && mapGeneralCategory(representative.course) === 'liberal') continue
+      // 미이수 교선·균필 시간표 칸은 숨긴다.
+      // 기이수 교양(공통교양·전공·학문기초가 아닌 나머지)은 그대로 둔다.
+      if (
+        !completedInst &&
+        representative &&
+        mapGeneralCategory(representative.course) === 'liberal'
+      ) {
+        continue
+      }
       if (completedInst) {
         const termKeys = instances.map((i) => i.termKey)
         const semester = pickCompletedDisplayTerm({
