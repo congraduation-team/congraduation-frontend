@@ -51,6 +51,8 @@ type MapCourse = {
   category: MapCategory
   semester: string
   completed: boolean
+  equivalentIds?: string[]
+  equivalentNames?: string[]
   /** 설계학점 불인정 또는 F — 느낌표 표시 */
   showAlert?: boolean
   alertReason?: string
@@ -180,12 +182,19 @@ function isMajorFoundationLabel(label: string) {
   return t.includes('전공기초') || t === '전기' || t.startsWith('전기(') || t.includes('(전기)')
 }
 
+function isMajorTranscriptLabel(label: string) {
+  const t = (label || '').replace(/\s+/g, '')
+  if (!t) return false
+  if (isMajorFoundationLabel(t)) return true
+  return t.includes('전공') || t.includes('전선') || t.includes('전필')
+}
+
 function normalizeCourseCode(code: string) {
   return code.replace(/\s+/g, '').toUpperCase()
 }
 
 function isAcademicFoundationLabel(label: string) {
-  if (isMajorFoundationLabel(label) || label.includes('전공')) return false
+  if (isMajorTranscriptLabel(label)) return false
   const t = label.replace(/\s+/g, '')
   return (
     t.includes('학문기초') ||
@@ -195,7 +204,7 @@ function isAcademicFoundationLabel(label: string) {
 }
 
 function isCommonLiberalLabel(label: string) {
-  if (isMajorFoundationLabel(label) || label.includes('전공') || isAcademicFoundationLabel(label)) {
+  if (isMajorTranscriptLabel(label) || isAcademicFoundationLabel(label)) {
     return false
   }
   return (
@@ -213,14 +222,12 @@ function isCommonLiberalLabel(label: string) {
 function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
   const label = (course.category || '').trim()
 
-  if (isMajorFoundationLabel(label)) return 'major-required'
-  if (isAcademicFoundationLabel(label)) return 'bsm'
-  if (isCommonLiberalLabel(label)) return 'common'
-
-  if (label.includes('전공')) {
-    if (label.includes('선택')) return 'major-elective'
+  if (isMajorFoundationLabel(label) || isMajorTranscriptLabel(label)) {
+    if (label.includes('선택') || label.replace(/\s+/g, '').includes('전선')) return 'major-elective'
     return 'major-required'
   }
+  if (isAcademicFoundationLabel(label)) return 'bsm'
+  if (isCommonLiberalLabel(label)) return 'common'
 
   // 이수구분이 있을 때: 공통·학문·전공이 아니면 교양 (BSM bucket으로 끌어오지 않음)
   if (label) {
@@ -459,11 +466,112 @@ function generalToMapCourse(
     category: mapGeneralCategory(course),
     semester,
     completed: course.completed === true,
+    ...toMapEquivalents(course),
   }
 }
 
 function normalizeCourseName(name: string) {
   return name.replace(/\s+/g, '').toLowerCase()
+}
+
+function equivalentCodeSet(course: {
+  courseCode?: string
+  equivalentCourseCodes?: string[]
+}) {
+  const codes = new Set<string>()
+  for (const raw of [course.courseCode, ...(course.equivalentCourseCodes ?? [])]) {
+    const code = normalizeCourseCode(String(raw ?? ''))
+    if (code) codes.add(code)
+  }
+  return codes
+}
+
+function equivalentNameSet(course: {
+  name?: string
+  courseName?: string
+  equivalentNames?: string[]
+  equivalentCourseNames?: string[]
+}) {
+  const names = new Set<string>()
+  for (const raw of [
+    course.name,
+    course.courseName,
+    ...(course.equivalentNames ?? []),
+    ...(course.equivalentCourseNames ?? []),
+  ]) {
+    const name = normalizeCourseName(String(raw ?? ''))
+    if (name) names.add(name)
+  }
+  return names
+}
+
+function toMapEquivalents(course: StudentRoadmapCourse) {
+  return {
+    equivalentIds: [...equivalentCodeSet(course)],
+    equivalentNames: [...equivalentNameSet(course)],
+  }
+}
+
+/** 동일과목 학수번호가 겹치면 한 칸만 남긴다. 기이수·이수 당시 과목명 우선. */
+function mergeEquivalentMapCourses(courses: MapCourse[]): MapCourse[] {
+  const parent = new Map<string, string>()
+  const find = (key: string): string => {
+    const next = parent.get(key)
+    if (!next || next === key) {
+      parent.set(key, key)
+      return key
+    }
+    const root = find(next)
+    parent.set(key, root)
+    return root
+  }
+  const union = (a: string, b: string) => {
+    const ra = find(a)
+    const rb = find(b)
+    if (ra !== rb) parent.set(ra, rb)
+  }
+
+  for (const course of courses) {
+    const codes = [course.id, ...(course.equivalentIds ?? [])]
+      .map((code) => normalizeCourseCode(code))
+      .filter(Boolean)
+    if (codes.length === 0) continue
+    const anchor = codes[0]
+    for (const code of codes) union(anchor, code)
+  }
+
+  const best = new Map<string, MapCourse>()
+  for (const course of courses) {
+    const codes = [course.id, ...(course.equivalentIds ?? [])]
+      .map((code) => normalizeCourseCode(code))
+      .filter(Boolean)
+    const root = codes.length > 0 ? find(codes[0]) : `name:${normalizeCourseName(course.name)}:${course.semester}`
+    const existing = best.get(root)
+    if (!existing) {
+      best.set(root, course)
+      continue
+    }
+    const keepCompleted = course.completed && !existing.completed
+    const keepTakenName =
+      course.completed &&
+      existing.completed &&
+      semesterOrder(course.semester) <= semesterOrder(existing.semester)
+    if (keepCompleted || keepTakenName) {
+      best.set(root, {
+        ...course,
+        equivalentIds: [...new Set([...(existing.equivalentIds ?? []), ...(course.equivalentIds ?? [])])],
+        equivalentNames: [...new Set([...(existing.equivalentNames ?? []), ...(course.equivalentNames ?? [])])],
+      })
+    } else {
+      existing.equivalentIds = [
+        ...new Set([...(existing.equivalentIds ?? []), ...(course.equivalentIds ?? [])]),
+      ]
+      existing.equivalentNames = [
+        ...new Set([...(existing.equivalentNames ?? []), ...(course.equivalentNames ?? [])]),
+      ]
+    }
+  }
+  return [...best.values()]
 }
 
 /**
@@ -515,7 +623,7 @@ function buildProgressCategoryIndex(progress: GraduationProgressResponse) {
   )
   for (const summary of progress.categorySummaries ?? []) {
     const label = summary.category || ''
-    if (!label.includes('전공')) continue
+    if (!isMajorTranscriptLabel(label)) continue
     ingest(summary.courses as Array<{ courseCode?: string; courseName?: string }> | undefined, major, majorNames)
   }
 
@@ -577,7 +685,7 @@ function liberalCoursesFromProgress(
   excludeCodes: Set<string>,
   takenTermByCode: Map<string, string>,
   standingByTaken?: Map<string, string>,
-  options?: { includeRequiredOverlay?: boolean },
+  options?: { includeRequiredOverlay?: boolean; excludeNames?: Set<string> },
 ): MapCourse[] {
   if (!progress) return []
   const admissionYear = progress.admissionYear
@@ -585,6 +693,7 @@ function liberalCoursesFromProgress(
   const seen = new Set<string>()
   const index = buildProgressCategoryIndex(progress)
   const includeRequiredOverlay = options?.includeRequiredOverlay === true
+  const excludeNames = options?.excludeNames ?? new Set<string>()
 
   const pushCompleted = (
     courses: Array<Record<string, unknown>> | undefined,
@@ -593,7 +702,8 @@ function liberalCoursesFromProgress(
     for (const raw of courses ?? []) {
       const code = normalizeCourseCode(String(raw.courseCode ?? ''))
       const name = String(raw.courseName ?? '').trim()
-      if (!code || !name || excludeCodes.has(code) || seen.has(code)) continue
+      const nameKey = normalizeCourseName(name)
+      if (!code || !name || excludeCodes.has(code) || seen.has(code) || excludeNames.has(nameKey)) continue
       const cal = takenCalendarKey(
         raw.takenYear as string | number | null | undefined,
         raw.takenSemester as string | number | null | undefined,
@@ -637,7 +747,7 @@ function liberalCoursesFromProgress(
       'major-required',
     )
     for (const summary of progress.categorySummaries ?? []) {
-      if (!(summary.category || '').includes('전공')) continue
+      if (!isMajorTranscriptLabel(summary.category || '')) continue
       pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, 'major-required')
     }
   }
@@ -675,7 +785,7 @@ function liberalCoursesFromProgress(
 
   // categorySummaries 잔여(전공 아님) → 교양 (라벨 퍼지로 공통/학문에 넣지 않음)
   for (const summary of progress.categorySummaries ?? []) {
-    if ((summary.category || '').includes('전공')) continue
+    if (isMajorTranscriptLabel(summary.category || '')) continue
     const leftover = (
       summary.courses as unknown as Array<Record<string, unknown>> | undefined
     )?.filter((raw) => {
@@ -721,10 +831,20 @@ function remainingRequiredSlotsFromProgress(
   existing: Map<string, MapCourse>,
 ): MapCourse[] {
   if (!progress) return []
-  const existingNames = new Set(
-    [...existing.values()].map((course) => normalizeCourseName(course.name)),
-  )
-  const existingIds = new Set(existing.keys())
+  const existingNames = new Set<string>()
+  const existingIds = new Set<string>()
+  for (const course of existing.values()) {
+    existingIds.add(course.id)
+    for (const id of course.equivalentIds ?? []) {
+      const code = normalizeCourseCode(id)
+      if (code) existingIds.add(code)
+    }
+    existingNames.add(normalizeCourseName(course.name))
+    for (const name of course.equivalentNames ?? []) {
+      const key = normalizeCourseName(name)
+      if (key) existingNames.add(key)
+    }
+  }
   const result: MapCourse[] = []
 
   const push = (
@@ -1322,6 +1442,7 @@ export function CurriculumPage() {
           category: mapGeneralCategory(completedInst.course),
           semester,
           completed: true,
+          ...toMapEquivalents(completedInst.course),
         })
         continue
       }
@@ -1352,23 +1473,47 @@ export function CurriculumPage() {
         }
       }
     }
+    const occupiedCodes = new Set<string>()
+    const occupiedNames = new Set<string>()
+    for (const course of byId.values()) {
+      for (const id of [course.id, ...(course.equivalentIds ?? [])]) {
+        const code = normalizeCourseCode(id)
+        if (code) occupiedCodes.add(code)
+      }
+      for (const name of [course.name, ...(course.equivalentNames ?? [])]) {
+        const key = normalizeCourseName(name)
+        if (key) occupiedNames.add(key)
+      }
+    }
     const protectedCodes = new Set(
       [...byId.values()]
         .filter(
           (c) =>
             c.category.startsWith('major') || c.category === 'bsm' || c.category === 'common',
         )
-        .map((c) => c.id),
+        .flatMap((c) => [c.id, ...(c.equivalentIds ?? [])].map((id) => normalizeCourseCode(id)))
+        .filter(Boolean),
     )
+    for (const code of occupiedCodes) protectedCodes.add(code)
     const liberalExtra = liberalCoursesFromProgress(
       graduation,
       protectedCodes,
       takenTermByCode,
       generalStandingByTaken,
-      { includeRequiredOverlay: applyOwnProgress },
+      { includeRequiredOverlay: applyOwnProgress, excludeNames: occupiedNames },
     )
     for (const course of liberalExtra) {
-      const existing = byId.get(course.id)
+      const existing =
+        byId.get(course.id) ??
+        [...byId.values()].find((item) => {
+          const ids = new Set(
+            [item.id, ...(item.equivalentIds ?? [])].map((id) => normalizeCourseCode(id)),
+          )
+          const names = new Set(
+            [item.name, ...(item.equivalentNames ?? [])].map((name) => normalizeCourseName(name)),
+          )
+          return ids.has(course.id) || names.has(normalizeCourseName(course.name))
+        })
       if (existing) {
         // progress 전용 필드(공통/학문/전공)만 덮어씀. 교양 잔여로는 전공·학문기초를 내리지 않음
         if (course.category === 'liberal') {
@@ -1381,6 +1526,7 @@ export function CurriculumPage() {
         if (course.completed && course.semester) {
           existing.completed = true
           existing.semester = course.semester
+          // 이수 당시 과목명 유지
         }
         continue
       }
@@ -1408,20 +1554,21 @@ export function CurriculumPage() {
       }
     }
 
-    // 동일 학기·동일 과목명 중복(학수번호 표기 차이) 제거 — 이수 우선
-    const byNameSem = new Map<string, MapCourse>()
-    for (const course of byId.values()) {
+    // 동일과목 학수번호·같은 학기·같은 과목명 중복 제거 — 이수·당시 과목명 우선
+    return mergeEquivalentMapCourses([...byId.values()]).reduce<MapCourse[]>((list, course) => {
       const key = `${course.semester}::${course.name.replace(/\s+/g, '')}`
-      const existing = byNameSem.get(key)
+      const existing = list.find(
+        (item) => `${item.semester}::${item.name.replace(/\s+/g, '')}` === key,
+      )
       if (!existing) {
-        byNameSem.set(key, course)
-        continue
+        list.push(course)
+        return list
       }
       if (course.completed && !existing.completed) {
-        byNameSem.set(key, course)
+        list.splice(list.indexOf(existing), 1, course)
       }
-    }
-    return [...byNameSem.values()]
+      return list
+    }, [])
   }, [
     viewKind,
     abeekRoadmap,

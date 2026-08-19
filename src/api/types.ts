@@ -686,6 +686,10 @@ export type FullRoadmapResponse = {
 export type StudentRoadmapCourse = {
   courseCode: string
   courseName: string
+  /** 동일과목 학수번호(자기 자신 포함) */
+  equivalentCourseCodes?: string[]
+  /** 동일과목 과목명(개편 전후 표기) */
+  equivalentCourseNames?: string[]
   /** 시간표 이수구분 원문 (예: 전공필수) */
   category?: string
   /** GENERAL | BSM | MAJOR | OTHER */
