@@ -73,11 +73,13 @@ const MAJOR_COMPLETED_CLASS =
   'border-transparent bg-[#c8012e] text-white shadow-[0_0_0_1px_rgba(200,1,46,0.25)]'
 const MAJOR_REQUIRED_INCOMPLETE_CLASS = 'border-sejong bg-white text-sejong'
 const MAJOR_ELECTIVE_INCOMPLETE_CLASS = 'border-transparent bg-sejong-pink text-ink'
+const COMMON_INCOMPLETE_CLASS = 'border-[#7dd3fc] bg-[#e0f2fe] text-[#0369a1]'
+const BSM_INCOMPLETE_CLASS = 'border-[#5eead4] bg-[#ccfbf1] text-[#0f766e]'
 
 const categoryStyle: Record<MapCategory, string> = {
   liberal: 'border-transparent bg-[#64748b] text-white',
-  common: 'border-transparent bg-[#0369a1] text-white',
-  bsm: 'border-transparent bg-[#0f766e] text-white',
+  common: COMMON_INCOMPLETE_CLASS,
+  bsm: BSM_INCOMPLETE_CLASS,
   'major-required': MAJOR_REQUIRED_INCOMPLETE_CLASS,
   'major-elective': MAJOR_ELECTIVE_INCOMPLETE_CLASS,
 }
@@ -109,6 +111,10 @@ function courseBadgeClass(
         ? MAJOR_REQUIRED_INCOMPLETE_CLASS
         : MAJOR_ELECTIVE_INCOMPLETE_CLASS
     return `${base} ${hasCompletionData ? 'opacity-70' : ''}`
+  }
+
+  if ((course.category === 'common' || course.category === 'bsm') && !course.completed) {
+    return categoryStyle[course.category]
   }
 
   const base = course.completed
