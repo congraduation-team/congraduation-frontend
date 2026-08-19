@@ -180,12 +180,19 @@ function isMajorFoundationLabel(label: string) {
   return t.includes('전공기초') || t === '전기' || t.startsWith('전기(') || t.includes('(전기)')
 }
 
+function isMajorTranscriptLabel(label: string) {
+  const t = (label || '').replace(/\s+/g, '')
+  if (!t) return false
+  if (isMajorFoundationLabel(t)) return true
+  return t.includes('전공') || t.includes('전선') || t.includes('전필')
+}
+
 function normalizeCourseCode(code: string) {
   return code.replace(/\s+/g, '').toUpperCase()
 }
 
 function isAcademicFoundationLabel(label: string) {
-  if (isMajorFoundationLabel(label) || label.includes('전공')) return false
+  if (isMajorTranscriptLabel(label)) return false
   const t = label.replace(/\s+/g, '')
   return (
     t.includes('학문기초') ||
@@ -195,7 +202,7 @@ function isAcademicFoundationLabel(label: string) {
 }
 
 function isCommonLiberalLabel(label: string) {
-  if (isMajorFoundationLabel(label) || label.includes('전공') || isAcademicFoundationLabel(label)) {
+  if (isMajorTranscriptLabel(label) || isAcademicFoundationLabel(label)) {
     return false
   }
   return (
@@ -213,14 +220,12 @@ function isCommonLiberalLabel(label: string) {
 function mapGeneralCategory(course: StudentRoadmapCourse): MapCategory {
   const label = (course.category || '').trim()
 
-  if (isMajorFoundationLabel(label)) return 'major-required'
-  if (isAcademicFoundationLabel(label)) return 'bsm'
-  if (isCommonLiberalLabel(label)) return 'common'
-
-  if (label.includes('전공')) {
-    if (label.includes('선택')) return 'major-elective'
+  if (isMajorFoundationLabel(label) || isMajorTranscriptLabel(label)) {
+    if (label.includes('선택') || label.replace(/\s+/g, '').includes('전선')) return 'major-elective'
     return 'major-required'
   }
+  if (isAcademicFoundationLabel(label)) return 'bsm'
+  if (isCommonLiberalLabel(label)) return 'common'
 
   // 이수구분이 있을 때: 공통·학문·전공이 아니면 교양 (BSM bucket으로 끌어오지 않음)
   if (label) {
@@ -515,7 +520,7 @@ function buildProgressCategoryIndex(progress: GraduationProgressResponse) {
   )
   for (const summary of progress.categorySummaries ?? []) {
     const label = summary.category || ''
-    if (!label.includes('전공')) continue
+    if (!isMajorTranscriptLabel(label)) continue
     ingest(summary.courses as Array<{ courseCode?: string; courseName?: string }> | undefined, major, majorNames)
   }
 
@@ -637,7 +642,7 @@ function liberalCoursesFromProgress(
       'major-required',
     )
     for (const summary of progress.categorySummaries ?? []) {
-      if (!(summary.category || '').includes('전공')) continue
+      if (!isMajorTranscriptLabel(summary.category || '')) continue
       pushCompleted(summary.courses as unknown as Array<Record<string, unknown>>, 'major-required')
     }
   }
@@ -675,7 +680,7 @@ function liberalCoursesFromProgress(
 
   // categorySummaries 잔여(전공 아님) → 교양 (라벨 퍼지로 공통/학문에 넣지 않음)
   for (const summary of progress.categorySummaries ?? []) {
-    if ((summary.category || '').includes('전공')) continue
+    if (isMajorTranscriptLabel(summary.category || '')) continue
     const leftover = (
       summary.courses as unknown as Array<Record<string, unknown>> | undefined
     )?.filter((raw) => {
