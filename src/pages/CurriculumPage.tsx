@@ -1200,67 +1200,45 @@ export function CurriculumPage() {
   )
 
   const allCourses = useMemo(() => {
-    const applyOwnProgress = isOwnDepartment
-    const overlayProgress = applyOwnProgress ? graduation : null
-    const admissionYear = graduation?.admissionYear ?? student?.admissionYear
-    const progressTaken = collectProgressTakenItems(graduation)
-
-    const generalStandingByTaken = buildStandingByTakenOrder([
-      ...generalFlat.map(({ course }) => ({
-        completed: course.completed,
-        takenYear: course.takenYear,
-        takenSemester: course.takenSemester,
-      })),
-      ...progressTaken,
-    ])
-
-    const abeekTermItems: Array<{
-      course: RoadmapCourse
-      termKey: string
-    }> = []
-    for (const term of abeekRoadmap?.terms ?? []) {
-      const termKey = (term.termKey || '').trim()
-      for (const courses of Object.values(term.categories ?? {})) {
-        if (!Array.isArray(courses)) continue
-        for (const course of courses) {
-          abeekTermItems.push({ course, termKey })
+    if (viewKind === 'abeek') {
+      const admissionYear = student?.admissionYear
+      const abeekTermItems: Array<{ course: RoadmapCourse; termKey: string }> = []
+      for (const term of abeekRoadmap?.terms ?? []) {
+        const termKey = (term.termKey || '').trim()
+        for (const courses of Object.values(term.categories ?? {})) {
+          if (!Array.isArray(courses)) continue
+          for (const course of courses) {
+            abeekTermItems.push({ course, termKey })
+          }
         }
       }
-    }
-    for (const course of abeekRoadmap?.unscheduledCourses ?? []) {
-      abeekTermItems.push({ course, termKey: course.recommendedTerm || '' })
-    }
-
-    const abeekStandingByTaken = buildStandingByTakenOrder([
-      ...abeekTermItems.map(({ course }) => ({
-        completed: course.completed,
-        takenYear: course.takenYear,
-        takenSemester: course.takenSemester,
-      })),
-      ...progressTaken,
-    ])
-
-    const standingByTaken =
-      viewKind === 'abeek' ? abeekStandingByTaken : generalStandingByTaken
-    const takenTermByCode = buildTakenTermMap(graduation, standingByTaken)
-
-    // ABEEK 뷰용: 이수 과목 taken → 순번 보강
-    for (const { course, termKey } of abeekTermItems) {
-      if (!course.completed || !course.abeekCourseCode || takenTermByCode.has(course.abeekCourseCode)) {
-        continue
+      for (const course of abeekRoadmap?.unscheduledCourses ?? []) {
+        abeekTermItems.push({ course, termKey: course.recommendedTerm || '' })
       }
-      const term = pickCompletedDisplayTerm({
-        termKeys: [termKey, course.recommendedTerm || ''].filter(Boolean),
-        takenYear: course.takenYear,
-        takenSemester: course.takenSemester,
-        courseStanding: course.standingTermKey,
-        standingByTaken: abeekStandingByTaken,
-        admissionYear,
-      })
-      if (term) takenTermByCode.set(course.abeekCourseCode, term)
-    }
 
-    if (viewKind === 'abeek') {
+      const abeekStandingByTaken = buildStandingByTakenOrder(
+        abeekTermItems.map(({ course }) => ({
+          completed: course.completed,
+          takenYear: course.takenYear,
+          takenSemester: course.takenSemester,
+        })),
+      )
+      const takenTermByCode = new Map<string, string>()
+      for (const { course, termKey } of abeekTermItems) {
+        if (!course.completed || !course.abeekCourseCode || takenTermByCode.has(course.abeekCourseCode)) {
+          continue
+        }
+        const term = pickCompletedDisplayTerm({
+          termKeys: [termKey, course.recommendedTerm || ''].filter(Boolean),
+          takenYear: course.takenYear,
+          takenSemester: course.takenSemester,
+          courseStanding: course.standingTermKey,
+          standingByTaken: abeekStandingByTaken,
+          admissionYear,
+        })
+        if (term) takenTermByCode.set(course.abeekCourseCode, term)
+      }
+
       const byId = new Map<string, MapCourse>()
       for (const { course, termKey } of abeekTermItems) {
         const mapped = abeekToMapCourse(
@@ -1280,6 +1258,21 @@ export function CurriculumPage() {
       }
       return [...byId.values()]
     }
+
+    const applyOwnProgress = isOwnDepartment
+    const overlayProgress = applyOwnProgress ? graduation : null
+    const admissionYear = graduation?.admissionYear ?? student?.admissionYear
+    const progressTaken = collectProgressTakenItems(graduation)
+
+    const generalStandingByTaken = buildStandingByTakenOrder([
+      ...generalFlat.map(({ course }) => ({
+        completed: course.completed,
+        takenYear: course.takenYear,
+        takenSemester: course.takenSemester,
+      })),
+      ...progressTaken,
+    ])
+    const takenTermByCode = buildTakenTermMap(graduation, generalStandingByTaken)
 
     // 학수번호별 API 칸 모아서 이수순번/중복 정리
     const grouped = new Map<string, Array<{ course: StudentRoadmapCourse; termKey: string }>>()
@@ -1418,7 +1411,6 @@ export function CurriculumPage() {
     return [...byNameSem.values()]
   }, [
     viewKind,
-    abeekRawCourses,
     abeekRoadmap,
     generalFlat,
     isOwnDepartment,
