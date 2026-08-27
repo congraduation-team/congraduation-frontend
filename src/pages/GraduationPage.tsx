@@ -647,17 +647,23 @@ export function GraduationPage() {
             </div>
           )}
           {readingCompleted ? (
-            <p className="mt-auto pt-3 text-center text-xs font-bold text-sejong">
-              {classicReadingCert?.detail ||
+            <CertDetailText
+              detail={
+                classicReadingCert?.detail ||
                 readingStatus?.message ||
-                '고전독서인증을 모두 완료하였습니다.'}
-            </p>
+                '고전독서인증을 모두 완료하였습니다.'
+              }
+              className="mt-auto pt-3 text-center text-xs font-bold leading-relaxed text-sejong"
+            />
           ) : (
-            <p className="mt-auto pt-3 text-center text-xs font-semibold text-ink-muted">
-              {classicReadingCert?.detail ||
+            <CertDetailText
+              detail={
+                classicReadingCert?.detail ||
                 readingStatus?.message ||
-                '영역별 필요 권수를 충족하면 인증이 완료됩니다.'}
-            </p>
+                '영역별 필요 권수를 충족하면 인증이 완료됩니다.'
+              }
+              className="mt-auto pt-3 text-center text-xs font-semibold leading-relaxed text-ink-muted"
+            />
           )}
         </article>
 
