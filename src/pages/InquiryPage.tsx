@@ -4,6 +4,7 @@ import { createFeedback, getMyFeedbacks } from '../api/endpoints'
 import type { FeedbackItem, FeedbackStatus, FeedbackType } from '../api/types'
 import { AppShell } from '../components/layout/AppShell'
 import { useAuth } from '../context/AuthContext'
+import { formatKstDateTime } from '../utils/formatDate'
 
 const inquiryTypes = [
   { value: 'BUG' as const, label: '오류 신고' },
@@ -38,15 +39,7 @@ const typeLabel: Record<FeedbackType, string> = {
 }
 
 function formatFeedbackDate(value?: string | null) {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value.replace('T', ' ').slice(0, 16)
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const h = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${y}-${m}-${day} ${h}:${min}`
+  return formatKstDateTime(value)
 }
 
 export function InquiryPage() {
