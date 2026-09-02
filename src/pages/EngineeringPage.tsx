@@ -22,6 +22,7 @@ import { CourseMiniList } from '../components/common/CourseMiniList'
 import { CourseListModal } from '../components/modals/CourseListModal'
 import { useAuth } from '../context/AuthContext'
 import { useMajorTrack } from '../context/MajorTrackContext'
+import { useAbeekTarget } from '../hooks/useAbeekTarget'
 import { isDoubleMajorStudent } from '../utils/majorTrack'
 import type { Course } from '../data/mockData'
 import { formatPercentLabel, toNumber, toPercent } from '../utils/number'
@@ -168,6 +169,7 @@ export function EngineeringPage() {
   const navigate = useNavigate()
   const { student } = useAuth()
   const { active } = useMajorTrack()
+  const { abeekTarget, loading: abeekTargetLoading } = useAbeekTarget()
   const [evaluation, setEvaluation] = useState<AbeekEvaluationResponse | null>(null)
   const [evaluationDetail, setEvaluationDetail] =
     useState<AbeekEvaluationDetailResponse | null>(null)
@@ -184,7 +186,10 @@ export function EngineeringPage() {
   } | null>(null)
 
   useEffect(() => {
-    if (!student) return
+    if (!student || abeekTargetLoading || !abeekTarget) {
+      if (!abeekTargetLoading && !abeekTarget) setLoading(false)
+      return
+    }
     let cancelled = false
 
     ;(async () => {
@@ -236,7 +241,7 @@ export function EngineeringPage() {
     return () => {
       cancelled = true
     }
-  }, [student, active?.department])
+  }, [student, active?.department, abeekTarget, abeekTargetLoading])
 
   const roadmapCourses = useMemo(() => flattenRoadmapCourses(roadmap), [roadmap])
 
@@ -437,6 +442,14 @@ export function EngineeringPage() {
     (evaluation?.entranceYear ?? student?.admissionYear ?? 9999) >= 2022
       ? '인증필수'
       : '전문교양'
+
+  if (abeekTargetLoading) {
+    return <div className="py-20 text-center text-sm text-ink-muted">불러오는 중...</div>
+  }
+
+  if (!abeekTarget) {
+    return null
+  }
 
   if (isDoubleMajorStudent(student) && !viewAbeekAnyway) {
     return (

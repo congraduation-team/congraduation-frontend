@@ -1,14 +1,27 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { MajorTrackSwitcher } from '../modals/MajorTrackSwitcher'
+import { useAbeekTarget } from '../../hooks/useAbeekTarget'
 import { AppShell } from './AppShell'
 
 const tabs = [
   { to: '/dashboard', label: '졸업요건', end: true },
-  { to: '/dashboard/engineering', label: '공학인증' },
+  { to: '/dashboard/engineering', label: '공학인증', abeekOnly: true },
   { to: '/dashboard/courses', label: '내 이수과목' },
-]
+] as const
 
 export function DashboardLayout() {
+  const location = useLocation()
+  const { abeekTarget, loading: abeekLoading } = useAbeekTarget()
+  const visibleTabs = tabs.filter((tab) => !('abeekOnly' in tab && tab.abeekOnly) || abeekTarget)
+
+  if (
+    !abeekLoading &&
+    !abeekTarget &&
+    location.pathname.startsWith('/dashboard/engineering')
+  ) {
+    return <Navigate to="/dashboard" replace />
+  }
+
   return (
     <AppShell>
       <main className="flex-1 overflow-auto px-4 pb-10 pt-5 md:px-8 md:pb-12 md:pt-9">
@@ -17,7 +30,7 @@ export function DashboardLayout() {
           <MajorTrackSwitcher />
         </div>
         <div className="mt-5 flex gap-6 overflow-x-auto border-b border-[#e5e5ea] md:gap-8">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <NavLink
               key={tab.to}
               to={tab.to}
