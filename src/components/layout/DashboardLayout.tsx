@@ -34,7 +34,7 @@ export function DashboardLayout() {
             <NavLink
               key={tab.to}
               to={tab.to}
-              end={tab.end}
+              end={'end' in tab ? tab.end : undefined}
               className={({ isActive }) =>
                 `shrink-0 pb-3 text-[15px] font-semibold transition ${
                   isActive
