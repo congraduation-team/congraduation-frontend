@@ -3,16 +3,23 @@ import { MajorTrackSwitcher } from '../modals/MajorTrackSwitcher'
 import { useAbeekTarget } from '../../hooks/useAbeekTarget'
 import { AppShell } from './AppShell'
 
-const tabs = [
+type DashboardTab = {
+  to: string
+  label: string
+  end?: boolean
+  abeekOnly?: boolean
+}
+
+const tabs: DashboardTab[] = [
   { to: '/dashboard', label: '졸업요건', end: true },
   { to: '/dashboard/engineering', label: '공학인증', abeekOnly: true },
   { to: '/dashboard/courses', label: '내 이수과목' },
-] as const
+]
 
 export function DashboardLayout() {
   const location = useLocation()
   const { abeekTarget, loading: abeekLoading } = useAbeekTarget()
-  const visibleTabs = tabs.filter((tab) => !('abeekOnly' in tab && tab.abeekOnly) || abeekTarget)
+  const visibleTabs = tabs.filter((tab) => !tab.abeekOnly || abeekTarget)
 
   if (
     !abeekLoading &&
@@ -34,7 +41,7 @@ export function DashboardLayout() {
             <NavLink
               key={tab.to}
               to={tab.to}
-              end={'end' in tab ? tab.end : undefined}
+              end={tab.end}
               className={({ isActive }) =>
                 `shrink-0 pb-3 text-[15px] font-semibold transition ${
                   isActive
